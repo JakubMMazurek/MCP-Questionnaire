@@ -35,7 +35,13 @@ export {
   MAX_ITERATIONS,
 } from "./evaluate.js";
 export { formLeaves, type Leaf, type RowMap, repeatablePaths } from "./leaves.js";
-export { type Malformed, malformedValues } from "./malformed.js";
+export {
+  type DateRange,
+  isRange,
+  type Malformed,
+  malformedReason,
+  malformedValues,
+} from "./malformed.js";
 export { canon, joinPath, mintRowId, segments, withinTarget } from "./paths.js";
 export {
   computeContext,

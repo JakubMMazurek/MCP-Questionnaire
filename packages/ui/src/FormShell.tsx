@@ -22,7 +22,7 @@ import {
   malformedValues,
   needsReviewPaths,
 } from "./engine/index.js";
-import { CounterPill, FieldView, isComputedField } from "./fields/field";
+import { CounterPill, FieldView, isComputedField, jumpToPath } from "./fields/field";
 import {
   useBridge,
   useDraftStatus,
@@ -36,16 +36,29 @@ const SECTION_STATUS_DOT = {
   untouched: "bg-line",
   progress: "bg-[var(--color-text-warning)]",
   complete: "bg-[var(--color-text-success)]",
+  error: "bg-[var(--color-text-danger)]",
   empty: "bg-line-soft",
 } as const;
 
-function useSectionStatus(sectionId: string): keyof typeof SECTION_STATUS_DOT {
+type SectionStatus = keyof typeof SECTION_STATUS_DOT;
+
+/**
+ * §4.8's per-section status — untouched / in progress / complete / has errors.
+ * "Has errors" outranks everything: it is the one state that gates submit
+ * (§6.3), and the rail is how the user finds it.
+ */
+function useSectionStatus(sectionId: string): SectionStatus {
   return useEngine((state) => {
     const values = { answers: state.answers, prefill: state.prefill, overlays: state.effects };
     const leaves = state.leaves.filter(
       (leaf) => leaf.section.id === sectionId && isVisible(state.effects, leaf.path),
     );
     if (leaves.length === 0) return "empty";
+    const broken = malformedValues(state.leaves, values, state.effects);
+    const mine = broken.some((entry) =>
+      leaves.some((leaf) => leaf.path === entry.path || leaf.fieldPath === entry.path),
+    );
+    if (mine) return "error";
     const answered = leaves.filter((leaf) => effectiveValue(values, leaf.path).present).length;
     if (answered === 0) return "untouched";
     return answered === leaves.length ? "complete" : "progress";
@@ -73,7 +86,14 @@ const RailEntry = memo(function RailEntry({ section }: { section: Section }) {
   );
 });
 
-const SectionView = memo(function SectionView({ section }: { section: Section }) {
+const SectionView = memo(function SectionView({
+  section,
+  silent,
+}: {
+  section: Section;
+  /** Inline: a one-section elicitation card repeats its own title otherwise. */
+  silent?: boolean;
+}) {
   const visible = useVisible(section.id);
   const [open, setOpen] = useState(section.initially !== "collapsed");
   if (!visible) return null;
@@ -81,7 +101,7 @@ const SectionView = memo(function SectionView({ section }: { section: Section })
 
   return (
     <section id={`section-${section.id}`} className="mb-4">
-      <div className="flex items-baseline gap-2">
+      <div className={silent && !collapsible ? "sr-only" : "flex items-baseline gap-2"}>
         <h2 className="m-0 text-[length:var(--font-heading-sm-size)] font-[var(--font-weight-semibold)]">
           {section.title}
         </h2>
@@ -109,7 +129,7 @@ const SectionView = memo(function SectionView({ section }: { section: Section })
   );
 });
 
-function ActionBar({ form }: { form: Form }) {
+export function ActionBar({ form }: { form: Form }) {
   const store = useEngineStore();
   const bridge = useBridge();
   const frozen = useFrozen();
@@ -123,10 +143,17 @@ function ActionBar({ form }: { form: Form }) {
     const values = { answers: state.answers, prefill: state.prefill, overlays: state.effects };
     return malformedValues(state.leaves, values, state.effects).length;
   });
-  const firstBlocking = useEngine((state) => {
+  // Two primitive selectors, not one object: every hook here is compared with
+  // `Object.is`, so a selector that MINTS its result re-renders on every store
+  // notification and then loops. Cheap to get wrong, loud when you do.
+  const blockingText = useEngine((state) => {
     const values = { answers: state.answers, prefill: state.prefill, overlays: state.effects };
     const first = malformedValues(state.leaves, values, state.effects)[0];
     return first ? `${first.label} ${first.reason}` : null;
+  });
+  const blockingPath = useEngine((state) => {
+    const values = { answers: state.answers, prefill: state.prefill, overlays: state.effects };
+    return malformedValues(state.leaves, values, state.effects)[0]?.path ?? null;
   });
 
   const submit = () => {
@@ -152,15 +179,22 @@ function ActionBar({ form }: { form: Form }) {
       <Button
         primary={affirmable === 0}
         disabled={blocking > 0 || frozen || sent}
-        {...(firstBlocking ? { title: firstBlocking } : {})}
+        {...(blockingText ? { title: blockingText } : {})}
         onClick={submit}
       >
         {sent ? "Sent" : (form.submitLabel ?? "Submit")}
       </Button>
-      {blocking > 0 ? (
-        <span className="text-[length:var(--font-text-sm-size)] text-[var(--color-text-danger)]">
-          {firstBlocking}
-        </span>
+      {blockingText ? (
+        // The gate names the offender AND takes you to it: "malformed values
+        // block submit and jump the section rail to the error" (§6.3).
+        <button
+          type="button"
+          className="gate"
+          onClick={() => blockingPath && jumpToPath(blockingPath)}
+        >
+          {blockingText}
+          {blocking > 1 ? ` (+${blocking - 1} more)` : ""}
+        </button>
       ) : null}
       <StatusLine message={status} />
       <span className="escape">…or just tell me in chat</span>
@@ -168,14 +202,21 @@ function ActionBar({ form }: { form: Form }) {
   );
 }
 
-export function FormShell() {
+/**
+ * `compact` is the INLINE elicitation card (§5.2/§7.3): the same fields, the
+ * same engine, a narrower column and no section rail — an inline app must fit
+ * its content height, so there is nothing to navigate.
+ */
+export function FormShell({ compact = false }: { compact?: boolean } = {}) {
   const form = useEngine((state) => state.form);
   if (!form) return null;
   const counters = form.sections.flatMap((section) => section.fields.filter(isComputedField));
-  const railed = form.sections.length > 1;
+  const railed = !compact && form.sections.length > 1;
 
   return (
-    <div className="mx-auto flex max-w-[980px] flex-col gap-2 p-4">
+    <div
+      className={`mx-auto flex flex-col gap-2 p-4 ${compact ? "max-w-[620px]" : "max-w-[980px]"}`}
+    >
       <header className="flex flex-wrap items-start gap-3">
         <div className="flex-1">
           <h1 className="m-0 text-[length:var(--font-heading-md-size)] font-[var(--font-weight-semibold)] leading-tight">
@@ -202,7 +243,7 @@ export function FormShell() {
         ) : null}
         <main>
           {form.sections.map((section) => (
-            <SectionView key={section.id} section={section} />
+            <SectionView key={section.id} section={section} silent={compact} />
           ))}
         </main>
       </div>

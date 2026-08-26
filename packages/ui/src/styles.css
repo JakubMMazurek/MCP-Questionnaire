@@ -425,6 +425,513 @@ body {
     border-top: var(--border-width-regular) solid var(--color-border-primary);
   }
 
+  /* ---------------- option tiles: cards and radios ----------------------- */
+  .stack {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-width: 0;
+    flex: 1 1 auto;
+  }
+
+  .tiles {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 6px;
+    width: 100%;
+  }
+
+  .radios {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    width: 100%;
+  }
+
+  .tile {
+    display: flex;
+    gap: 8px;
+    align-items: flex-start;
+    padding: 8px 11px;
+    border: var(--border-width-regular) solid var(--color-border-primary);
+    border-radius: var(--border-radius-sm);
+    background: var(--color-background-primary);
+    color: var(--color-text-primary);
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+    appearance: none;
+  }
+
+  .radios > .tile {
+    border-color: transparent;
+    background: transparent;
+    padding: 5px 8px;
+  }
+
+  .tile:hover:not(:disabled) {
+    background: var(--color-background-secondary);
+  }
+
+  .tile[aria-checked="true"] {
+    background: var(--color-background-tertiary);
+    box-shadow: inset 0 0 0 1px var(--color-border-primary);
+  }
+
+  .tile:disabled {
+    color: var(--color-text-disabled);
+    cursor: not-allowed;
+  }
+
+  .tile-mark {
+    flex: none;
+    width: 13px;
+    height: 13px;
+    margin-top: 3px;
+    border: var(--border-width-regular) solid var(--color-border-primary);
+    border-radius: var(--border-radius-full);
+    background: var(--color-background-primary);
+  }
+
+  .tile[aria-checked="true"] > .tile-mark {
+    border-width: 4px;
+    border-color: var(--color-text-primary);
+  }
+
+  .tile-body {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+
+  .tile-label {
+    font-size: var(--font-text-sm-size);
+    font-weight: var(--font-weight-semibold);
+  }
+
+  .tile-description {
+    color: var(--color-text-secondary);
+    font-family: var(--font-serif);
+    font-size: var(--font-text-sm-size);
+    font-style: italic;
+  }
+
+  .tile-skip .tile-label {
+    font-style: italic;
+    font-weight: var(--font-weight-medium);
+  }
+
+  /* ---------------- multi_select: chips and checkboxes ------------------- */
+  .chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+  }
+
+  .chip-toggle {
+    padding: 3px 11px;
+    border: var(--border-width-regular) solid var(--color-border-primary);
+    border-radius: var(--border-radius-full);
+    background: var(--color-background-primary);
+    color: var(--color-text-secondary);
+    font: inherit;
+    font-size: var(--font-text-sm-size);
+    font-weight: var(--font-weight-semibold);
+    cursor: pointer;
+    appearance: none;
+  }
+
+  .chip-toggle:hover:not(:disabled) {
+    background: var(--color-background-secondary);
+  }
+
+  .chip-toggle[aria-pressed="true"] {
+    border-color: var(--color-background-inverse);
+    background: var(--color-background-tertiary);
+    color: var(--color-text-primary);
+  }
+
+  .chip-toggle-skip {
+    border-style: dashed;
+    font-style: italic;
+  }
+
+  .checks {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    margin: 0;
+    padding: 0;
+    border: 0;
+  }
+
+  .check {
+    display: flex;
+    gap: 8px;
+    align-items: flex-start;
+    padding: 3px 0;
+    cursor: pointer;
+  }
+
+  .check > input {
+    margin-top: 3px;
+    accent-color: var(--color-text-primary);
+  }
+
+  .check > span {
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* ---------------- combobox (§7.3: top layer or in flow) ---------------- */
+  .combo {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    min-width: 12rem;
+    flex: 1 1 auto;
+  }
+
+  .combo-trigger {
+    display: flex;
+    flex: 1 1 auto;
+    gap: 8px;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 11px;
+    border: var(--border-width-regular) solid var(--color-border-primary);
+    border-radius: var(--border-radius-sm);
+    background: var(--color-background-secondary);
+    color: var(--color-text-primary);
+    font: inherit;
+    font-size: var(--font-text-sm-size);
+    text-align: left;
+    cursor: pointer;
+    appearance: none;
+  }
+
+  .combo-list {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .combo-option {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    padding: 5px 9px;
+    border: 0;
+    border-radius: var(--border-radius-sm);
+    background: transparent;
+    color: var(--color-text-primary);
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+    appearance: none;
+  }
+
+  .combo-option:hover {
+    background: var(--color-background-secondary);
+  }
+
+  .combo-option[aria-selected="true"] {
+    background: var(--color-background-tertiary);
+  }
+
+  .combo-option-skip .tile-label {
+    font-style: italic;
+  }
+
+  .combo-empty {
+    padding: 5px 9px;
+    color: var(--color-text-secondary);
+    font-family: var(--font-serif);
+    font-size: var(--font-text-sm-size);
+    font-style: italic;
+  }
+
+  .combo-inline {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 6px;
+    border: var(--border-width-regular) solid var(--color-border-secondary);
+    border-radius: var(--border-radius-sm);
+    background: var(--color-background-secondary);
+  }
+
+  /*
+   * The TOP LAYER (§7.3): a modal <dialog> escapes ancestor overflow inside our
+   * own document, which is the only escape available — there is no portaling out
+   * of the sandbox. Never rendered in an inline card.
+   */
+  .combo-dialog {
+    width: min(420px, 92vw);
+    max-height: 70vh;
+    padding: 0;
+    border: var(--border-width-regular) solid var(--color-border-primary);
+    border-radius: var(--border-radius-md);
+    background: var(--color-background-primary);
+    color: var(--color-text-primary);
+    box-shadow: var(--shadow-md);
+  }
+
+  .combo-dialog::backdrop {
+    background: rgb(0 0 0 / 28%);
+  }
+
+  .combo-dialog-body {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 12px;
+    overflow: auto;
+  }
+
+  /* ---------------- switch, presets, units ------------------------------- */
+  .switch {
+    display: inline-flex;
+    flex: none;
+    gap: 8px;
+    align-items: center;
+    padding: 4px 10px 4px 4px;
+    border: var(--border-width-regular) solid var(--color-border-primary);
+    border-radius: var(--border-radius-full);
+    background: var(--color-background-primary);
+    color: var(--color-text-primary);
+    font: inherit;
+    font-size: var(--font-text-sm-size);
+    font-weight: var(--font-weight-semibold);
+    cursor: pointer;
+    appearance: none;
+  }
+
+  .switch-track {
+    display: inline-flex;
+    width: 30px;
+    height: 18px;
+    padding: 2px;
+    border-radius: var(--border-radius-full);
+    background: var(--color-background-tertiary);
+    transition: background 120ms linear;
+  }
+
+  .switch-thumb {
+    width: 14px;
+    height: 14px;
+    border-radius: var(--border-radius-full);
+    background: var(--color-text-tertiary);
+    transition: transform 120ms linear;
+  }
+
+  .switch[aria-checked="true"] .switch-track {
+    background: var(--color-background-inverse);
+  }
+
+  .switch[aria-checked="true"] .switch-thumb {
+    transform: translateX(12px);
+    background: var(--color-text-inverse);
+  }
+
+  .switch[data-empty="true"] {
+    border-style: dashed;
+    color: var(--color-text-secondary);
+  }
+
+  .presets {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+  }
+
+  .preset {
+    padding: 3px 10px;
+    border: var(--border-width-regular) solid var(--color-border-primary);
+    border-radius: var(--border-radius-full);
+    background: var(--color-background-primary);
+    color: var(--color-text-secondary);
+    font: inherit;
+    font-size: var(--font-text-sm-size);
+    font-weight: var(--font-weight-semibold);
+    cursor: pointer;
+    appearance: none;
+  }
+
+  .preset[aria-checked="true"] {
+    border-color: var(--color-background-inverse);
+    background: var(--color-background-tertiary);
+    color: var(--color-text-primary);
+  }
+
+  .preset-skip {
+    border-style: dashed;
+    font-style: italic;
+  }
+
+  .unit {
+    color: var(--color-text-secondary);
+    font-size: var(--font-text-sm-size);
+    white-space: nowrap;
+  }
+
+  .number-input {
+    width: 6.5rem;
+    flex: none;
+  }
+
+  .date-input {
+    width: auto;
+    flex: none;
+  }
+
+  .field-error {
+    color: var(--color-text-danger);
+    font-size: var(--font-text-sm-size);
+  }
+
+  /* The submit gate, said in place and clickable (§6.3). */
+  .gate {
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--color-text-danger);
+    font: inherit;
+    font-size: var(--font-text-sm-size);
+    text-align: left;
+    text-decoration: underline dotted;
+    cursor: pointer;
+    appearance: none;
+  }
+
+  /* ---------------- slider (§5.2 tradeoff control) ----------------------- */
+  .slider-line {
+    display: flex;
+    flex: 1 1 auto;
+    gap: 8px;
+    align-items: center;
+    min-width: 0;
+  }
+
+  .slider {
+    flex: 1 1 auto;
+    min-width: 6rem;
+    accent-color: var(--color-text-primary);
+  }
+
+  .slider[data-empty="true"] {
+    accent-color: var(--color-text-tertiary);
+    opacity: 0.7;
+  }
+
+  .slider-end {
+    color: var(--color-text-secondary);
+    font-family: var(--font-serif);
+    font-size: var(--font-text-sm-size);
+    font-style: italic;
+    white-space: nowrap;
+  }
+
+  /* ---------------- rank ------------------------------------------------- */
+  .rank-list {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .rank-row {
+    display: flex;
+    gap: 9px;
+    align-items: center;
+    padding: 6px 8px;
+    border: var(--border-width-regular) solid var(--color-border-secondary);
+    border-radius: var(--border-radius-sm);
+    background: var(--color-background-primary);
+  }
+
+  .rank-row[data-dragging="true"] {
+    border-color: var(--color-border-primary);
+    box-shadow: var(--shadow-sm);
+    opacity: 0.9;
+  }
+
+  .rank-position {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    border-radius: var(--border-radius-full);
+    background: var(--color-background-tertiary);
+    color: var(--color-text-secondary);
+    font-family: var(--font-mono);
+    font-size: var(--font-text-xs-size);
+  }
+
+  .rank-handle {
+    flex: none;
+    padding: 2px 7px;
+    border: var(--border-width-regular) solid var(--color-border-primary);
+    border-radius: var(--border-radius-sm);
+    background: var(--color-background-primary);
+    color: var(--color-text-secondary);
+    font: inherit;
+    cursor: grab;
+    touch-action: none;
+    appearance: none;
+  }
+
+  /* ---------------- allocation ------------------------------------------- */
+  .alloc-row {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    padding: 4px 0;
+    border-top: var(--border-width-regular) solid var(--color-border-secondary);
+  }
+
+  /* ---------------- repeatable ------------------------------------------- */
+  .repeat-row {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 8px;
+    border: var(--border-width-regular) solid var(--color-border-secondary);
+    border-radius: var(--border-radius-sm);
+  }
+
+  .repeat-head {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+  }
+
+  .repeat-body {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .sub-field {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+  }
+
+  .sub-label {
+    flex: 0 0 8rem;
+    color: var(--color-text-secondary);
+    font-size: var(--font-text-xs-size);
+  }
+
   /* ---------------- skeletons, never spinners (§7.4) --------------------- */
   .skeleton {
     border-radius: var(--border-radius-sm);

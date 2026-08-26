@@ -14,7 +14,7 @@
 // a native radio cannot express.
 
 import type { Option, Prefill, Value } from "@gather/schema";
-import { memo, type ReactNode } from "react";
+import { memo, type ReactNode, useCallback, useEffect, useId, useRef, useState } from "react";
 
 export function cn(...parts: (string | false | null | undefined)[]): string {
   return parts.filter(Boolean).join(" ");
@@ -128,6 +128,397 @@ export const Segmented = memo(function Segmented({
     </div>
   );
 });
+
+/* -------------------------------------------------------------------------- */
+/* option tiles — `render: "cards"` and `render: "radio"`                     */
+/* -------------------------------------------------------------------------- */
+
+export type TilesProps = {
+  options: readonly Segment[];
+  value: unknown;
+  disabled?: boolean;
+  label: string;
+  /** `cards` shows the description inline; `radio` is one dense column. */
+  variant: "cards" | "radio";
+  onPick: (value: Value) => void;
+  onClear: () => void;
+};
+
+/**
+ * Cards for ≤6 options with descriptions, radio for a dense column (§4.2).
+ * Same radiogroup affordance as the segmented control, for the same reason:
+ * picking the selected option again clears the answer, which a native radio
+ * cannot express.
+ */
+export const Tiles = memo(function Tiles({
+  options,
+  value,
+  disabled,
+  label,
+  variant,
+  onPick,
+  onClear,
+}: TilesProps) {
+  return (
+    <div className={variant === "cards" ? "tiles" : "radios"} role="radiogroup" aria-label={label}>
+      {options.map((option) => {
+        const selected = value !== undefined && option.value === value;
+        return (
+          <button
+            key={String(option.value)}
+            type="button"
+            role="radio"
+            aria-checked={selected}
+            disabled={disabled}
+            className={cn("tile", option.skip && "tile-skip")}
+            onClick={() => (selected ? onClear() : onPick(option.value))}
+          >
+            <span className="tile-mark" aria-hidden="true" />
+            <span className="tile-body">
+              <span className="tile-label">{option.label}</span>
+              {option.description ? (
+                <span className="tile-description">{option.description}</span>
+              ) : null}
+            </span>
+          </button>
+        );
+      })}
+    </div>
+  );
+});
+
+/* -------------------------------------------------------------------------- */
+/* multi-select: chips and checkboxes                                         */
+/* -------------------------------------------------------------------------- */
+
+export type MultiProps = {
+  options: readonly Segment[];
+  /** The selected set. */
+  values: readonly Value[];
+  disabled?: boolean;
+  label: string;
+  onToggle: (value: Value) => void;
+};
+
+/** `render: "chips"` — a row of toggles. `aria-pressed`, not a radiogroup. */
+export const Chips = memo(function Chips({
+  options,
+  values,
+  disabled,
+  label,
+  onToggle,
+}: MultiProps) {
+  return (
+    <div className="chips" role="group" aria-label={label}>
+      {options.map((option) => (
+        <button
+          key={String(option.value)}
+          type="button"
+          aria-pressed={values.includes(option.value)}
+          disabled={disabled}
+          className={cn("chip-toggle", option.skip && "chip-toggle-skip")}
+          {...(option.description ? { title: option.description } : {})}
+          onClick={() => onToggle(option.value)}
+        >
+          {option.label}
+        </button>
+      ))}
+    </div>
+  );
+});
+
+/** `render: "checkboxes"` — real inputs; nothing here needs a custom affordance. */
+export const CheckboxList = memo(function CheckboxList({
+  options,
+  values,
+  disabled,
+  label,
+  onToggle,
+}: MultiProps) {
+  return (
+    <fieldset className="checks">
+      <legend className="sr-only">{label}</legend>
+      {options.map((option) => (
+        <label key={String(option.value)} className="check">
+          <input
+            type="checkbox"
+            checked={values.includes(option.value)}
+            disabled={disabled}
+            onChange={() => onToggle(option.value)}
+          />
+          <span>
+            <span className="tile-label">{option.label}</span>
+            {option.description ? (
+              <span className="tile-description">{option.description}</span>
+            ) : null}
+          </span>
+        </label>
+      ))}
+    </fieldset>
+  );
+});
+
+/* -------------------------------------------------------------------------- */
+/* combobox — `render: "list"` (§7.3 is the whole design constraint)           */
+/* -------------------------------------------------------------------------- */
+
+export type ComboBoxProps = {
+  options: readonly Segment[];
+  /** Selected values — one entry for single_select, any number for multi. */
+  values: readonly Value[];
+  multi?: boolean;
+  disabled?: boolean;
+  label: string;
+  placeholder?: string;
+  /**
+   * True in fullscreen: the option list may leave the flow, and does so through
+   * the TOP LAYER (a modal `<dialog>`), which escapes ancestor `overflow` inside
+   * our own document — there is no portaling out of the sandbox (§7.3).
+   *
+   * False inline: §7.3 forbids menus and popovers in an inline card outright
+   * (host clipping, z-index), so the list renders IN FLOW and the card grows,
+   * which the size report then tells the host about.
+   */
+  layered: boolean;
+  onToggle: (value: Value) => void;
+  onClear: () => void;
+};
+
+const MAX_INLINE_MATCHES = 8;
+
+export const ComboBox = memo(function ComboBox({
+  options,
+  values,
+  multi,
+  disabled,
+  label,
+  placeholder,
+  layered,
+  onToggle,
+  onClear,
+}: ComboBoxProps) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const dialog = useRef<HTMLDialogElement | null>(null);
+  const listId = useId();
+
+  // Matching is a plain substring test on the agent's own label text — never an
+  // interpretation of it (§4.1).
+  const needle = query.trim().toLowerCase();
+  const matches = needle
+    ? options.filter((option) => option.label.toLowerCase().includes(needle))
+    : options;
+
+  const close = useCallback(() => {
+    setOpen(false);
+    setQuery("");
+    const element = dialog.current;
+    if (element?.open && typeof element.close === "function") element.close();
+  }, []);
+
+  useEffect(() => {
+    const element = dialog.current;
+    if (!layered || !element) return;
+    if (open && !element.open) {
+      // `showModal` puts it in the top layer. jsdom (and an old WebView) may not
+      // have it; the plain `open` attribute still shows the list, in flow.
+      if (typeof element.showModal === "function") element.showModal();
+      else element.setAttribute("open", "");
+    }
+    if (!open && element.open && typeof element.close === "function") element.close();
+  }, [open, layered]);
+
+  const selectedLabels = options
+    .filter((option) => values.includes(option.value))
+    .map((option) => option.label);
+  const summary =
+    selectedLabels.length > 0 ? selectedLabels.join(", ") : (placeholder ?? "Choose…");
+
+  const list = (
+    <>
+      <input
+        className="field-input"
+        type="search"
+        aria-label={`Search ${label}`}
+        aria-controls={listId}
+        value={query}
+        placeholder="Type to filter…"
+        onChange={(event) => setQuery(event.target.value)}
+      />
+      <ul id={listId} className="combo-list" aria-label={label}>
+        {matches.slice(0, layered ? matches.length : MAX_INLINE_MATCHES).map((option) => {
+          const selected = values.includes(option.value);
+          return (
+            <li key={String(option.value)}>
+              <button
+                type="button"
+                role="option"
+                aria-selected={selected}
+                className={cn("combo-option", option.skip && "combo-option-skip")}
+                onClick={() => {
+                  onToggle(option.value);
+                  if (!multi) close();
+                }}
+              >
+                <span className="tile-label">{option.label}</span>
+                {option.description ? (
+                  <span className="tile-description">{option.description}</span>
+                ) : null}
+              </button>
+            </li>
+          );
+        })}
+        {matches.length === 0 ? <li className="combo-empty">Nothing matches “{query}”</li> : null}
+      </ul>
+    </>
+  );
+
+  return (
+    <div className="combo">
+      <div className="flex items-center gap-1">
+        <button
+          type="button"
+          className="combo-trigger"
+          disabled={disabled}
+          aria-expanded={open}
+          aria-haspopup="listbox"
+          aria-label={label}
+          onClick={() => (open ? close() : setOpen(true))}
+        >
+          <span className={selectedLabels.length > 0 ? undefined : "text-faint"}>{summary}</span>
+          <span aria-hidden="true">▾</span>
+        </button>
+        {selectedLabels.length > 0 ? (
+          <button
+            type="button"
+            className="btn-icon"
+            disabled={disabled}
+            aria-label={`Clear ${label}`}
+            onClick={() => {
+              onClear();
+              close();
+            }}
+          >
+            ×
+          </button>
+        ) : null}
+      </div>
+
+      {layered ? (
+        <dialog ref={dialog} className="combo-dialog" onClose={() => setOpen(false)}>
+          <div className="combo-dialog-body">
+            <div className="flex items-baseline justify-between gap-3">
+              <strong className="text-[length:var(--font-text-sm-size)]">{label}</strong>
+              <button type="button" className="btn-icon" aria-label="Close" onClick={close}>
+                ×
+              </button>
+            </div>
+            {list}
+          </div>
+        </dialog>
+      ) : open ? (
+        <div className="combo-inline">{list}</div>
+      ) : null}
+    </div>
+  );
+});
+
+/* -------------------------------------------------------------------------- */
+/* switch, preset pills, field error                                          */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * `boolean` with `render: "toggle"`. A switch has two states, so there is no
+ * clearing gesture on it: emptiness is reachable only through the field's
+ * `skipOptions`, which is the §4.3 mechanism for exactly this.
+ */
+export const Switch = memo(function Switch({
+  value,
+  trueLabel,
+  falseLabel,
+  disabled,
+  label,
+  onPick,
+}: {
+  value: unknown;
+  trueLabel: string;
+  falseLabel: string;
+  disabled?: boolean;
+  label: string;
+  onPick: (value: boolean) => void;
+}) {
+  const on = value === true;
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={on}
+      aria-label={label}
+      disabled={disabled}
+      className="switch"
+      data-empty={value === undefined}
+      onClick={() => onPick(!on)}
+    >
+      <span className="switch-track" aria-hidden="true">
+        <span className="switch-thumb" />
+      </span>
+      <span>{on ? trueLabel : falseLabel}</span>
+    </button>
+  );
+});
+
+/**
+ * `date`/`date_range` presets. "Named presets ('end of Q3') matter more than the
+ * picker" (§4.2), so they come first and the input is beside them.
+ */
+export const PresetPills = memo(function PresetPills({
+  options,
+  value,
+  disabled,
+  label,
+  onPick,
+  onClear,
+}: {
+  options: readonly Segment[];
+  value: unknown;
+  disabled?: boolean;
+  label: string;
+  onPick: (value: Value) => void;
+  onClear: () => void;
+}) {
+  return (
+    <div className="presets" role="radiogroup" aria-label={label}>
+      {options.map((option) => {
+        const selected = value !== undefined && option.value === value;
+        return (
+          <button
+            key={String(option.value)}
+            type="button"
+            role="radio"
+            aria-checked={selected}
+            disabled={disabled}
+            className={cn("preset", option.skip && "preset-skip")}
+            {...(option.description ? { title: option.description } : {})}
+            onClick={() => (selected ? onClear() : onPick(option.value))}
+          >
+            {option.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+});
+
+/** The §6.3 gate, said where the fix happens. */
+export function FieldError({ reason, label }: { reason: string | null; label?: string }) {
+  if (!reason) return null;
+  return (
+    <span role="alert" className="field-error">
+      {label ? `${label} ` : ""}
+      {reason}
+    </span>
+  );
+}
 
 /* -------------------------------------------------------------------------- */
 /* buttons, skeletons                                                         */

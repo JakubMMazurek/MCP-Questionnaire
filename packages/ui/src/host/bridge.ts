@@ -359,6 +359,18 @@ export function createBridge(options: BridgeOptions): Bridge {
 
   /* --------------------------- inbound handling --------------------------- */
 
+  /**
+   * The two pieces of host context the RENDERER (not the stylesheet) branches
+   * on: the display mode, which the host owns outright (§7.3), and the
+   * platform, which decides whether a dense grid is editable at all.
+   */
+  function adoptContext(): void {
+    if (hostContext.displayMode && hostContext.displayMode !== "pip") {
+      store.getState().setDisplayMode(hostContext.displayMode);
+    }
+    if (hostContext.platform) store.getState().setPlatform(hostContext.platform);
+  }
+
   function loadFromArguments(args: unknown): void {
     store.getState().loadForm(extractForm(args));
     const answers = extractAnswers(args);
@@ -433,9 +445,7 @@ export function createBridge(options: BridgeOptions): Bridge {
       case METHOD.hostContextChanged: {
         hostContext = mergeHostContext(hostContext, (params ?? {}) as HostContext);
         apply(hostContext);
-        if (hostContext.displayMode && hostContext.displayMode !== "pip") {
-          store.getState().setDisplayMode(hostContext.displayMode);
-        }
+        adoptContext();
         emit({ type: "context", context: hostContext });
         break;
       }
@@ -470,9 +480,7 @@ export function createBridge(options: BridgeOptions): Bridge {
       });
       hostContext = result?.hostContext ?? {};
       apply(hostContext);
-      if (hostContext.displayMode && hostContext.displayMode !== "pip") {
-        store.getState().setDisplayMode(hostContext.displayMode);
-      }
+      adoptContext();
       emit({ type: "context", context: hostContext });
       peer.notify(METHOD.initialized, {});
 

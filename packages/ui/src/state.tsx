@@ -9,7 +9,7 @@
  * component that actually changed.
  */
 
-import type { Computed, Prefill, Value } from "@gather/schema";
+import type { Computed, Field, Prefill, Value } from "@gather/schema";
 import { createContext, type ReactNode, useContext } from "react";
 import { useStore } from "zustand";
 import {
@@ -19,6 +19,8 @@ import {
   type EngineStore,
   effectiveValue,
   isVisible,
+  malformedReason,
+  malformedValues,
 } from "./engine/index.js";
 import type { Bridge } from "./host/index.js";
 
@@ -124,6 +126,58 @@ export function useFilteredOptions(path: string): readonly Value[] | undefined {
 /** A `computed` field's value. Recomputed only when the store changes. */
 export function useComputed(compute: Computed): number {
   return useEngine((state) => computeValue(computeContext(state), compute));
+}
+
+/**
+ * Why this path's own value is impossible, or null (§6.3). The control renders
+ * it in place: the submit gate names the first offender, but the fix happens at
+ * the field, so the sentence has to be there too.
+ */
+export function useMalformed(path: string, field: Field): string | null {
+  const value = useEffective(path);
+  return value === undefined ? null : malformedReason(field, value);
+}
+
+/**
+ * The set-level verdict on one `allocation` (§4.2 — "the constraint is on the
+ * set"). Keyed by the field path, which is also where the rail jumps to.
+ */
+export function useFieldMalformed(fieldPath: string): string | null {
+  return useEngine((state) => {
+    const values = { answers: state.answers, prefill: state.prefill, overlays: state.effects };
+    const hit = malformedValues(state.leaves, values, state.effects).find(
+      (entry) => entry.path === fieldPath,
+    );
+    return hit ? hit.reason : null;
+  });
+}
+
+/**
+ * Runtime rows of a `repeatable` (§4.5 — client-minted ids). Reference-stable:
+ * the store replaces the array only when rows change.
+ */
+export function useRows(containerPath: string): readonly string[] {
+  return useEngine((state) => state.rows[containerPath] ?? EMPTY_ROWS);
+}
+
+const EMPTY_ROWS: readonly string[] = [];
+
+/** Values a per-cell `matrix` constraint restricts a leaf to, or undefined (§5.5). */
+export function useAllowed(path: string): readonly Value[] | undefined {
+  return useEngine((state) => state.leaves.find((leaf) => leaf.path === path)?.allowed);
+}
+
+/**
+ * The mode we are rendering in (§7.3). Controls read it to decide whether they
+ * may use the top layer at all: inline cards get no popovers, ever.
+ */
+export function useDisplayMode(): "inline" | "fullscreen" {
+  return useEngine((state) => (state.displayMode === "inline" ? "inline" : "fullscreen"));
+}
+
+/** True on a phone (§7.3 — editing a dense grid is a desktop affordance). */
+export function useMobile(): boolean {
+  return useEngine((state) => state.platform === "mobile");
 }
 
 export function useFrozen(): boolean {

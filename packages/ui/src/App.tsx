@@ -4,14 +4,24 @@
  *  loading    — skeletons, never spinners, while the schema streams in
  *  invalid    — a plain "could not be rendered" card; never garbage
  *  cancelled  — the form, frozen
- *  ready      — inline summary card, or the full surface in fullscreen
+ *  ready      — inline (the elicitation card, or a summary), or the full surface
  *
- * Inline is a SUMMARY surface (§7.3): auto-fit height, no nested scroll, two
- * actions, and a button that asks the host for fullscreen. The dense ledger is
- * never rendered inline — vertical pan inside an inline app belongs to the
- * conversation scroll.
+ * Inline is TWO surfaces, and which one you get is a property of the form, not
+ * of the archetype (§7.3):
+ *
+ *  - A SMALL form renders for real — the §5.2 elicitation card. Fields inline,
+ *    auto-fit height, no nested scroll, one primary action. That is the whole
+ *    point of an elicitation form: it replaces three turns of Q&A, and a card
+ *    that only says "open me" replaces nothing.
+ *  - Anything DENSE gets the summary card and a fullscreen button. Vertical pan
+ *    inside an inline app belongs to the conversation scroll, so a surface that
+ *    cannot fit its own height must not be drawn there.
+ *
+ * The line between them is structural: more than eight answerable fields, or any
+ * `table`/`matrix` — a grid has no honest inline rendering at all.
  */
 
+import type { Form } from "@gather/schema";
 import { useEffect, useRef } from "react";
 import { Button, Pill, Skeleton, StatusLine } from "./components/primitives";
 import { FormShell } from "./FormShell";
@@ -76,6 +86,21 @@ function CancelledBanner() {
   );
 }
 
+/** §7.3 — is this form small enough to render inside the conversation? */
+export function fitsInline(form: Form): boolean {
+  let answerable = 0;
+  for (const section of form.sections) {
+    for (const field of section.fields) {
+      if (field.type === "table" || field.type === "matrix") return false;
+      if (field.type === "info" || field.type === "computed") continue;
+      answerable += 1;
+    }
+  }
+  return answerable <= INLINE_FIELD_LIMIT;
+}
+
+export const INLINE_FIELD_LIMIT = 8;
+
 function InlineCard() {
   const form = useEngine((state) => state.form);
   const bridge = useBridge();
@@ -111,6 +136,7 @@ function InlineCard() {
 export function App() {
   const status = useEngine((state) => state.status);
   const displayMode = useEngine((state) => state.displayMode);
+  const form = useEngine((state) => state.form);
   const bridge = useBridge();
   const frame = useRef<HTMLDivElement | null>(null);
 
@@ -128,7 +154,11 @@ export function App() {
       {status === "invalid" ? <Invalid /> : null}
       {status === "ready" || status === "cancelled" ? (
         displayMode === "inline" ? (
-          <InlineCard />
+          form && fitsInline(form) ? (
+            <FormShell compact />
+          ) : (
+            <InlineCard />
+          )
         ) : (
           <FormShell />
         )

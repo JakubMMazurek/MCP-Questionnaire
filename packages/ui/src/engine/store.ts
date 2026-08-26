@@ -57,6 +57,12 @@ export type EngineState = {
   /** What the host told us, if it has. */
   hostDisplayMode: DisplayMode | null;
   /**
+   * `hostContext.platform` (§7.4). The renderer branches on it in exactly one
+   * place — §7.3's "dense matrix on a phone: render a per-field summary list
+   * instead. Editing is a desktop/tablet affordance."
+   */
+  platform: "web" | "desktop" | "mobile";
+  /**
    * One line of plumbing news worth showing the user: a draft that will not
    * save (§3's size cap), a form that could not be pulled back. Written by the
    * bridge, rendered in the action bar. Never bumps `revision` — it is not an
@@ -78,6 +84,7 @@ export type EngineActions = {
   addRow: (containerPath: string) => string | null;
   removeRow: (containerPath: string, rowId: string) => void;
   setDisplayMode: (mode: DisplayMode) => void;
+  setPlatform: (platform: EngineState["platform"]) => void;
   setDraftStatus: (message: string | null) => void;
   cancel: () => void;
 };
@@ -96,6 +103,7 @@ const INITIAL: EngineState = {
   priorConditions: {},
   displayMode: "inline",
   hostDisplayMode: null,
+  platform: "web",
   draftStatus: null,
   revision: 0,
 };
@@ -413,6 +421,11 @@ export function createEngineStore(): EngineStore {
       },
 
       setDisplayMode: (mode) => set({ displayMode: mode, hostDisplayMode: mode }),
+
+      setPlatform: (platform) => {
+        if (get().platform === platform) return;
+        set({ platform });
+      },
 
       setDraftStatus: (message) => {
         if (get().draftStatus === message) return;
