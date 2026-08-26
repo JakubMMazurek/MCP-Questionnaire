@@ -9,6 +9,11 @@
     "node": ">=22"
   },
   "scripts": {
+    "//": "The UI bundle IS the Worker's assets directory (packages/ui/dist), so every script that runs or ships the Worker builds the UI first. `build` is the ordering, in one place.",
+    "build": "pnpm --filter @gather/ui build",
+    "dev": "pnpm build && pnpm --filter @gather/worker exec wrangler dev",
+    "deploy": "pnpm build && pnpm --filter @gather/worker exec wrangler deploy",
+    "check": "pnpm build && pnpm --filter @gather/worker exec wrangler deploy --dry-run --outdir packages/worker/.wrangler/dry-run",
     "test": "pnpm -r test",
     "typecheck": "pnpm -r typecheck",
     "lint": "biome check .",

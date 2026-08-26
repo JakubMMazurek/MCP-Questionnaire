@@ -196,9 +196,22 @@ export function createServer(env: WorkerEnv): McpServer {
       const stored: Form = { ...validation.form, formId };
       await formStore(env, formId).init(stored);
 
-      // Warnings are smells, not gates — they ride along with the stub, which
-      // is the only place they can be seen without echoing the schema.
-      const warnings = validation.warnings.length > 0 ? `\n\n${validation.text}` : "";
+      /**
+       * Warnings mark, they never gate — the form renders as authored. But the
+       * formatted warning text quotes the author's own ids and labels, and this
+       * result lands in model context, where §3 allows a stub and nothing else.
+       *
+       * So what rides along is the closed part: the COUNT and the diagnostic
+       * CODES. Codes are a fixed vocabulary, so nothing schema-shaped leaks,
+       * and the agent still learns that it shipped a form with no prefill —
+       * which is the warning worth learning. The full text is available on the
+       * next call, where it will gate nothing either.
+       */
+      const codes = [...new Set(validation.warnings.map((w) => w.code))];
+      const warnings =
+        codes.length > 0
+          ? ` ${validation.warnings.length} warning(s): ${codes.join(", ")} — the form renders as-is; see get_form_guide for the recipe.`
+          : "";
       const result = stub(formId);
       return {
         ...result,
@@ -251,7 +264,7 @@ export function createServer(env: WorkerEnv): McpServer {
       if (!isFormId(formId)) return failure(NOT_FOUND(formId));
       const exists = await formStore(env, formId).exists();
       if (!exists) return failure(NOT_FOUND(formId));
-      logEvent({ event: "form_loaded", formId });
+      logEvent({ event: "form_loaded" });
       // The same stub shape as gather_decisions. The schema is NOT sent here
       // either — the renderer fetches it itself with get_form_state, because
       // the host delivers only tool input to the app.
@@ -293,7 +306,7 @@ export function createServer(env: WorkerEnv): McpServer {
       const state: FormState | null = await formStore(env, formId).getState();
       if (!state) return failure(NOT_FOUND(formId));
       const answerCount = Object.keys(state.answers).length;
-      logEvent({ event: "state_served", formId, count: answerCount });
+      logEvent({ event: "state_served", count: answerCount });
       return {
         content: [
           {

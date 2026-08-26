@@ -93,8 +93,24 @@ type FormRow = {
 type AnswerRow = { path: string; state: string; value: string | null; note: string | null };
 
 export class FormDO extends DurableObject<WorkerEnv> {
-  constructor(ctx: DurableObjectState, env: WorkerEnv) {
-    super(ctx, env);
+  /* ------------------------------- lifecycle ------------------------------ */
+
+  /**
+   * Created by `init` and NOT by the constructor, deliberately.
+   *
+   * A DO instance outlives its storage: `alarm()` calls `deleteAll()`, which
+   * drops these tables, and the instance stays in memory to serve whatever
+   * arrives next. Creating the tables in the constructor therefore does not
+   * help — the instance that survives the wipe already ran its constructor —
+   * and re-creating them after the wipe would leave every expired form holding
+   * an empty schema forever, which is exactly the billed storage the TTL exists
+   * to release.
+   *
+   * So the tables exist only while a form does, and every read tolerates their
+   * absence (`#hasTables`). An expired form then behaves from the outside
+   * exactly like an id that was never used, which is the correct answer.
+   */
+  #createTables(): void {
     // Synchronous on the SQLite backend, so no blockConcurrencyWhile needed.
     this.ctx.storage.sql.exec(`
       CREATE TABLE IF NOT EXISTS form (
@@ -116,7 +132,14 @@ export class FormDO extends DurableObject<WorkerEnv> {
     `);
   }
 
-  /* ------------------------------- lifecycle ------------------------------ */
+  #hasTables(): boolean {
+    const row = this.ctx.storage.sql
+      .exec<{ n: number }>(
+        "SELECT COUNT(*) AS n FROM sqlite_master WHERE type = 'table' AND name IN ('form', 'answers')",
+      )
+      .one();
+    return row.n === 2;
+  }
 
   /**
    * Resets the 30-day idle clock. Called by EVERY method, read or write —
@@ -139,6 +162,8 @@ export class FormDO extends DurableObject<WorkerEnv> {
   /* --------------------------------- reads -------------------------------- */
 
   #readForm(): FormRow | null {
+    // Never initialised, or expired and wiped. Both are "no form".
+    if (!this.#hasTables()) return null;
     const rows = this.ctx.storage.sql
       .exec<FormRow>(
         "SELECT schema, version, createdAt, updatedAt, lastDraftAt FROM form WHERE id = 1",
@@ -198,6 +223,7 @@ export class FormDO extends DurableObject<WorkerEnv> {
   async init(form: Form): Promise<{ createdAt: number }> {
     const now = Date.now();
     const existing = this.#readForm();
+    this.#createTables();
     const createdAt = existing?.createdAt ?? now;
     this.ctx.storage.sql.exec(
       `INSERT INTO form (id, schema, version, createdAt, updatedAt) VALUES (1, ?, ?, ?, ?)
@@ -209,7 +235,7 @@ export class FormDO extends DurableObject<WorkerEnv> {
       now,
     );
     await this.#touch(now);
-    logEvent({ event: "form_init", formId: form.formId, count: form.sections.length });
+    logEvent({ event: "form_init", count: form.sections.length });
     return { createdAt };
   }
 
@@ -237,7 +263,7 @@ export class FormDO extends DurableObject<WorkerEnv> {
       return {
         ok: false,
         code: "too_large",
-        message: `draft is ${bytes} bytes; the per-write cap is ${MAX_DRAFT_BYTES} bytes.`,
+        message: `draft is ${bytes} bytes; the per-write cap is 256 KiB (${MAX_DRAFT_BYTES} bytes). Nothing was saved.`,
         bytes,
         limit: MAX_DRAFT_BYTES,
       };

@@ -12,13 +12,16 @@
  * has nowhere to go. Diagnostics text is a product surface for the AGENT
  * (§6.3), not for the log — it quotes the author's own labels and paths, so it
  * is counted, never printed.
+ *
+ * There is no `formId` field either, deliberately. The id IS the capability
+ * (§3): form state at rest is reachable by anyone who knows it, so putting ids
+ * into retained logs would hand out the keys to make the log useful. Which
+ * form a line refers to is not knowable from the logs, and that is correct.
  */
 
 export type LogFields = {
   /** Which code path. */
   event: string;
-  /** The form id. It is a capability, but it is also the only usable key. */
-  formId?: string;
   /** Byte size of a rejected/accepted payload. A number, not the payload. */
   bytes?: number;
   /** How many answer rows / diagnostics / whatever was counted. */

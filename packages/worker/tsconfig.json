@@ -6,7 +6,8 @@
     // `wrangler types` writes from the installed workerd. It is generated, not
     // committed — `pnpm typecheck` regenerates it first (no network, no auth).
     "lib": ["ES2023"],
-    "types": []
+    // `cloudflare:test` (env, SELF, runInDurableObject, runDurableObjectAlarm).
+    "types": ["@cloudflare/vitest-plugin/types"]
   },
   "include": ["src/**/*.ts", "test/**/*.ts", "worker-configuration.d.ts", "vitest.config.ts"]
 }
