@@ -189,6 +189,9 @@
   .cell[data-v="R"]{color:var(--info);background:color-mix(in srgb,var(--info) 11%,transparent);border-color:color-mix(in srgb,var(--info) 30%,transparent)}
   .cell[data-v="RW"]{color:var(--ok);background:color-mix(in srgb,var(--ok) 12%,transparent);border-color:color-mix(in srgb,var(--ok) 32%,transparent)}
   .cell.dirty::after{content:"";position:absolute;top:3px;right:3px;width:5px;height:5px;border-radius:50%;background:var(--warn)}
+  .cell.dirty[data-v="-"]{color:var(--warn);background:color-mix(in srgb,var(--warn) 8%,transparent);border-color:color-mix(in srgb,var(--warn) 30%,transparent)}
+  .mgrid .mrl{cursor:pointer;border-radius:5px}
+  .mgrid .mrl:hover{background:var(--surface2);color:var(--ink)}
 
   /* decision log */
   .dlog{display:grid;grid-template-columns:minmax(200px,4fr) minmax(240px,5fr);border:1px solid var(--line);border-radius:var(--r);overflow:hidden;font-size:.85rem;font-family:"Familjen Grotesk",sans-serif}
@@ -559,7 +562,7 @@ $self.detail</code></pre>
   <div class="measure">
   <ul class="tight">
     <li><strong>No dropdowns in cells — interaction scales with option count.</strong> <span class="chip decided">decided 2026-08-26</span> Two clicks × 800 cells is untenable, and dropdowns clip. Two closed modes, picked by the renderer from the cell's option count, overridable via render hint: <code>cycle</code> (≤4 options — click/space advances, drag-fill paints the current value; the mockup above) and <code>paint</code> (5+ — a value <em>palette</em> in the matrix toolbar: select the value once, click or drag cells to apply, number keys 1–9 pick palette entries). Cycling degrades past ~4 options (a wrong click costs ~n/2 more, and the next value stops being predictable); painting is also the better bulk model at high cardinality. A per-cell popover is a secondary affordance, fullscreen only (§7.3).</li>
-    <li><strong>Header-click bulk apply</strong> (column, row) — 90% of real editing.</li>
+    <li><strong>Header-click bulk apply</strong> (column, row) — 90% of real editing. Semantics: a header click sets the whole group to <em>one</em> value — <code>next(first cell's value)</code> in cycle mode, so a uniform group cycles naturally and a mixed group <em>unifies</em> on the first click; in paint mode it applies the palette selection, so no ambiguity exists. A changed-to-empty cell renders visibly dirty, not merely blank.</li>
     <li><strong>Rectangle fill</strong> — shift-click or drag to paint a region.</li>
     <li><strong>Diff against baseline</strong> — <code>source: "existing"</code> renders dirty cells distinctly, with an N-changes counter and per-cell revert.</li>
     <li><strong>Column collapsing</strong> — 30 columns don't fit; group, and offer "hide columns with no exceptions".</li>
@@ -883,9 +886,16 @@ $self.detail</code></pre>
     grid.appendChild(h);
   });
   fields.forEach(function(f,i){
-    var l = document.createElement('div'); l.className='mrl'; l.textContent=f; grid.appendChild(l);
+    var l = document.createElement('div'); l.className='mrl'; l.textContent=f; l.title='bulk-apply to row';
+    l.addEventListener('click',function(){
+      var next = CYCLE[(CYCLE.indexOf(cur[i][0])+1)%3];
+      cols.forEach(function(c,j){ cur[i][j]=next; });
+      Array.prototype.forEach.call(grid.querySelectorAll('[data-row="'+i+'"]'),function(btn,j){ paintCell(btn,i,j); });
+      paintCounter();
+    });
+    grid.appendChild(l);
     cols.forEach(function(c,j){
-      var b = document.createElement('button'); b.type='button'; b.className='cell'; b.setAttribute('data-col',j);
+      var b = document.createElement('button'); b.type='button'; b.className='cell'; b.setAttribute('data-col',j); b.setAttribute('data-row',i);
       b.addEventListener('click',function(){
         cur[i][j] = CYCLE[(CYCLE.indexOf(cur[i][j])+1)%3];
         paintCell(b,i,j); paintCounter();
