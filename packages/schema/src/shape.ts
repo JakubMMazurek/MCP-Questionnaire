@@ -220,6 +220,10 @@ const computedSchema: z.ZodType<Computed> = z.unknown().transform((raw, ctx) => 
       op: z.literal("count_changed"),
       targets: computedTargets,
     }),
+    count_needs_review: z.strictObject({
+      op: z.literal("count_needs_review"),
+      targets: computedTargets,
+    }),
     sum: z.strictObject({ op: z.literal("sum"), targets: computedTargets }),
   } as const;
   const parsed = variants[op as keyof typeof variants].safeParse(raw);

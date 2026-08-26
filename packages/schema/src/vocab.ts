@@ -99,6 +99,11 @@ export const RULE_ACTIONS = [
  * - `count_answered` count targets whose answer state is "answered"
  * - `count_changed`  count targets whose answer differs from their
  *                    `source: "existing"` prefill (the §4.7 baseline)
+ * - `count_needs_review` count targets whose prefill carries `needsReview: true`
+ *                    and which hold no answer yet — any touch, even confirming
+ *                    the prefilled value, writes an answer and clears it. The
+ *                    §4.7 "N inferred values need review" header counter; on a
+ *                    fully-prefilled form `count_empty` reads 0, this doesn't
  * - `sum`            add the numeric answers over `targets`
  */
 export const COMPUTED_OPS = [
@@ -106,6 +111,7 @@ export const COMPUTED_OPS = [
   "count_empty",
   "count_answered",
   "count_changed",
+  "count_needs_review",
   "sum",
 ] as const;
 

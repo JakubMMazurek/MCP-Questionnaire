@@ -107,6 +107,27 @@ function targetKey(target: ResolvedTarget): string {
   }
 }
 
+/**
+ * True when a prefill path addresses the computed target or something inside
+ * it: a matrix cell within its grid, a table cell within its column or table,
+ * a sub-field within its repeatable. Same head id, and the target's step ids
+ * appearing in order within the prefill path's steps — so `grid` contains
+ * `grid[Discount__c][sales_ops]`, and `assumptions.verdict` contains
+ * `assumptions[r_eu].verdict`.
+ */
+function prefillWithinTarget(prefillPath: string, targetPath: string): boolean {
+  const p = parsePath(prefillPath);
+  const t = parsePath(targetPath);
+  if (!p.ok || !t.ok) return false;
+  if (p.path.head.kind !== "id" || t.path.head.kind !== "id") return false;
+  if (p.path.head.id !== t.path.head.id) return false;
+  let matched = 0;
+  for (const step of p.path.steps) {
+    if (matched < t.path.steps.length && t.path.steps[matched]?.id === step.id) matched += 1;
+  }
+  return matched === t.path.steps.length;
+}
+
 /** Resolves a path, turning any failure into a diagnostic at `location`. */
 function resolveOrDiagnose(
   form: Form,
@@ -422,10 +443,8 @@ function checkComputed(
     const prefill = form.prefill ?? {};
     const hasBaseline = Object.entries(prefill).some(([path, entry]) => {
       if (entry.source !== "existing") return false;
-      const resolved = resolvePath(form, path);
-      if (!resolved.ok) return false;
-      const key = targetKey(resolved.target);
-      return targets.some((t) => targetKey(t.target) === key);
+      if (!resolvePath(form, path).ok) return false;
+      return targets.some((t) => prefillWithinTarget(path, t.path));
     });
     if (!hasBaseline) {
       out.push(
@@ -433,6 +452,24 @@ function checkComputed(
           "computed_needs_baseline",
           `${location}.compute "${fieldId}"`,
           `Computed field "${fieldId}" counts changes, but no target carries a prefill with source "existing". "count_changed" is a diff against that baseline (§4.7) — with no baseline it counts every answered field. Add the current values as prefill with source "existing", or use "count_answered".`,
+        ),
+      );
+    }
+  }
+
+  if (compute.op === "count_needs_review") {
+    const prefill = form.prefill ?? {};
+    const hasReviewable = Object.entries(prefill).some(([path, entry]) => {
+      if (entry.needsReview !== true) return false;
+      if (!resolvePath(form, path).ok) return false;
+      return targets.some((t) => prefillWithinTarget(path, t.path));
+    });
+    if (!hasReviewable) {
+      out.push(
+        warning(
+          "computed_nothing_to_review",
+          `${location}.compute "${fieldId}"`,
+          `Computed field "${fieldId}" counts values needing review, but no target carries a prefill with "needsReview": true. The counter reads the §4.7 envelope — any touch on the field, even confirming the prefilled value, writes an answer and clears it. Mark the inferred prefills "needsReview": true, or count something else ("count_empty", "count_answered").`,
         ),
       );
     }

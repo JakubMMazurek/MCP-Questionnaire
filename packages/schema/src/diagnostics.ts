@@ -53,6 +53,7 @@ export type DiagnosticCode =
   | "computed_target_not_numeric"
   | "computed_target_read_only"
   | "computed_needs_baseline"
+  | "computed_nothing_to_review"
   // prefill
   | "prefill_target_read_only"
   | "prefill_value_not_an_option"

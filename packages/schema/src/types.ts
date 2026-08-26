@@ -256,6 +256,7 @@ export type Computed =
   | { op: "count_empty"; targets: Path[] }
   | { op: "count_answered"; targets: Path[] }
   | { op: "count_changed"; targets: Path[] }
+  | { op: "count_needs_review"; targets: Path[] }
   | { op: "sum"; targets: Path[] };
 
 /** §4.2 — read-only derived value. Counting answers is what makes a form feel alive. */

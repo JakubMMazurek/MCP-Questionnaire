@@ -349,7 +349,7 @@
     <tr><td><code>short_text</code></td><td></td><td>support, discourage</td></tr>
     <tr><td><code>long_text</code></td><td></td><td>smell. If a form is mostly these, it should have been a conversation</td></tr>
     <tr><td><code>info</code></td><td>markdown block</td><td>makes draft-review an ordinary form (§5)</td></tr>
-    <tr><td><code>computed</code></td><td>read-only derived value</td><td>totals, deltas, "4 unresolved, 2 marked 'let's talk'" — counts by equality on agent-declared values (§4.3). Counting <em>answers</em> rather than summing numbers is what makes a form feel alive</td></tr>
+    <tr><td><code>computed</code></td><td>read-only derived value</td><td>closed op vocabulary (audited 2026-08-26): <code>count_value</code>, <code>count_empty</code>, <code>count_answered</code>, <code>count_changed</code> (vs the <code>existing</code> baseline), <code>count_needs_review</code> (prefills marked <code>needsReview</code> with no answer yet — any touch, even confirming, clears it), <code>sum</code>. Targets may be containers or columns — they expand to cells. Counts by equality on agent-declared values (§4.3); counting <em>answers</em> rather than summing numbers is what makes a form feel alive</td></tr>
   </table></div>
 
   <div class="measure">
@@ -437,7 +437,7 @@ $self.detail</code></pre>
 };</code></pre>
   <ul class="tight">
     <li>Render <code>inferred</code> + <code>low</code> visibly distinct, <code>rationale</code> on hover/expand.</li>
-    <li>Header shows a <code>computed</code> "N inferred values need review" counter.</li>
+    <li>Header shows a <code>computed</code> "N inferred values need review" counter — the <code>count_needs_review</code> op: prefills marked <code>needsReview: true</code> that hold no answer yet. Any touch on the field, even confirming the prefilled value, writes an answer and clears it. (<code>count_empty</code> reads 0 on a fully-prefilled form — the audit added this op for exactly that reason.)</li>
     <li><code>existing</code> gives baseline-diff behaviour for free — dirty-cell rendering in a matrix, changed-value marks elsewhere.</li>
   </ul>
   <div class="callout warn">
@@ -468,7 +468,7 @@ $self.detail</code></pre>
 
   <h3>5.1 Assumption ledger — <em>build this first</em></h3>
   <p>The highest-value surface, and the one that justifies the project. The failure mode it fixes: a plan requires forty small inferences. The user catches two wrong ones on read-through and the other thirty-eight stay wrong <em>silently</em> — not agreed to, just invisible. Nobody audits a paragraph for premises.</p>
-  <p>Shape: dense list of inferences, each a <code>single_select</code> with <code>render: segmented</code>, plus agent-defined defer options ("You decide" / "TBD"), plus optional per-row <code>note</code> and a conditional correction input. Every row carries <code>source</code> + <code>rationale</code>. With forty rows of identical shape, generate it columns+data (§4.2 <code>table</code>): the segmented options are declared once as a column definition, rows are data.</p>
+  <p>Shape: dense list of inferences, each a <code>single_select</code> with <code>render: segmented</code>, plus agent-defined defer options ("You decide" / "TBD"), plus optional per-row <code>note</code> and a conditional correction input. Every row carries <code>source</code> + <code>rationale</code> — and <strong>row provenance is not a row property</strong> (audited 2026-08-26): each verdict is prefilled <code>confirm</code> with <code>source</code>/<code>confidence</code>/<code>rationale</code>/<code>needsReview</code>, so the provenance chip, the <code>count_needs_review</code> counter and bulk affirm all read the one §4.7 envelope — bulk affirm is "accept the needs-review prefills". With forty rows of identical shape, generate it columns+data (§4.2 <code>table</code>): the segmented options are declared once as a column definition, rows are data.</p>
   </div>
 
   <div class="mock" id="ledgerMock">
@@ -537,7 +537,7 @@ $self.detail</code></pre>
 
   <div class="measure">
   <h3>5.3 Brainstorm convergence</h3>
-  <p>The agent has just produced fifteen options in prose and the user must prune, rank and combine. Options <strong>come from the conversation</strong>, not a catalog. <code>multi_select</code> over generated candidates + <code>rank</code> for priority + <code>allocation</code> for effort split + <code>repeatable</code> "add your own".</p>
+  <p>The agent has just produced fifteen options in prose and the user must prune, rank and combine. Options <strong>come from the conversation</strong>, not a catalog. Audited shape (2026-08-26): candidates are a <code>table</code> with a boolean <code>keep</code> column and a <code>$self</code>-scoped rejection-reason select — <em>not</em> a <code>multi_select</code>, because rule ops have no membership test over multi-valued answers and the per-candidate reason needs row scope anyway — plus <code>repeatable</code> "add your own". <strong>Ranking the survivors is the next form in the chain (§5.6)</strong>: <code>rank</code> items are declared at authoring time, and the survivors aren't known until the prune comes back. <code>allocation</code> for effort split rides in that second form too.</p>
   <p><strong>Capture rejection reasons.</strong> When twelve options become two, <em>why the other ten died</em> is more informative than the pick — it reveals the shape of the constraint. One-tap reasons: too expensive / too slow / wrong team / already tried / not the problem. Cheap for the user, disproportionately useful for the agent.</p>
 
   <h3>5.4 Plan confirmation / draft review</h3>
@@ -728,8 +728,8 @@ $self.detail</code></pre>
   <h2>Build order</h2>
   <div class="measure">
   <ol style="padding-left:1.3em">
-    <li style="margin:.6em 0"><strong>Meta-schema + validator.</strong> TypeScript types, Zod validator, path parser and resolver. No UI. Includes two items easy to lose: the <strong>closed vocabulary of <code>computed</code> ops</strong> (count-by-value, sum, delta-vs-baseline, …) — the same §4.1 treatment as rules, since an implicit expression language is where model-generated schemas fall apart — and a <strong>version field on the schema envelope</strong>, cheap now, painful to retrofit. Get the error messages good — they're a product surface (§6.3).</li>
-    <li style="margin:.6em 0"><strong>Archetype audit.</strong> Write all five archetypes as JSON against the meta-schema and run them through the validator. <strong>Do this before the renderer.</strong> One archetype surfaced three gaps in a minute of conversation; the other four will surface the rest. This is how the real primitive set gets found instead of guessed.</li>
+    <li style="margin:.6em 0"><strong>Meta-schema + validator.</strong> <span class="chip decided">done 2026-08-26</span> (<code>packages/schema</code>, 131 tests.) TypeScript types, Zod validator, path parser and resolver. No UI. Includes two items easy to lose: the <strong>closed vocabulary of <code>computed</code> ops</strong> (count-by-value, sum, delta-vs-baseline, …) — the same §4.1 treatment as rules, since an implicit expression language is where model-generated schemas fall apart — and a <strong>version field on the schema envelope</strong>, cheap now, painful to retrofit. Get the error messages good — they're a product surface (§6.3).</li>
+    <li style="margin:.6em 0"><strong>Archetype audit.</strong> <span class="chip decided">done 2026-08-26</span> All five archetypes written in full against the meta-schema (<code>packages/schema/src/__fixtures__/archetypes.ts</code> — they become the §6.2 worked examples) and validated. Findings, all folded back into §4/§5: the <code>count_needs_review</code> op (the §4.7 review counter was inexpressible on a fully-prefilled form); a container-expansion fix so <code>count_changed</code> sees cell-level baselines; ledger row provenance lives in the prefill envelope, not on rows; convergence is a table + chained rank form, not a <code>multi_select</code>; plan review is expressible but verbose — recipes cap plan parts per form. Two of the audit's five failures were the validator correctly teaching the author (§6.3 working as designed).</li>
     <li style="margin:.6em 0"><strong>Renderer v1 — assumption ledger only.</strong> One field type (<code>single_select</code> segmented) + defer options + notes + bulk affirm + <code>computed</code> counter. Inline and fullscreen. Proves the whole loop end to end.</li>
     <li style="margin:.6em 0"><strong>Worker + MCP handler.</strong> <code>gather_decisions</code>, <code>get_form_guide</code>, <code>load_form</code>, the app-visible <code>save_draft</code>, the form Durable Object, <code>ui://forms/renderer</code>. Deploy. Connect as a custom connector.</li>
     <li style="margin:.6em 0"><strong>Remaining archetypes</strong>, in order of use: elicitation → confirmation → convergence → matrix.</li>
