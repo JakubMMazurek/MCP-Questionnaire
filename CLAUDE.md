@@ -1,6 +1,6 @@
 # MCP Questionnaire — build rules
 
-**Status (2026-08-26): all seven §9 build steps are DONE** — 356 tests across
+**Status (2026-08-26): all seven §9 build steps are DONE, field-tested on claude.ai** — 359 tests across
 `packages/{schema,ui,worker}` (`@mcpq/*` scope), deployed to
 `mcp-questionnaire.qba0550.workers.dev`. **Auth is GitHub OAuth** (step 7):
 `@cloudflare/workers-oauth-provider` owns the Worker's fetch, MCP is served at

@@ -64,7 +64,7 @@ installed from a plugin marketplace. Form ids remain capabilities internally.
 ## Develop
 
     pnpm install
-    pnpm -r test            # 356 tests
+    pnpm -r test            # 359 tests
     pnpm --filter @mcpq/ui dev    # offline host harness at localhost:5173/dev/
     pnpm build              # single-file renderer bundle, verified self-contained
 
