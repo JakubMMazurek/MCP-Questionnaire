@@ -6,6 +6,14 @@
  */
 
 export {
+  archetypes,
+  assumptionLedger,
+  convergence,
+  elicitation,
+  matrixFls,
+  planConfirmation,
+} from "./__fixtures__/archetypes.js";
+export {
   countBySeverity,
   type Diagnostic,
   type DiagnosticCode,
