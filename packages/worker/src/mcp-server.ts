@@ -130,6 +130,20 @@ export function createServer(env: WorkerEnv): McpServer {
    * on the content item returned by `resources/read`. The spec serves the ui
    * block with the contents, and the content item's copy is the one that
    * governs — so the two are kept identical rather than relying on either.
+   *
+   * NOT DONE, and it is a real gap against §3's "send
+   * notifications/resources/list_changed on change so the host re-fetches":
+   * this handler is stateless, so there is no connection to push down. The SDK
+   * does advertise `capabilities.resources.listChanged` and the handler exposes
+   * `notify.resourcesChanged()`, but that publishes only to clients holding an
+   * open `subscriptions/listen` stream, which a per-request server never has.
+   * Firing it would also need a trigger, and the only trigger available here is
+   * an unauthenticated HTTP endpoint on a server that has no auth by design —
+   * a worse trade than the thing it buys. Consequence: after a renderer deploy,
+   * a host that cached the bundle keeps the old one until it re-reads. The
+   * bundle is versioned by deploy, not by URI (§7.1 wants one stable
+   * `ui://forms/renderer` forever), so bumping the URI is not an option
+   * either. Revisit if the extension gains a pull-based invalidation.
    */
   server.registerResource(
     RENDERER_NAME,
