@@ -39,6 +39,15 @@ describe("archetype audit (§5 → §4)", () => {
     expectAccepted("elicitation");
   });
 
+  it("4.6 branching — sections shown per answer, cascade, require, default, clear", () => {
+    // Not an archetype: the MECHANIC every archetype uses, written out once so
+    // `get_form_guide` can hand it over. It carries every rule action worth
+    // composing and must validate with no warnings at all — a worked example
+    // that trips the validator teaches the wrong lesson twice over.
+    const { warnings } = expectAccepted("conditionalBranching");
+    expect(warnings).toEqual([]);
+  });
+
   it("5.3 convergence — table not multi_select; ranking is the next chained form", () => {
     // Audit notes:
     //  - Rejection reasons need per-candidate rules, so candidates are a table

@@ -142,10 +142,11 @@ describe("worked example selection", () => {
 
 describe("the shipped worked examples", () => {
   it("all validate — an example that does not is worse than none", () => {
-    // Two archetypes ship two examples: the ledger (the audited reference plus
-    // its minimal floor) and convergence (the prune plus the chained rank form
-    // it hands off to, §5.6).
-    expect(ALL_EXAMPLES.length).toBe(ARCHETYPES.length + 2);
+    // Three archetypes ship two examples: the ledger (the audited reference plus
+    // its minimal floor), convergence (the prune plus the chained rank form it
+    // hands off to, §5.6), and elicitation (the inline card plus the branching
+    // form that shows what §4.6's rules compose into).
+    expect(ALL_EXAMPLES.length).toBe(ARCHETYPES.length + 3);
     for (const example of ALL_EXAMPLES) {
       const result = validateForm(example.form);
       expect(result.errors, example.title).toEqual([]);

@@ -734,6 +734,300 @@ export const matrixFls = {
   },
 } satisfies Form;
 
+/**
+ * BRANCHING — one answer reshapes the form (§4.6).
+ *
+ * Not a sixth archetype: branching is a MECHANIC, and every archetype uses it.
+ * It lives here as a fixture because it is the half of §4.6 the recipes only
+ * gestured at, and the half that makes a form worth more than a list of
+ * questions — a static intake form asks for login, key and OAuth details at
+ * once and lets the user work out which nine of the twelve fields to ignore.
+ *
+ * What it composes, in one valid form:
+ *  - `show` targeting whole SECTIONS, so a branch appears as a titled block
+ *    rather than as loose fields. A `show` target starts hidden, so no `hide`
+ *    rule is needed and nothing flashes on first render.
+ *  - `op: "in"` for a section two branches share (an endpoint is an endpoint
+ *    whether the credential is a key or a token).
+ *  - `require` firing only inside the branch that is live — `required` MARKS,
+ *    it never gates (§6.3), so this drives the asterisk and the rail, not a
+ *    block.
+ *  - `filter_options` cascading region -> datacentre. A value that no longer
+ *    survives its filter reads as ABSENT with no extra rule: the datacentre
+ *    un-answers itself when the region moves away from it.
+ *  - `set_default`, which writes only into an EMPTY field, so a proposal never
+ *    overwrites an answer.
+ *  - `clear`, which is EDGE-triggered (false -> true), because a rule that kept
+ *    blanking a field for as long as its condition held would fight the user.
+ *
+ * And the thing this shape is most often reached for, said once: it asks where
+ * a secret LIVES, never what it is. Answers travel into model context and rest
+ * in the form's store (§3) — the shape of a connection belongs in a form, the
+ * password does not.
+ */
+export const conditionalBranching = {
+  version: FORM_SCHEMA_VERSION,
+  title: "Wire up the warehouse connection",
+  description:
+    "Pick how it authenticates and I'll ask for only what that needs. I've guessed the rest — check the amber ones, or just tell me in chat.",
+  display: "fullscreen",
+  submitLabel: "Save the connection",
+  sections: [
+    {
+      id: "shape",
+      title: "The connection",
+      fields: [
+        {
+          type: "computed",
+          id: "unreviewed",
+          label: "needing review",
+          compute: {
+            op: "count_needs_review",
+            targets: ["auth_method", "environment", "key_header", "region"],
+          },
+        },
+        {
+          type: "single_select",
+          id: "auth_method",
+          label: "How does it authenticate?",
+          description: "This decides which details I ask for below.",
+          render: "segmented",
+          options: [
+            { value: "basic", label: "Login + password" },
+            { value: "api_key", label: "API key" },
+            { value: "oauth", label: "OAuth 2.0" },
+          ],
+          skipOptions: [{ value: "you_decide", label: "You decide" }],
+        },
+        {
+          type: "single_select",
+          id: "environment",
+          label: "Which environment?",
+          render: "segmented",
+          options: [
+            { value: "sandbox", label: "Sandbox" },
+            { value: "production", label: "Production" },
+          ],
+        },
+      ],
+    },
+    {
+      id: "basic_details",
+      title: "Login + password",
+      description: "Shown because you picked login + password.",
+      fields: [
+        { type: "short_text", id: "username", label: "Username", placeholder: "service account" },
+        {
+          type: "single_select",
+          id: "password_source",
+          label: "Where does the password live?",
+          description: "I never want the password itself — only where to read it from.",
+          render: "radio",
+          options: [
+            { value: "env", label: "An environment variable" },
+            { value: "secret_manager", label: "A secret manager" },
+            { value: "prompt", label: "Prompt at runtime" },
+          ],
+        },
+      ],
+    },
+    {
+      id: "key_details",
+      title: "API key",
+      description: "Shown because you picked an API key.",
+      fields: [
+        {
+          type: "short_text",
+          id: "key_header",
+          label: "Header the key goes in",
+          placeholder: "Authorization",
+        },
+        {
+          type: "single_select",
+          id: "key_source",
+          label: "Where does the key live?",
+          render: "radio",
+          options: [
+            { value: "env", label: "An environment variable" },
+            { value: "secret_manager", label: "A secret manager" },
+          ],
+        },
+      ],
+    },
+    {
+      id: "oauth_details",
+      title: "OAuth 2.0",
+      description: "Shown because you picked OAuth.",
+      fields: [
+        { type: "short_text", id: "client_id", label: "Client id" },
+        { type: "short_text", id: "token_url", label: "Token URL" },
+        {
+          type: "multi_select",
+          id: "scopes",
+          label: "Scopes",
+          render: "chips",
+          options: [
+            { value: "read", label: "read" },
+            { value: "write", label: "write" },
+            { value: "admin", label: "admin" },
+          ],
+        },
+        { type: "boolean", id: "pkce", label: "Use PKCE?", render: "toggle" },
+      ],
+    },
+    {
+      id: "endpoint",
+      title: "Where to reach it",
+      description: "Shared by the key and OAuth paths — both talk to a host.",
+      fields: [
+        {
+          type: "short_text",
+          id: "base_url",
+          label: "Base URL",
+          placeholder: "https://…",
+        },
+        {
+          type: "single_select",
+          id: "region",
+          label: "Region",
+          render: "segmented",
+          options: [
+            { value: "us", label: "US" },
+            { value: "eu", label: "EU" },
+            { value: "apac", label: "APAC" },
+          ],
+        },
+        {
+          type: "single_select",
+          id: "datacenter",
+          label: "Datacentre",
+          description: "Narrowed by the region — pick the region first.",
+          render: "radio",
+          options: [
+            { value: "us_east", label: "us-east-1" },
+            { value: "us_west", label: "us-west-2" },
+            { value: "eu_west", label: "eu-west-1" },
+            { value: "eu_central", label: "eu-central-1" },
+            { value: "apac_se", label: "ap-southeast-2" },
+          ],
+        },
+      ],
+    },
+    {
+      id: "production_gate",
+      title: "Because this is production",
+      description: "Shown only for production, and it asks for one more thing.",
+      fields: [
+        {
+          type: "short_text",
+          id: "change_ticket",
+          label: "Change ticket",
+          placeholder: "CHG-1234",
+        },
+        {
+          type: "boolean",
+          id: "dry_run",
+          label: "Dry-run the first sync?",
+          render: "toggle",
+          trueLabel: "Dry run",
+          falseLabel: "Go live",
+        },
+      ],
+    },
+  ],
+  rules: [
+    // One branch per credential kind. The targets are SECTIONS, so each branch
+    // arrives as a titled block with its own description.
+    {
+      when: { field: "auth_method", op: "eq", value: "basic" },
+      then: { action: "show", targets: ["basic_details"] },
+    },
+    {
+      when: { field: "auth_method", op: "eq", value: "api_key" },
+      then: { action: "show", targets: ["key_details"] },
+    },
+    {
+      when: { field: "auth_method", op: "eq", value: "oauth" },
+      then: { action: "show", targets: ["oauth_details"] },
+    },
+    // `in` — one section, two branches. Login + password is a database
+    // connection here and needs no base URL, so it is deliberately excluded.
+    {
+      when: { field: "auth_method", op: "in", value: ["api_key", "oauth"] },
+      then: { action: "show", targets: ["endpoint"] },
+    },
+    // A second, independent branch on a different field. Rules are a flat list
+    // re-run until the view is stable, so branches compose without nesting.
+    {
+      when: { field: "environment", op: "eq", value: "production" },
+      then: { action: "show", targets: ["production_gate"] },
+    },
+    {
+      when: { field: "environment", op: "eq", value: "production" },
+      then: { action: "require", targets: ["change_ticket"] },
+    },
+    // Proposes a dry run for production — into an EMPTY field only, so a user
+    // who has already said "go live" is not overruled.
+    {
+      when: { field: "environment", op: "eq", value: "production" },
+      then: { action: "set_default", targets: ["dry_run"], value: true },
+    },
+    // Dropping to sandbox blanks the host, which is the one field the switch
+    // invalidates while leaving it on screen. Edge-triggered: it fires on the
+    // false -> true transition and not for as long as sandbox stays selected,
+    // or the field could never be typed into afterwards. Note the target: a
+    // `clear` aimed at something the same switch HIDES would be redundant —
+    // what is not rendered already submits empty (§4.6).
+    {
+      when: { field: "environment", op: "eq", value: "sandbox" },
+      then: { action: "clear", targets: ["base_url"] },
+    },
+    // The cascade. No `clear` rule for the datacentre: a value outside its
+    // surviving option set already reads as absent.
+    {
+      when: { field: "region", op: "eq", value: "us" },
+      then: { action: "filter_options", targets: ["datacenter"], options: ["us_east", "us_west"] },
+    },
+    {
+      when: { field: "region", op: "eq", value: "eu" },
+      then: {
+        action: "filter_options",
+        targets: ["datacenter"],
+        options: ["eu_west", "eu_central"],
+      },
+    },
+    {
+      when: { field: "region", op: "eq", value: "apac" },
+      then: { action: "filter_options", targets: ["datacenter"], options: ["apac_se"] },
+    },
+  ],
+  prefill: {
+    auth_method: {
+      value: "api_key",
+      source: "inferred",
+      confidence: "low",
+      rationale: "the docs you pasted show a bearer token, not a login form",
+      needsReview: true,
+    },
+    environment: {
+      value: "sandbox",
+      source: "inferred",
+      confidence: "high",
+      rationale: "you said you wanted to try it before wiring it up properly",
+    },
+    key_header: {
+      value: "Authorization",
+      source: "default",
+      rationale: "the usual header, and what their docs use",
+    },
+    region: {
+      value: "eu",
+      source: "user",
+      rationale: "you said the data has to stay in the EU",
+    },
+  },
+} satisfies Form;
+
 export const archetypes = {
   assumptionLedger,
   elicitation,
@@ -741,4 +1035,5 @@ export const archetypes = {
   convergenceRank,
   planConfirmation,
   matrixFls,
+  conditionalBranching,
 } as const;

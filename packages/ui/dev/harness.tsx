@@ -32,6 +32,7 @@ const FIXTURES: { key: FixtureKey; label: string }[] = [
   { key: "convergenceRank", label: "§5.3/§5.6 convergence — chained rank" },
   { key: "planConfirmation", label: "§5.4 plan confirmation" },
   { key: "matrixFls", label: "§5.5 matrix (FLS)" },
+  { key: "conditionalBranching", label: "§4.6 branching" },
 ];
 
 /**

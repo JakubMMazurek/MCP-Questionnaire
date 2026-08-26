@@ -33,22 +33,33 @@ names. If you are about to:
 2. **Call `get_form_guide(<archetype>)` first** if you have not this
    conversation — archetypes: `ledger`, `elicitation`, `convergence`,
    `plan_confirmation`, `matrix`. It returns the recipe and worked examples.
-3. **Partial submit is normal.** Unanswered fields come back `empty`; decide or
+3. **Make the form conditional.** One answer should reshape it: `show`/`hide`
+   rules take **section** ids as well as field ids, so each branch is a titled
+   block that only appears when it applies (auth method → login vs API key vs
+   OAuth details). Also `in` for a section two branches share,
+   `filter_options` to narrow one select by an earlier answer, `require` inside
+   the live branch, `set_default` to propose without overruling. A flat form
+   that asks every branch at once is barely better than the prose it replaced —
+   `get_form_guide` carries the rule vocabulary and a worked branching form.
+4. **Never ask for a secret.** No password, API key, token or card number
+   fields — the answers enter your context and rest in the form's store. Ask
+   where the value *lives* ("env var / secret manager / prompt at runtime").
+5. **Partial submit is normal.** Unanswered fields come back `empty`; decide or
    ask, don't scold. Defer options ("You decide", "TBD") are ordinary options
    you defined — you interpret your own values.
-4. **Always leave the escape hatch** — the form's description ends with a
+6. **Always leave the escape hatch** — the form's description ends with a
    variant of "…or just tell me".
-5. **Read the answers with `get_answers(formId)`.** You do NOT see what the
+7. **Read the answers with `get_answers(formId)`.** You do NOT see what the
    user selects by watching the widget — the tool result only says a form was
    displayed. On submit, a one-line receipt appears in the conversation naming
    the `formId`; call `get_answers` with it before acting, and again after any
    turn where the user may have changed something. Never guess at the answers
    and never ask the user to retype what they just filled in.
-6. **Chain forms via `formId`** (returned in the tool result) and `load_form`,
+8. **Chain forms via `formId`** (returned in the tool result) and `load_form`,
    not by re-serialising answers through your context. Ranking survivors of a
    prune is the NEXT form, reusing the prune's row ids.
-7. The user's process preferences (what their defers mean, how terse they like
+9. The user's process preferences (what their defers mean, how terse they like
    forms) live in CLAUDE.md/memory and override the recipes.
-8. If the tool returns validation errors, they include the fix and a worked
+10. If the tool returns validation errors, they include the fix and a worked
    example — correct the schema and call again; never fall back to prose bullets
    after a single failure.

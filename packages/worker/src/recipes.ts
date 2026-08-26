@@ -19,6 +19,7 @@
 
 import {
   assumptionLedger,
+  conditionalBranching,
   convergence,
   convergenceRank,
   elicitation,
@@ -50,7 +51,43 @@ const CROSS_CUTTING = `ALWAYS, IN EVERY ARCHETYPE (§5.6 — more important than
 - Give the user a skip affordance rather than inventing one. skipOptions, or ordinary agent-defined options like "You decide" / "TBD". There is no special deferred state; you interpret those values yourself.
 - Forms chain. elicitation -> draft -> convergence -> plan -> confirmation. Pass formIds forward instead of re-serialising answer maps and minted row ids through your own context, and prefill form three from form one's answers.
 - Paths are a closed grammar, not JSONPath: field.sub, table[rowId].column, matrix[rowId][colId]. Row ids are ids, never ordinals — table[2].owner is rejected with a teaching error.
-- Rules are one flat list of { when, then }; inside a table row, $self scopes to that row ($self.verdict -> $self.correction). Hidden fields contribute empty; set_default only writes into empty fields.`;
+- Rules are one flat list of { when, then }; inside a table row, $self scopes to that row ($self.verdict -> $self.correction). Hidden fields contribute empty; set_default only writes into empty fields.
+- NEVER ask for a secret itself. Passwords, API keys, tokens and card numbers must not be form fields: answers travel into your context and rest in the form's store. Ask for the SHAPE — "where does the key live?" with options like env var / secret manager / prompt at runtime — and let the user wire the value up themselves.`;
+
+/* -------------------------------------------------------------------------- */
+/* the rules half — §4.6, and the reason a form beats a list of questions      */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Appended to every recipe. Branching is not an archetype — it is the mechanic
+ * that makes all five of them worth more than prose, and the audited fixtures
+ * only gestured at it. A twelve-field form that asks everything at once is the
+ * thing this tool exists to replace, and an author who has not seen `show`
+ * pointed at a SECTION will write one.
+ */
+const RULES = `RULES — ONE ANSWER RESHAPES THE FORM (§4.6). Read this even if you think you only need fields.
+
+A form that asks for every branch at once is barely better than the prose it replaced. The user should see the four fields their situation needs, not the twelve that cover every situation.
+
+TARGET SECTIONS, NOT JUST FIELDS. "targets" takes section ids as happily as field ids, so a branch arrives as a titled block with its own description:
+  { when: { field: "auth_method", op: "eq", value: "oauth" }, then: { action: "show", targets: ["oauth_details"] } }
+A "show" target STARTS HIDDEN — inferred from the rule list, so you need no matching "hide" rule and nothing flashes on first render. Same for "enable": an "enable" target starts disabled.
+
+THE OPS: eq, neq, in, gt, lt, empty, filled. "in" takes an array and is how two branches share a section ("value": ["api_key", "oauth"]). "empty"/"filled" take no value and are how you react to the user having answered at all.
+
+THE ACTIONS, and what each is actually for:
+- show / hide — the branch itself. Prefer show, so the default state is "not asked".
+- require / optional — mark a field inside the live branch. required MARKS, never gates (§6.3): it drives the asterisk, the section rail and count_empty. A blank required field still submits.
+- filter_options — narrow a select from an earlier answer (region -> datacentre, environment -> instance size). Two filters on one target INTERSECT rather than overwrite. You need no clear rule for the stale value: an answer that no longer survives its filter reads as absent everywhere, including in the payload.
+- set_default — propose a value. Writes ONLY into an empty field, so it can never overrule the user; it is a proposal with a rule behind it, not an answer.
+- clear — blank a field the new answer invalidated. EDGE-triggered (fires on the condition going false -> true, never for as long as it holds, and never on the form's first evaluation), or it would blank a field the user is trying to type into. Only worth aiming at a field that STAYS VISIBLE: what a branch hides already submits empty, so clearing it is redundant.
+- enable / disable — grey a control out while leaving it legible. Use it when the user should see that something exists and why they cannot touch it yet; use hide when it is simply not their business.
+
+BRANCHES COMPOSE. The list is flat and re-evaluated until the rendered state is stable, so two independent conditions on two different fields need no nesting, and a rule may read a field a rule revealed. Don't build a cycle (A shows B, B hides A) — the validator warns, and the engine caps the iterations.
+
+WHAT A CLOSED BRANCH SUBMITS. Empty, whatever the user typed there before switching (§4.6 — the payload is a function of the rendered view). The client keeps the typing so flipping back is lossless, but you never receive answers from a path the user abandoned. That is what makes branching safe to use freely.
+
+WORKED: call get_form_guide("elicitation") — its second example is a branching connection form with sections per credential kind, "in" for the shared endpoint, a filter_options cascade, require, set_default and clear, all in one valid envelope.`;
 
 /* -------------------------------------------------------------------------- */
 /* the recipes                                                                */
@@ -252,6 +289,11 @@ const EXAMPLES: Record<ArchetypeName, WorkedExample[]> = {
       note: "Six fields, defaults prefilled and marked, a tradeoff slider, filter_options narrowing one answer by another.",
       form: elicitation,
     },
+    {
+      title: "Elicitation — branching: one answer reshapes the form",
+      note: "The §4.6 mechanic composed: `show` pointed at whole SECTIONS so each credential kind is its own titled block, `in` for the endpoint section two branches share, a filter_options cascade from region to datacentre (no clear rule needed — a value that fails its filter reads as absent), `require` inside the live branch only, `set_default` proposing a dry run without overruling an answer, and an edge-triggered `clear` on the one field the switch invalidates while leaving it on screen. Note what it never asks for: the password or the key, only where they live. This is the example to copy when the questions depend on each other, which is most of the time.",
+      form: conditionalBranching,
+    },
   ],
   convergence: [
     {
@@ -282,7 +324,7 @@ const EXAMPLES: Record<ArchetypeName, WorkedExample[]> = {
 };
 
 export function recipeFor(archetype: ArchetypeName): string {
-  return `${RECIPE_TEXT[archetype]}\n\n${CROSS_CUTTING}`;
+  return `${RECIPE_TEXT[archetype]}\n\n${RULES}\n\n${CROSS_CUTTING}`;
 }
 
 export function examplesFor(archetype: ArchetypeName): WorkedExample[] {

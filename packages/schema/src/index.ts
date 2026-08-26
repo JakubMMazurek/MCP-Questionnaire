@@ -8,6 +8,7 @@
 export {
   archetypes,
   assumptionLedger,
+  conditionalBranching,
   convergence,
   convergenceRank,
   elicitation,
