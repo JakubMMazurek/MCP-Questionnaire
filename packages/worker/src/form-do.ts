@@ -38,6 +38,14 @@ export type FormState = {
   answers: Answers;
   createdAt: number;
   updatedAt: number;
+  /**
+   * When the user pressed submit, or null while the form is still a draft.
+   *
+   * The distinction is the whole reason the agent-visible read tool can be
+   * trusted: "these are the answers" and "these are the answers so far" are
+   * different claims, and only the app knows which one it is holding.
+   */
+  submittedAt: number | null;
   /** §10 audit attribution — the GitHub login of the LAST writer, or null. */
   updatedBy: string | null;
 };
@@ -69,6 +77,14 @@ export type SaveDraftInput = {
    * touched this while authenticated".
    */
   updatedBy?: string | null;
+  /**
+   * Set once, by the submit flush: this payload is what the user submitted.
+   *
+   * Only ever written to `true` — a submitted form that the user then edits is
+   * still a submitted form with newer answers, and the timestamp says which is
+   * which. Implies `complete`, and the caller sets both.
+   */
+  submitted?: boolean;
 };
 
 export type SaveDraftResult =
@@ -100,6 +116,7 @@ type FormRow = {
   createdAt: number;
   updatedAt: number;
   updatedBy: string | null;
+  submittedAt: number | null;
   lastDraftAt: number;
 };
 type AnswerRow = { path: string; state: string; value: string | null; note: string | null };
@@ -136,7 +153,10 @@ export class FormDO extends DurableObject<WorkerEnv> {
         lastDraftAt INTEGER NOT NULL DEFAULT 0,
         -- §10 audit attribution (build step 7): the GitHub login of the last
         -- writer. Nullable because a write can legitimately have no identity.
-        updatedBy   TEXT
+        updatedBy   TEXT,
+        -- Null until the user submits. Read by the agent-visible answer tool,
+        -- which must not present a half-filled draft as a decision.
+        submittedAt INTEGER
       );
       CREATE TABLE IF NOT EXISTS answers (
         path  TEXT PRIMARY KEY,
@@ -174,6 +194,9 @@ export class FormDO extends DurableObject<WorkerEnv> {
     if (!columns.some((column) => column.name === "updatedBy")) {
       this.ctx.storage.sql.exec("ALTER TABLE form ADD COLUMN updatedBy TEXT");
     }
+    if (!columns.some((column) => column.name === "submittedAt")) {
+      this.ctx.storage.sql.exec("ALTER TABLE form ADD COLUMN submittedAt INTEGER");
+    }
   }
 
   /**
@@ -202,7 +225,7 @@ export class FormDO extends DurableObject<WorkerEnv> {
     this.#migrate();
     const rows = this.ctx.storage.sql
       .exec<FormRow>(
-        "SELECT schema, version, createdAt, updatedAt, lastDraftAt, updatedBy FROM form WHERE id = 1",
+        "SELECT schema, version, createdAt, updatedAt, lastDraftAt, updatedBy, submittedAt FROM form WHERE id = 1",
       )
       .toArray();
     return rows[0] ?? null;
@@ -240,6 +263,7 @@ export class FormDO extends DurableObject<WorkerEnv> {
       answers: this.#readAnswers(),
       createdAt: row.createdAt,
       updatedAt: row.updatedAt,
+      submittedAt: row.submittedAt ?? null,
       updatedBy: row.updatedBy ?? null,
     };
     await this.#touch(Date.now());
@@ -314,7 +338,22 @@ export class FormDO extends DurableObject<WorkerEnv> {
 
     const now = Date.now();
     const since = now - row.lastDraftAt;
-    if (since < MIN_DRAFT_INTERVAL_MS) {
+    /**
+     * The FIRST submit skips the rate limit, and only that one.
+     *
+     * The limit exists to make a leaked id un-spammable and to absorb autosave
+     * chatter — neither describes the submit write, which happens once, on a
+     * user gesture, and is the write the agent is about to be told to read.
+     * Throttling it means the receipt can reach the conversation before the
+     * answers reach the store, and the agent reads a form that looks unfinished.
+     *
+     * Bounded by `submittedAt IS NULL`, so the exemption is worth exactly one
+     * extra write per form for the lifetime of the form. Later submits (the
+     * user edited something and submitted again) queue like anything else, and
+     * the app preserves the flag across the retry.
+     */
+    const firstSubmit = input.submitted === true && row.submittedAt === null;
+    if (since < MIN_DRAFT_INTERVAL_MS && !firstSubmit) {
       const retryAfterMs = MIN_DRAFT_INTERVAL_MS - since;
       logEvent({ event: "draft_rejected", code: "throttled", ms: retryAfterMs });
       return {
@@ -356,11 +395,14 @@ export class FormDO extends DurableObject<WorkerEnv> {
 
     this.ctx.storage.sql.exec(
       // COALESCE for the same reason as `init`: no identity leaves the last
-      // known writer in place rather than blanking the column.
-      "UPDATE form SET updatedAt = ?, lastDraftAt = ?, updatedBy = COALESCE(?, updatedBy) WHERE id = 1",
+      // known writer in place rather than blanking the column. `submittedAt`
+      // takes the FIRST submit and keeps it — later edits move `updatedAt`.
+      `UPDATE form SET updatedAt = ?, lastDraftAt = ?, updatedBy = COALESCE(?, updatedBy),
+                       submittedAt = COALESCE(submittedAt, ?) WHERE id = 1`,
       now,
       now,
       input.updatedBy ?? null,
+      input.submitted === true ? now : null,
     );
     await this.#touch(now);
     logEvent({ event: "draft_saved", count: paths.length });

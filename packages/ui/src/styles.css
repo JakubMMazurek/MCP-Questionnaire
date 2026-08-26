@@ -320,15 +320,26 @@ body {
     cursor: not-allowed;
   }
 
-  /* The one accent on the surface (§8.2). */
+  /*
+   * The one accent on the surface (§8.2).
+   *
+   * Painted with the page's OWN ink and ground, inverted — not with
+   * `--color-background-inverse` / `--color-text-inverse`. Those two are
+   * separate host tokens with no guarantee that they contrast with EACH OTHER,
+   * and on claude.ai in dark mode both resolve light: a white button with white
+   * text, i.e. an invisible Submit. `--color-text-primary` on
+   * `--color-background-primary` is the one pair a coherent palette cannot get
+   * wrong, because the host is already using it to render body text (§7.4 still
+   * holds — every colour here is the host's).
+   */
   .btn-primary {
-    border-color: var(--color-background-inverse);
-    background: var(--color-background-inverse);
-    color: var(--color-text-inverse);
+    border-color: var(--color-text-primary);
+    background: var(--color-text-primary);
+    color: var(--color-background-primary);
   }
 
   .btn-primary:hover:not(:disabled) {
-    background: var(--color-background-inverse);
+    background: var(--color-text-primary);
     filter: brightness(1.15);
   }
 
@@ -547,7 +558,7 @@ body {
   }
 
   .chip-toggle[aria-pressed="true"] {
-    border-color: var(--color-background-inverse);
+    border-color: var(--color-text-primary);
     background: var(--color-background-tertiary);
     color: var(--color-text-primary);
   }
@@ -732,13 +743,14 @@ body {
     transition: transform 120ms linear;
   }
 
+  /* Ink-on-ground for the same reason as `.btn-primary`. */
   .switch[aria-checked="true"] .switch-track {
-    background: var(--color-background-inverse);
+    background: var(--color-text-primary);
   }
 
   .switch[aria-checked="true"] .switch-thumb {
     transform: translateX(12px);
-    background: var(--color-text-inverse);
+    background: var(--color-background-primary);
   }
 
   .switch[data-empty="true"] {
@@ -766,7 +778,7 @@ body {
   }
 
   .preset[aria-checked="true"] {
-    border-color: var(--color-background-inverse);
+    border-color: var(--color-text-primary);
     background: var(--color-background-tertiary);
     color: var(--color-text-primary);
   }
@@ -961,7 +973,7 @@ body {
   }
 
   .palette-swatch[aria-checked="true"] {
-    border-color: var(--color-background-inverse);
+    border-color: var(--color-text-primary);
     background: var(--color-background-tertiary);
     color: var(--color-text-primary);
   }
@@ -1136,6 +1148,130 @@ body {
       opacity: 0.45;
     }
   }
+}
+
+/*
+ * NARROW SURFACES (§7.3, §7.4).
+ *
+ * An inline card is as wide as the conversation, and on a phone that is about
+ * 340 CSS px of content. Every horizontal affordance on this surface was built
+ * for a desktop row and does not fit: a five-option segmented control ran off
+ * the right edge with two options unreachable, and a slider with its two end
+ * labels beside it lost the right-hand label entirely. Neither clipped
+ * visibly — the widget just ended, which reads as a broken form rather than a
+ * cut-off one.
+ *
+ * The breakpoint is on the VIEWPORT because the iframe's viewport IS the card:
+ * a narrow inline card on a desktop gets the same treatment, which is right.
+ * These rules sit OUTSIDE `@layer components` deliberately — unlayered wins
+ * over layered, so each one overrides its component rule without an arms race
+ * of selectors.
+ */
+@media (width <= 560px) {
+  /*
+   * The segmented control unrolls into a wrapped row of buttons. It stops being
+   * one joined control and becomes several — which is the honest thing at this
+   * width, and keeps every option reachable without a nested scroll. Radiogroup
+   * semantics and the clear-by-reselect behaviour are untouched.
+   */
+  .seg {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+    max-width: 100%;
+    overflow: visible;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+  }
+
+  .seg > button {
+    border: var(--border-width-regular) solid var(--color-border-primary);
+    border-radius: var(--border-radius-sm);
+    white-space: normal;
+  }
+
+  .seg > button:first-child {
+    border-left: var(--border-width-regular) solid var(--color-border-primary);
+  }
+
+  .seg > button.seg-skip {
+    border-style: dashed;
+  }
+
+  /* Labels on one line, the track spanning the full width beneath them. */
+  .slider-line {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 2px 10px;
+    width: 100%;
+  }
+
+  .slider {
+    grid-row: 2;
+    grid-column: 1 / -1;
+    min-width: 0;
+  }
+
+  .slider-end {
+    white-space: normal;
+  }
+
+  .slider-end:first-child {
+    grid-row: 1;
+    grid-column: 1;
+  }
+
+  .slider-end:last-child {
+    grid-row: 1;
+    grid-column: 2;
+    text-align: right;
+  }
+
+  /*
+   * The title takes the whole width and the counter pills drop below it.
+   * `flex-1` can shrink to min-content, and at this width it did: a title
+   * wrapping to five lines beside two pills, which is not a header.
+   */
+  .form-title {
+    flex-basis: 100%;
+  }
+
+  /* A label and its control each get the whole width rather than 40% each. */
+  .ledger-row > .grow {
+    flex-basis: 100%;
+  }
+
+  .sub-label {
+    flex: 0 0 100%;
+  }
+
+  /*
+   * The chat escape hatch drops below the actions instead of being squeezed
+   * against them by `margin-left: auto` — at this width that left the primary
+   * button about two characters wide.
+   */
+  .escape {
+    flex-basis: 100%;
+    margin-left: 0;
+  }
+
+  /* Presets, chips and swatches are already wrapping rows; just let long
+     free-text labels break instead of forcing the row wider than the card. */
+  .chip-toggle,
+  .preset,
+  .palette-swatch {
+    max-width: 100%;
+  }
+}
+
+/*
+ * A last-resort guard, not a layout tool: an agent-authored label is free text
+ * of any length (§4.1), and one unbroken 40-character word must not be able to
+ * push the whole surface sideways.
+ */
+:where(h1, h2, p, span, label, button, li, td, th) {
+  overflow-wrap: anywhere;
 }
 
 :where(button, input, a, [tabindex]):focus-visible {

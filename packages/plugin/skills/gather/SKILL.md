@@ -38,11 +38,17 @@ names. If you are about to:
    you defined — you interpret your own values.
 4. **Always leave the escape hatch** — the form's description ends with a
    variant of "…or just tell me".
-5. **Chain forms via `formId`** (returned in the tool result) and `load_form`,
+5. **Read the answers with `get_answers(formId)`.** You do NOT see what the
+   user selects by watching the widget — the tool result only says a form was
+   displayed. On submit, a one-line receipt appears in the conversation naming
+   the `formId`; call `get_answers` with it before acting, and again after any
+   turn where the user may have changed something. Never guess at the answers
+   and never ask the user to retype what they just filled in.
+6. **Chain forms via `formId`** (returned in the tool result) and `load_form`,
    not by re-serialising answers through your context. Ranking survivors of a
    prune is the NEXT form, reusing the prune's row ids.
-6. The user's process preferences (what their defers mean, how terse they like
+7. The user's process preferences (what their defers mean, how terse they like
    forms) live in CLAUDE.md/memory and override the recipes.
-7. If the tool returns validation errors, they include the fix and a worked
+8. If the tool returns validation errors, they include the fix and a worked
    example — correct the schema and call again; never fall back to prose bullets
    after a single failure.

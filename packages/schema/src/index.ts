@@ -33,6 +33,7 @@ export {
   parsePath,
   parsePathOrThrow,
 } from "./paths.js";
+export { type AnswerLine, type AnswerReport, reportAnswers } from "./report.js";
 export {
   describeTarget,
   isNumericTarget,

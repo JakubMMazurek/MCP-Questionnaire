@@ -23,10 +23,15 @@ import { AppProvider } from "./state";
 
 afterEach(cleanup);
 
-function mount(form: unknown, mode: "inline" | "fullscreen" = "fullscreen"): EngineStore {
+function mount(
+  form: unknown,
+  mode: "inline" | "fullscreen" = "fullscreen",
+  platform: "web" | "mobile" = "web",
+): EngineStore {
   const store = createEngineStore();
   store.getState().loadForm(form);
   store.getState().setDisplayMode(mode);
+  store.getState().setPlatform(platform);
   render(
     <AppProvider value={{ store, bridge: null }}>
       <App />
@@ -69,6 +74,75 @@ describe("the inline elicitation card (§5.2/§7.3)", () => {
       ],
     };
     expect(fitsInline(many)).toBe(false);
+  });
+
+  /**
+   * §7.3 — "vertical pan gestures inside an inline app go to the conversation
+   * scroll, so inline apps must fit their content height; request fullscreen if
+   * you need your own scroll viewport."
+   *
+   * Eight fields do not fit a phone-width card. The first field session filled
+   * one on a phone and had to scroll INSIDE the card, fighting the conversation
+   * for every drag. So the same form that renders inline on a desktop gets the
+   * summary card and one tap to fullscreen on a phone.
+   */
+  it("hands a phone the summary card for a form a desktop renders inline", () => {
+    const form = elicitation as unknown as Form;
+    expect(fitsInline(form, "web")).toBe(true);
+    expect(fitsInline(form, "mobile")).toBe(false);
+
+    mount(form, "inline", "mobile");
+    expect(screen.getByText("Open the form")).toBeDefined();
+    expect(screen.queryByRole("slider")).toBeNull();
+    // The escape hatch survives every surface (§5.6).
+    expect(screen.getByText("…or just tell me in chat")).toBeDefined();
+  });
+
+  it("still renders a genuinely small form inline on a phone", () => {
+    const small: Form = {
+      version: FORM_SCHEMA_VERSION,
+      title: "Two questions",
+      sections: [
+        {
+          id: "s",
+          title: "s",
+          fields: [
+            { type: "short_text", id: "q0", label: "Q0" },
+            { type: "short_text", id: "q1", label: "Q1" },
+          ],
+        },
+      ],
+    };
+    expect(fitsInline(small, "mobile")).toBe(true);
+    mount(small, "inline", "mobile");
+    expect(screen.getByLabelText("Q0")).toBeDefined();
+  });
+
+  /** A drag surface needs room and a scroll of its own; a phone card has neither. */
+  it("keeps a composite off a phone card whatever its field count", () => {
+    const ranked: Form = {
+      version: FORM_SCHEMA_VERSION,
+      title: "One question",
+      sections: [
+        {
+          id: "s",
+          title: "s",
+          fields: [
+            {
+              type: "rank",
+              id: "r",
+              label: "Order these",
+              items: [
+                { id: "a", label: "A" },
+                { id: "b", label: "B" },
+              ],
+            },
+          ],
+        },
+      ],
+    };
+    expect(fitsInline(ranked, "web")).toBe(true);
+    expect(fitsInline(ranked, "mobile")).toBe(false);
   });
 
   it("offers at most two actions inline, and always the chat escape hatch", () => {

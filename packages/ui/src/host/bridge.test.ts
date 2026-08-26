@@ -166,6 +166,33 @@ describe("tool input (§7.2)", () => {
     expect(store.getState().diagnostics.length).toBeGreaterThan(0);
   });
 
+  /**
+   * The get_form_guide defect, pinned from the APP side.
+   *
+   * A text tool's arguments reaching this app is a host-side mistake, and the
+   * fix on the Worker (drop `resourceUri` from text tools) is the real one. But
+   * the visible consequence was the app calling the AGENT wrong in front of the
+   * user — "this form could not be rendered", over input that was never a form.
+   * So the app refuses to be the messenger: not-a-form draws nothing.
+   */
+  it("draws nothing, and blames nobody, for input that is not a form at all", async () => {
+    const { host, store } = await connect();
+    host.sendToolInput({ archetype: "ledger" });
+    await settle();
+    expect(store.getState().status).toBe("idle");
+    expect(store.getState().form).toBeNull();
+    expect(store.getState().diagnostics).toEqual([]);
+  });
+
+  it("still blames a bad SCHEMA, which is a form attempt", async () => {
+    const { host, store } = await connect();
+    // `version` + `title` is an envelope with its sections missing — the agent
+    // meant a form and got it wrong, which is exactly what `invalid` is for.
+    host.sendToolInput({ version: 1, title: "no sections", archetype: "ledger" });
+    await settle();
+    expect(store.getState().status).toBe("invalid");
+  });
+
   it("buffers a partial schema and renders it only once it parses", async () => {
     const { host, store } = await connect();
     host.sendPartial({ version: 1, title: "Before I draft" });
@@ -268,9 +295,13 @@ describe("outbound pushes (§7.2 context discipline)", () => {
 });
 
 describe("submit (§5.6)", () => {
+  /** A server-minted id, as `gather_decisions`' stub result carries it (§3). */
+  const FORM_ID = "0123456789abcdef0123456789abcdef";
+
   it("sends the full structured payload once, then the turn-triggering message", async () => {
     const { host, store, bridge } = await connect();
     host.sendToolInput(assumptionLedger);
+    host.sendToolResult({ structuredContent: { formId: FORM_ID } });
     await settle();
     store.getState().setAnswer(VERDICT, "fix");
 
@@ -293,15 +324,28 @@ describe("submit (§5.6)", () => {
       content: { type: string; text: string }[];
     };
     expect(message.role).toBe("user");
-    // The message lands VISIBLY in the conversation, so it is a short receipt —
-    // the widget already shows every answer and the structured payload
-    // travelled on the context channel above, never as JSON in the chat.
-    expect(message.content[0]?.text).toBe("Submitted “Before I draft the rollout plan…”.");
+    // The message lands VISIBLY in the conversation and the host asks the user
+    // to confirm it, so it is a receipt and a POINTER — never the payload. The
+    // pointer is what makes the answers reachable at all: the context push
+    // above is advisory, and an agent holding only "form displayed" is the
+    // defect this replaced.
+    const text = message.content[0]?.text ?? "";
+    expect(text).toContain("Submitted “Before I draft the rollout plan…”");
+    expect(text).toContain("5 of 10 answered");
+    expect(text).toContain(`get_answers(formId: "${FORM_ID}")`);
+    expect(text).not.toContain('"state":"answered"');
   });
 
-  it("falls back to JSON in the message only when the context push fails", async () => {
+  /**
+   * The context push failing is NOT what puts JSON in the chat any more — a
+   * host that accepts the push and then never surfaces it looks identical from
+   * here, which is precisely how the answers went missing. The receipt points
+   * at a pull instead, and it keeps doing so.
+   */
+  it("keeps the receipt clean even when the context push fails", async () => {
     const { host, store, bridge } = await connect();
     host.sendToolInput(assumptionLedger);
+    host.sendToolResult({ structuredContent: { formId: FORM_ID } });
     await settle();
     store.getState().setAnswer(VERDICT, "fix");
     host.failNext(METHOD.updateModelContext);
@@ -314,8 +358,71 @@ describe("submit (§5.6)", () => {
     const message = host.last(METHOD.message)?.params as {
       content: { text: string }[];
     };
-    // Last-resort carrier: the answers must never be lost outright.
+    expect(message.content[0]?.text).toContain(`get_answers(formId: "${FORM_ID}")`);
+    expect(message.content[0]?.text).not.toContain('"state":"answered"');
+  });
+
+  /**
+   * The one case that still carries JSON: no formId, so there is no store to
+   * read back from (§3 — a view the Worker never minted an id for). The answers
+   * must never be lost outright.
+   */
+  it("falls back to JSON in the message when there is no formId to point at", async () => {
+    const { host, store, bridge } = await connect();
+    host.sendToolInput(assumptionLedger);
+    await settle();
+    store.getState().setAnswer(VERDICT, "fix");
+
+    const promise = bridge.submit();
+    await vi.advanceTimersByTimeAsync(0);
+    await settle();
+    await promise;
+
+    const message = host.last(METHOD.message)?.params as {
+      content: { text: string }[];
+    };
     expect(message.content[0]?.text).toContain('"state":"answered"');
+  });
+
+  /** The submit flush is what marks the stored draft as submitted (§3). */
+  it("marks the stored draft submitted, before the receipt goes out", async () => {
+    const { host, store, bridge } = await connect();
+    host.sendToolInput(assumptionLedger);
+    host.sendToolResult({ structuredContent: { formId: FORM_ID } });
+    await settle();
+    store.getState().setAnswer(VERDICT, "fix");
+
+    const promise = bridge.submit();
+    await vi.advanceTimersByTimeAsync(0);
+    await settle();
+    await promise;
+
+    const save = host.last(METHOD.toolsCall)?.params as {
+      arguments: { formId: string; complete?: boolean; submitted?: boolean };
+    };
+    expect(save.arguments.formId).toBe(FORM_ID);
+    expect(save.arguments.complete).toBe(true);
+    expect(save.arguments.submitted).toBe(true);
+    const order = host.seen.map((entry) => entry.method);
+    expect(order.indexOf(METHOD.toolsCall)).toBeLessThan(order.indexOf(METHOD.message));
+  });
+
+  /** Teardown is not a submit: it flushes, it does not decide anything. */
+  it("does not mark a teardown flush as submitted", async () => {
+    const { host, store } = await connect();
+    host.sendToolInput(assumptionLedger);
+    host.sendToolResult({ structuredContent: { formId: FORM_ID } });
+    await settle();
+    store.getState().setAnswer(VERDICT, "fix");
+
+    await host.teardown();
+    await settle();
+
+    const save = host.last(METHOD.toolsCall)?.params as {
+      arguments: { complete?: boolean; submitted?: boolean };
+    };
+    expect(save.arguments.complete).toBe(true);
+    expect(save.arguments.submitted).toBeUndefined();
   });
 
   /**

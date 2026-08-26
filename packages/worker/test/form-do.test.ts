@@ -237,6 +237,17 @@ describe("attribution (§10)", () => {
     expect((await rpc.getState())?.updatedBy).toBe("octocat");
   });
 
+  it("adds submittedAt to a form table created before it existed", async () => {
+    const { stub, rpc } = await seeded();
+    await runInDurableObject(stub, (_instance, state) => {
+      state.storage.sql.exec("ALTER TABLE form DROP COLUMN submittedAt");
+    });
+    // Same failure mode as `updatedBy` below: every read names the column.
+    expect((await rpc.getState())?.submittedAt).toBeNull();
+    await rpc.saveDraft({ answers: {}, complete: true, submitted: true });
+    expect((await rpc.getState())?.submittedAt).toBeGreaterThan(0);
+  });
+
   it("adds the column to a form table created before build step 7", async () => {
     const { stub, rpc } = await seeded();
     // Reproduce the pre-step-7 shape: the column simply is not there.
@@ -248,6 +259,63 @@ describe("attribution (§10)", () => {
     await bypassThrottle(stub);
     await rpc.saveDraft({ answers: {}, updatedBy: "octocat" });
     expect((await rpc.getState())?.updatedBy).toBe("octocat");
+  });
+});
+
+/* -------------------------------------------------------------------------- */
+
+/**
+ * The submitted marker (§7.2's pull channel).
+ *
+ * `get_answers` reports "these are the answers" or "these are the answers so
+ * far", and the difference is this column. It is written once, by the app's
+ * submit flush, and it must survive later edits — a submitted form the user then
+ * changes is still a submitted form, with a newer `updatedAt`.
+ */
+describe("the submitted marker", () => {
+  it("is null until the app says the user submitted", async () => {
+    const { stub, rpc } = await seeded();
+    expect((await rpc.getState())?.submittedAt).toBeNull();
+    await bypassThrottle(stub);
+    await rpc.saveDraft({ answers: {} });
+    expect((await rpc.getState())?.submittedAt).toBeNull();
+  });
+
+  it("keeps the FIRST submit time across later edits", async () => {
+    const { stub, rpc } = await seeded();
+    await rpc.saveDraft({ answers: {}, complete: true, submitted: true });
+    const first = (await rpc.getState())?.submittedAt;
+    expect(first).toBeGreaterThan(0);
+
+    await bypassThrottle(stub);
+    await rpc.saveDraft({
+      answers: { q: { state: "answered", value: "later" } },
+      complete: true,
+      submitted: true,
+    });
+    const state = await rpc.getState();
+    expect(state?.submittedAt).toBe(first);
+    expect(state?.updatedAt).toBeGreaterThanOrEqual(first as number);
+  });
+
+  /**
+   * The receipt tells the agent to read the answers, so the write behind it
+   * cannot be the one the rate limit drops. Exactly one write per form gets
+   * this exemption — see the comment on `firstSubmit` in form-do.ts.
+   */
+  it("lets the first submit through the rate limit, and only the first", async () => {
+    const { rpc } = await seeded();
+    // `init` leaves lastDraftAt at 0 so the first autosave is never throttled;
+    // this is that one. Everything after it is inside the interval.
+    expect((await rpc.saveDraft({ answers: {} })).ok).toBe(true);
+    const throttled = await rpc.saveDraft({ answers: {} });
+    expect(throttled.ok).toBe(false);
+
+    const submit = await rpc.saveDraft({ answers: {}, complete: true, submitted: true });
+    expect(submit.ok).toBe(true);
+
+    const again = await rpc.saveDraft({ answers: {}, complete: true, submitted: true });
+    expect(again.ok).toBe(false);
   });
 });
 

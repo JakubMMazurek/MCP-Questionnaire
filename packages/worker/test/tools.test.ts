@@ -42,7 +42,9 @@ describe("declaration (§7.1)", () => {
         visibility: ["model", "app"],
       });
     }
-    expect(meta("get_form_guide")).toEqual({ visibility: ["model"] });
+    for (const name of ["get_form_guide", "get_answers"]) {
+      expect(meta(name), name).toEqual({ visibility: ["model"] });
+    }
     // §7.1 — anything the UI needs and the model must not see.
     for (const name of ["save_draft", "get_form_state"]) {
       expect(meta(name), name).toEqual({ visibility: ["app"] });
@@ -382,6 +384,79 @@ describe("get_form_guide", () => {
  * tool handler stamps the login on the write. Any one of those four links
  * breaking shows up here as a null.
  */
+/**
+ * The PULL channel for answers (§7.2).
+ *
+ * This exists because the push one is advisory: the app sends the payload on
+ * `ui/update-model-context`, the extension's own contract is that the host
+ * "will typically defer" it to the next user message, and a host that quietly
+ * drops it leaves the agent holding "form displayed" and not one answer — which
+ * is what the first field session watched happen. So the answers are readable
+ * on demand, by a model-visible tool, and these tests pin the three things the
+ * agent depends on: that they come back at all, that a draft is labelled a
+ * draft, and that the schema does NOT ride along (§3).
+ */
+describe("get_answers (§7.2 — the pull channel)", () => {
+  it("reads the answers back as prose, with labels and values", async () => {
+    const { formId } = await mintForm();
+    const { call, close } = await connect();
+    await call("save_draft", {
+      formId,
+      answers: {
+        "assumptions[r_eu][verdict]": { state: "answered", value: "fix" },
+        "assumptions[r_eu][correction]": {
+          state: "answered",
+          value: "EU and UK",
+          note: "UK is a separate org",
+        },
+        "assumptions[r_cutover][verdict]": { state: "empty" },
+      },
+    });
+    const answers = await call("get_answers", { formId });
+    await close();
+
+    const text = firstText(answers);
+    expect(answers.isError).toBeFalsy();
+    expect(text).toContain(formId);
+    expect(text).toContain("2 of 3 answered, 1 left empty");
+    expect(text).toContain("EU and UK");
+    expect(text).toContain("note: UK is a separate org");
+    // §3 — the schema is never echoed back. The answers are; the form is not.
+    expect(text).not.toContain("single_select");
+    expect(text).not.toContain('"options"');
+  });
+
+  it("says out loud that an unsubmitted form is a draft", async () => {
+    const { formId } = await mintForm();
+    const { call, close } = await connect();
+    await call("save_draft", {
+      formId,
+      answers: { "assumptions[r_eu][verdict]": { state: "answered", value: "fix" } },
+    });
+    const draft = await call("get_answers", { formId });
+    expect(firstText(draft)).toContain("NOT YET SUBMITTED");
+
+    await call("save_draft", {
+      formId,
+      answers: { "assumptions[r_eu][verdict]": { state: "answered", value: "fix" } },
+      complete: true,
+      submitted: true,
+    });
+    const submitted = await call("get_answers", { formId });
+    await close();
+    expect(firstText(submitted)).toContain("Submitted ");
+    expect(firstText(submitted)).not.toContain("NOT YET SUBMITTED");
+  });
+
+  it("teaches, rather than throwing, on an id that is not a form", async () => {
+    const { call, close } = await connect();
+    const result = await call("get_answers", { formId: "not-an-id" });
+    await close();
+    expect(result.isError).toBe(true);
+    expect(firstText(result)).toContain("not found");
+  });
+});
+
 describe("attribution through the OAuth seam (§10)", () => {
   it("stamps the authenticated login on a form the agent creates", async () => {
     const { formId } = await mintForm();

@@ -54,6 +54,7 @@ export {
 } from "./store.js";
 export {
   buildSubmission,
+  countsLine,
   highConfidence,
   labelFor,
   type NoteTriple,

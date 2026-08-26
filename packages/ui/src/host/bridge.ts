@@ -17,6 +17,7 @@ import { App } from "@modelcontextprotocol/ext-apps";
 import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
 import {
   buildSubmission,
+  countsLine,
   type EngineStore,
   type Submission,
   summaryLine,
@@ -84,7 +85,7 @@ export type Bridge = {
   reportSize: (width: number, height: number) => void;
   observe: (element: Element) => () => void;
   /** Flushes the whole rendered view as a `complete` draft. Awaited by teardown. */
-  flush: () => Promise<void>;
+  flush: (options?: { submitted?: boolean }) => Promise<void>;
   /** The server-minted formId, once it is known (§3). */
   formId: () => string | null;
   frozen: () => boolean;
@@ -126,6 +127,31 @@ function debounce(run: () => Promise<void> | void, ms: number): Debounced {
       await fire();
     },
   };
+}
+
+/**
+ * Whether these tool arguments are an ATTEMPT at a form.
+ *
+ * Only `gather_decisions` and `load_form` carry `_meta.ui.resourceUri`, so only
+ * they should ever mount this app — but "should" is the host's promise, not
+ * ours, and the first field session watched a text tool's `{archetype}` land
+ * here and render "this form could not be rendered" to the user. That card
+ * accuses the agent of writing a bad schema; on someone else's tool input it is
+ * a lie, and a loud one.
+ *
+ * So the app decides for itself whether it was handed a form. The test is
+ * STRUCTURAL and generous — the envelope bare, the envelope under `form`, a
+ * `formId` to pull by, or the two properties every envelope has (§4) — because
+ * the validator is still the only thing that judges a form's contents. What
+ * fails this test is not a bad form; it is not a form.
+ */
+export function isFormAttempt(args: unknown): boolean {
+  const args_ = record(args);
+  if (!args_) return false;
+  if (Array.isArray(args_.sections)) return true;
+  if (record(args_.form)) return true;
+  if (typeof args_.formId === "string" && args_.formId.length > 0) return true;
+  return "version" in args_ && "title" in args_;
 }
 
 /**
@@ -250,6 +276,12 @@ export function createBridge(options: BridgeOptions): Bridge {
   let knownFormId: string | null = null;
   /** Set for the next push only: the submit and teardown snapshots (§3). */
   let completeFlush = false;
+  /**
+   * Set for the submit snapshot only. It is what turns the stored draft into a
+   * submitted one, and it is the difference `get_answers` reports back to the
+   * agent — "these are the answers" versus "these are the answers so far".
+   */
+  let submittedFlush = false;
   let lastPartial: unknown = null;
   let unsubscribeStore: (() => void) | null = null;
   let observer: ResizeObserver | null = null;
@@ -311,7 +343,9 @@ export function createBridge(options: BridgeOptions): Bridge {
     const state = store.getState();
     if (!state.form || state.status !== "ready") return;
     const complete = completeFlush;
+    const submitted = submittedFlush;
     completeFlush = false;
+    submittedFlush = false;
     const answers = complete ? (currentSubmission()?.answers ?? state.answers) : state.answers;
     try {
       const result = await app.callServerTool({
@@ -320,6 +354,7 @@ export function createBridge(options: BridgeOptions): Bridge {
           formId: state.form.formId ?? knownFormId,
           answers,
           ...(complete ? { complete: true } : {}),
+          ...(submitted ? { submitted: true } : {}),
         },
       });
       const outcome = draftOutcome(result);
@@ -329,6 +364,7 @@ export function createBridge(options: BridgeOptions): Bridge {
           // it asked for and try again. Not a failure — counting it would trip
           // the give-up counter on a form the user is simply filling fast.
           if (complete) completeFlush = true;
+          if (submitted) submittedFlush = true;
           draftPush.schedule(outcome.retryAfterMs);
           break;
         case "too_large":
@@ -357,10 +393,15 @@ export function createBridge(options: BridgeOptions): Bridge {
    * something: a complete write on an untouched form would spend a round trip
    * to say nothing.
    */
-  const flushComplete = async (): Promise<void> => {
+  const flushComplete = async (options: { submitted?: boolean } = {}): Promise<void> => {
     completeFlush = true;
-    await draftPush.flush({ force: store.getState().revision > 0 });
+    if (options.submitted) submittedFlush = true;
+    // A submit is forced even on an untouched form: "I accept every prefilled
+    // value as it stands" is a real answer, and it is the one a fully prefilled
+    // plan_confirmation exists to collect (§5.4).
+    await draftPush.flush({ force: options.submitted === true || store.getState().revision > 0 });
     completeFlush = false;
+    submittedFlush = false;
   };
 
   /* --------------------------- inbound handling --------------------------- */
@@ -425,6 +466,11 @@ export function createBridge(options: BridgeOptions): Bridge {
   app.addEventListener("toolinput", (params) => {
     frozen = false;
     const args = params.arguments;
+    if (!isFormAttempt(args)) {
+      // Not our tool's input. Draw nothing, say nothing (see `isFormAttempt`).
+      store.getState().noForm();
+      return;
+    }
     const reopened = loadFormId(args);
     if (reopened) {
       knownFormId = reopened;
@@ -520,38 +566,46 @@ export function createBridge(options: BridgeOptions): Bridge {
       const submission = currentSubmission();
       if (!submission || !state.form) return null;
       contextPush.cancel();
-      await flushComplete();
-      // Full structured answers travel here, once (§7.2); `ui/message` is what
-      // triggers the turn.
-      let contextCarried = true;
+      // The submit flush is what stamps the stored draft as submitted, and it
+      // is awaited BEFORE the receipt goes out: the receipt tells the agent to
+      // read the answers, so they had better be written first.
+      await flushComplete({ submitted: true });
+      // Full structured answers travel here too, once (§7.2). Kept, but no
+      // longer RELIED on: it is a push the app cannot verify — see the receipt
+      // below, and `get_answers` on the Worker.
       try {
         await app.updateModelContext({
           content: [{ type: "text", text: summaryLine(state.form, submission.summary) }],
           structuredContent: submission as unknown as Record<string, unknown>,
         });
       } catch {
-        // The message below becomes the payload carrier of last resort.
-        contextCarried = false;
+        // A host that refuses the push is not a reason to break the submit.
       }
       // `content` is an ARRAY of content blocks. The hand-rolled layer sent a
       // single block here and every strict host rejected the submit.
       //
       // The text is a human-readable receipt — `ui/message` lands VISIBLY in
-      // the conversation, so raw JSON here reads as noise to the user (§7.2:
-      // the context channel above carries the payload; this only triggers the
-      // turn). And it is SHORT: the widget above it already shows every answer,
-      // so the receipt only needs to say that the submit happened. The counts
-      // live in the context-channel summary; the serialized submission is
-      // appended ONLY when the context push failed, as carrier of last resort.
-      const receipt = `Submitted “${state.form.title}”.`;
+      // the conversation, and the host asks the user to confirm it before it
+      // sends, so raw JSON here is both noise and an unreviewable payload. It
+      // says one legible thing and hands the agent a POINTER instead: the
+      // formId, and the tool that reads the answers back out of the store.
+      //
+      // That pointer is the fix for the defect the first field session could
+      // not see past. The context channel above is ADVISORY — the extension's
+      // own contract is that the host "will typically defer" it to the next
+      // user message — so an agent relying on it alone can end up holding
+      // "form displayed" and not one answer, which is what happened. A pull the
+      // agent makes itself cannot be silently dropped.
+      //
+      // JSON rides along only when there is no formId to point at: a view with
+      // no server-side store (§3), where the pull does not exist.
+      const formId = state.form.formId ?? knownFormId;
+      const receipt = formId
+        ? `Submitted “${state.form.title}” — ${countsLine(submission.summary)} Read them with get_answers(formId: "${formId}").`
+        : `Submitted “${state.form.title}”.\n\n${JSON.stringify(submission)}`;
       await app.sendMessage({
         role: "user",
-        content: [
-          {
-            type: "text",
-            text: contextCarried ? receipt : `${receipt}\n\n${JSON.stringify(submission)}`,
-          },
-        ],
+        content: [{ type: "text", text: receipt }],
       });
       emit({ type: "submitted", submission });
       return submission;

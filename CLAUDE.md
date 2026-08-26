@@ -1,6 +1,6 @@
 # MCP Questionnaire — build rules
 
-**Status (2026-08-26): all seven §9 build steps are DONE, field-tested on claude.ai** — 359 tests across
+**Status (2026-08-26): all seven §9 build steps are DONE, field-tested twice on claude.ai** — 384 tests across
 `packages/{schema,ui,worker}` (`@mcpq/*` scope), deployed to
 `mcp-questionnaire.qba0550.workers.dev`. **Auth is GitHub OAuth** (step 7):
 `@cloudflare/workers-oauth-provider` owns the Worker's fetch, MCP is served at
@@ -14,6 +14,12 @@ wrangler `vars` entry replaces a same-named secret (so `GITHUB_CLIENT_ID` /
 `GITHUB_CLIENT_SECRET` are secrets and live nowhere in `vars`; fakes are in
 `.dev.vars`), and a trailing newline piped into `wrangler secret put` is a real
 bug that has bitten this deploy before.
+
+**The answers reach the agent by a PULL, not a push.** `ui/update-model-context`
+is advisory — the host may accept it and never surface it, which is exactly what
+the second field session found. The submit receipt carries the formId and names
+`get_answers(formId)`; that tool reads the DO and renders the answers as prose.
+Never make the context channel the only carrier again (§7.2, §9 second session).
 
 **DESIGN.html is the canonical spec.** Read it before implementing anything. Every
 `decided` chip is settled — do not re-litigate or "improve" a decided item; if you

@@ -31,6 +31,15 @@ export type FormStatus =
   | "ready"
   /** A schema arrived and did not validate — render the plain failure state (§6.3). */
   | "invalid"
+  /**
+   * The tool input was not a form at all, so there is nothing to draw and
+   * nothing to complain about. DISTINCT from `invalid`, and the distinction is
+   * the whole point: `invalid` accuses the agent of writing a bad schema in
+   * front of the user, and it must only ever appear when the agent really did.
+   * A host that mounts this app on some other tool's arguments (a text tool
+   * carrying `{archetype}` is the case that happened) gets silence instead.
+   */
+  | "idle"
   /** `ui/notifications/tool-cancelled` — frozen, no more pushes (§7.2). */
   | "cancelled";
 
@@ -75,6 +84,8 @@ export type EngineState = {
 
 export type EngineActions = {
   loadForm: (form: unknown) => void;
+  /** "That input was not a form" — render nothing (see `idle`). */
+  noForm: () => void;
   hydrate: (answers: Answers) => void;
   setAnswer: (path: string, value: unknown) => void;
   setEmpty: (path: string) => void;
@@ -284,6 +295,8 @@ export function createEngineStore(): EngineStore {
           revision: 0,
         });
       },
+
+      noForm: () => set({ status: "idle", form: null, diagnostics: [] }),
 
       hydrate: (answers) => {
         const state = get();

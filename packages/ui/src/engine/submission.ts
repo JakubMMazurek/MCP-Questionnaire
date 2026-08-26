@@ -130,15 +130,23 @@ export function buildSubmission(
 }
 
 /**
- * The one-line progress summary pushed to `ui/update-model-context` (§7.2).
- * A SUMMARY, never the payload — mid-fill context discipline is the whole point.
+ * The counts alone — no title. The submit receipt names the form itself and
+ * would say it twice otherwise.
  */
-export function summaryLine(form: Form, summary: SubmissionSummary): string {
+export function countsLine(summary: SubmissionSummary): string {
   const total = summary.answered + summary.empty;
   const parts = [`${summary.answered} of ${total} answered`];
   if (summary.unreviewed > 0) parts.push(`${summary.unreviewed} inferred values unreviewed`);
   if (summary.changed > 0) parts.push(`${summary.changed} changed from current`);
-  return `"${form.title}": ${parts.join("; ")}.`;
+  return `${parts.join("; ")}.`;
+}
+
+/**
+ * The one-line progress summary pushed to `ui/update-model-context` (§7.2).
+ * A SUMMARY, never the payload — mid-fill context discipline is the whole point.
+ */
+export function summaryLine(form: Form, summary: SubmissionSummary): string {
+  return `"${form.title}": ${countsLine(summary)}`;
 }
 
 /** Paths whose prefill still needs review, for bulk affirm (§5.1). */

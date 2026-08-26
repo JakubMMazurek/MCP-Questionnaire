@@ -462,6 +462,7 @@ function Harness() {
       <div style={styles.stage}>
         <div style={{ ...styles.label, marginBottom: "6px" }}>
           {mode === "inline" ? "inline card (auto-fit height)" : "fullscreen surface"}
+          {platform === "mobile" ? " · phone width (390px)" : ""}
         </div>
         <iframe
           key={generation}
@@ -469,7 +470,16 @@ function Harness() {
           title="MCP Questionnaire renderer"
           src="/index.html"
           style={{
-            width: mode === "inline" ? "min(560px, 100%)" : "100%",
+            // The platform toggle narrows the FRAME too, because that is what
+            // being on a phone actually does to this app: §7.4's media queries
+            // key off the iframe's own viewport, and a 900px-wide "mobile"
+            // frame reproduces none of the conditions worth testing.
+            width:
+              platform === "mobile"
+                ? "min(390px, 100%)"
+                : mode === "inline"
+                  ? "min(560px, 100%)"
+                  : "100%",
             height: mode === "inline" ? `${Math.max(size?.height ?? 160, 120)}px` : "100%",
             minHeight: mode === "inline" ? "120px" : "600px",
             border: "1px solid #d5dad3",

@@ -1,8 +1,11 @@
 /**
- * The app: one of four states (§7.3, §7.4, §6.3).
+ * The app: one of five states (§7.3, §7.4, §6.3).
  *
  *  loading    — skeletons, never spinners, while the schema streams in
  *  invalid    — a plain "could not be rendered" card; never garbage
+ *  idle       — the input was not a form at all: draw nothing (see the bridge's
+ *               `isFormAttempt`). Never confuse this with `invalid`, which
+ *               blames the agent for a schema in front of the user
  *  cancelled  — the form, frozen
  *  ready      — inline (the elicitation card, or a summary), or the full surface
  *
@@ -24,9 +27,10 @@
 import type { Form } from "@mcpq/schema";
 import { useEffect, useRef } from "react";
 import { Button, Pill, Skeleton, StatusLine } from "./components/primitives";
+import type { EngineState } from "./engine/index.js";
 import { FormShell } from "./FormShell";
 import { CounterPill, isComputedField } from "./fields/field";
-import { useBridge, useDraftStatus, useEngine, useFrozen } from "./state";
+import { useBridge, useDraftStatus, useEngine, useFrozen, useMobile } from "./state";
 
 function Loading() {
   // A reopened form pulls its own state (§7.2); if that pull fails the
@@ -69,7 +73,14 @@ function Invalid() {
           <summary>What went wrong</summary>
           <ul className="m-0 pl-4">
             {diagnostics.slice(0, 8).map((diagnostic) => (
-              <li key={`${diagnostic.code}-${diagnostic.location}`}>{diagnostic.message}</li>
+              <li key={`${diagnostic.code}-${diagnostic.location}`}>
+                {/* The LOCATION, not just the sentence. "Expected number, got
+                    nothing" names no field and teaches nobody anything —
+                    CLAUDE.md's rule is that every error says where. */}
+                <code className="font-[family-name:var(--font-mono)]">{diagnostic.location}</code>
+                {" — "}
+                {diagnostic.message}
+              </li>
             ))}
           </ul>
         </details>
@@ -86,25 +97,50 @@ function CancelledBanner() {
   );
 }
 
-/** §7.3 — is this form small enough to render inside the conversation? */
-export function fitsInline(form: Form): boolean {
+/**
+ * §7.3 — is this form small enough to render inside the conversation?
+ *
+ * On a PHONE the answer is almost always no, and the reason is not aesthetics:
+ * "vertical pan gestures inside an inline app go to the conversation scroll, so
+ * inline apps must fit their content height; request fullscreen if you need
+ * your own scroll viewport". Eight fields do not fit ~340 px of phone-width
+ * card, so the card grew its own nested scroll and fought the conversation for
+ * every drag — which is exactly what the field session looked like. Four is
+ * what actually fits without one.
+ *
+ * The composites go the same way for the same reason as `table` and `matrix`
+ * already do: a rank list you drag, a split you balance and a row list you
+ * extend all need room and a scroll of their own. "Editing is a
+ * desktop/tablet affordance" is the spec's own line about grids; it is just as
+ * true of these.
+ */
+export function fitsInline(form: Form, platform: Platform = "web"): boolean {
+  const mobile = platform === "mobile";
   let answerable = 0;
   for (const section of form.sections) {
     for (const field of section.fields) {
       if (field.type === "table" || field.type === "matrix") return false;
+      if (mobile && (field.type === "rank" || field.type === "allocation")) return false;
+      if (mobile && field.type === "repeatable") return false;
       if (field.type === "info" || field.type === "computed") continue;
       answerable += 1;
     }
   }
-  return answerable <= INLINE_FIELD_LIMIT;
+  return answerable <= (mobile ? INLINE_FIELD_LIMIT_MOBILE : INLINE_FIELD_LIMIT);
 }
 
+/** `hostContext.platform`, as the store holds it (§7.4). */
+type Platform = EngineState["platform"];
+
 export const INLINE_FIELD_LIMIT = 8;
+/** §7.3 — what fits a phone-width card without a nested scroll of its own. */
+export const INLINE_FIELD_LIMIT_MOBILE = 4;
 
 function InlineCard() {
   const form = useEngine((state) => state.form);
   const bridge = useBridge();
   const frozen = useFrozen();
+  const mobile = useMobile();
   if (!form) return null;
   const counters = form.sections.flatMap((section) => section.fields.filter(isComputedField));
 
@@ -125,7 +161,8 @@ function InlineCard() {
           disabled={frozen}
           onClick={() => void bridge?.requestDisplayMode("fullscreen")}
         >
-          Review in fullscreen
+          {/* On a phone "fullscreen" describes the mechanism, not the act. */}
+          {mobile ? "Open the form" : "Review in fullscreen"}
         </Button>
         <span className="escape">…or just tell me in chat</span>
       </div>
@@ -137,6 +174,7 @@ export function App() {
   const status = useEngine((state) => state.status);
   const displayMode = useEngine((state) => state.displayMode);
   const form = useEngine((state) => state.form);
+  const platform = useEngine((state) => state.platform);
   const bridge = useBridge();
   const frame = useRef<HTMLDivElement | null>(null);
 
@@ -154,7 +192,7 @@ export function App() {
       {status === "invalid" ? <Invalid /> : null}
       {status === "ready" || status === "cancelled" ? (
         displayMode === "inline" ? (
-          form && fitsInline(form) ? (
+          form && fitsInline(form, platform) ? (
             <FormShell compact />
           ) : (
             <InlineCard />

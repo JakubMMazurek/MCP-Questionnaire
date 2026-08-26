@@ -217,8 +217,8 @@ export function FormShell({ compact = false }: { compact?: boolean } = {}) {
     <div
       className={`mx-auto flex flex-col gap-2 p-4 ${compact ? "max-w-[620px]" : "max-w-[980px]"}`}
     >
-      <header className="flex flex-wrap items-start gap-3">
-        <div className="flex-1">
+      <header className="form-head flex flex-wrap items-start gap-3">
+        <div className="form-title flex-1">
           <h1 className="m-0 text-[length:var(--font-heading-md-size)] font-[var(--font-weight-semibold)] leading-tight">
             {form.title}
           </h1>

@@ -1,6 +1,7 @@
 /**
- * The MCP server: four model-visible tools, two app-visible ones, and one UI
- * resource (§7.1).
+ * The MCP server: four model-visible tools (gather_decisions, get_form_guide,
+ * load_form, get_answers), two app-visible ones (save_draft, get_form_state),
+ * and one UI resource (§7.1).
  *
  * One server instance PER REQUEST. `createMcpHandler` (agents/mcp/server, the
  * current recommendation — `McpAgent` is deprecated and feature-frozen) is
@@ -16,7 +17,7 @@
  */
 
 import type { Answers, Form } from "@mcpq/schema";
-import { validateAnswers, validateForm } from "@mcpq/schema";
+import { reportAnswers, validateAnswers, validateForm } from "@mcpq/schema";
 import { McpServer } from "@modelcontextprotocol/server";
 import { getMcpAuthContext } from "agents/mcp/server";
 import { z } from "zod";
@@ -25,6 +26,7 @@ import type { FormState, FormStore, SaveDraftResult } from "./form-do.js";
 import { isFormId, mintFormId } from "./form-id.js";
 import {
   GATHER_DECISIONS_DESCRIPTION,
+  GET_ANSWERS_DESCRIPTION,
   GET_FORM_GUIDE_DESCRIPTION,
   GET_FORM_STATE_DESCRIPTION,
   LOAD_FORM_DESCRIPTION,
@@ -42,7 +44,7 @@ import {
 } from "./renderer-resource.js";
 import { diagnosticsWithExample, serialiseExample } from "./worked-example.js";
 
-export const SERVER_INFO = { name: "mcp-questionnaire", version: "0.2.0" } as const;
+export const SERVER_INFO = { name: "mcp-questionnaire", version: "0.3.0" } as const;
 
 /* -------------------------------------------------------------------------- */
 /* _meta.ui (§7.1)                                                            */
@@ -313,6 +315,54 @@ export function createServer(env: WorkerEnv): McpServer {
     },
   );
 
+  /* ------------------------------- get_answers --------------------------- */
+
+  /**
+   * The PULL channel for answers, and the reason it exists is a field defect
+   * rather than a design preference.
+   *
+   * §7.2's context discipline says the payload travels on
+   * `ui/update-model-context` and `ui/message` carries only a receipt. That is
+   * still the right division — a user-role message full of JSON is noise in the
+   * conversation, and the app composing a user turn is the injection vector the
+   * host makes the user confirm. But the context channel is advisory: the
+   * extension's own contract is that the host "will typically defer" it to the
+   * next user message, and a host that drops it silently leaves the agent
+   * holding "form displayed" and nothing else, which is exactly what the first
+   * field session saw. A push the agent cannot verify is not a channel.
+   *
+   * So: model-visible, text-only, no widget. §3's "the result is a stub" is not
+   * violated — the rule exists so the SCHEMA is not paid for twice, and the
+   * schema is not what comes back here. The answers are the thing the agent
+   * asked for, and they come back once, when asked for.
+   */
+  server.registerTool(
+    "get_answers",
+    {
+      title: "Get answers",
+      description: GET_ANSWERS_DESCRIPTION,
+      inputSchema: z.object({
+        formId: z.string().describe("The id returned by gather_decisions."),
+      }),
+      _meta: textOnlyMeta,
+    },
+    async ({ formId }) => {
+      if (!isFormId(formId)) return failure(NOT_FOUND(formId));
+      const state: FormState | null = await formStore(env, formId).getState();
+      if (!state) return failure(NOT_FOUND(formId));
+
+      const report = reportAnswers(state.form, state.answers);
+      const when = new Date(state.submittedAt ?? state.updatedAt).toISOString();
+      const status =
+        state.submittedAt === null
+          ? `NOT YET SUBMITTED — this is the draft as it stands at ${when}. The user may still be filling it in.`
+          : `Submitted ${when}.`;
+
+      logEvent({ event: "answers_served", count: report.answered });
+      return text([`"${state.form.title}" (formId ${formId})`, status, "", report.text].join("\n"));
+    },
+  );
+
   /* ----------------------------- get_form_state -------------------------- */
 
   /**
@@ -360,6 +410,7 @@ export function createServer(env: WorkerEnv): McpServer {
           answers: state.answers,
           createdAt: state.createdAt,
           updatedAt: state.updatedAt,
+          submittedAt: state.submittedAt,
           // §10 attribution. App-visible only, and it is the viewer's own
           // login in the single-user case — the renderer ignores it today, but
           // "who last wrote this" is the question the column exists to answer.
@@ -397,10 +448,16 @@ export function createServer(env: WorkerEnv): McpServer {
           .describe(
             "True only when `answers` is the whole answer map for the rendered view; paths absent from it are then deleted. Default false = incremental upsert.",
           ),
+        submitted: z
+          .boolean()
+          .optional()
+          .describe(
+            "True on the submit flush only: this payload is what the user submitted. Stamps submittedAt once; implies `complete`.",
+          ),
       }),
       _meta: appOnlyMeta,
     },
-    async ({ formId, answers, complete }) => {
+    async ({ formId, answers, complete, submitted }) => {
       if (formId === null) {
         return {
           content: [
@@ -426,6 +483,7 @@ export function createServer(env: WorkerEnv): McpServer {
         answers: shape.answers as Answers,
         updatedBy: currentLogin(),
         ...(complete === undefined ? {} : { complete }),
+        ...(submitted === undefined ? {} : { submitted }),
       });
 
       if (result.ok) {

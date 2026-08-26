@@ -32,6 +32,9 @@ If you have not called get_form_guide in this conversation, call it first. It re
 HOW
 Pass the form envelope as \`form\`. Prefill everything you can infer and mark it as inferred with a rationale — a form of empty fields is worse than the prose it replaced. The result is a short stub plus a formId; the schema is never echoed back to you. Reopen the same form later with load_form(formId), and pass formIds forward when you chain forms rather than re-serialising answers.
 
+READING THE ANSWERS
+You do NOT see what the user typed by watching the form. When they submit, a one-line receipt arrives in the conversation naming the formId — call get_answers(formId) to read the answers. Do that before you act on them, and do not guess or ask the user to repeat themselves.
+
 If the envelope is malformed you get the specific errors plus a worked example back, and can call again.`;
 
 export const GET_FORM_GUIDE_DESCRIPTION = `Return the generation recipe and worked examples for one form archetype. Call this before gather_decisions if you have not already in this conversation — it is where the craft lives, and it costs one round trip against a human filling in a form.
@@ -42,6 +45,12 @@ archetype:
 - convergence — prune and rank options you just produced in prose.
 - plan_confirmation — a fully prefilled plan or draft for approval, with per-part notes.
 - matrix — a 2D grid (roles x permissions, fields x profiles).`;
+
+export const GET_ANSWERS_DESCRIPTION = `Read back the answers the user gave on a form. Takes the formId from gather_decisions (the submit receipt in the conversation repeats it).
+
+This is how the answers reach you. The form is a surface the user interacts with directly; nothing they select is visible to you until you read it here. Call this as soon as a submit receipt appears, and again after any turn in which the user may have changed something.
+
+The result is one line per question — the label the user saw, the path, and the value — including the ones left empty, which are answers too. It says whether the form was submitted or is still a draft; a draft is safe to read, it is just not a decision yet.`;
 
 export const LOAD_FORM_DESCRIPTION = `Re-open a form that was already rendered, with everything the user has answered so far. Forms are documents, not one-shot events — use this to bring one back after other turns, or to show the user their own state again. Takes the formId returned by gather_decisions.`;
 
