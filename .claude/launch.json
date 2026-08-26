@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "ui-harness",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["--filter", "@gather/ui", "dev"],
+      "port": 5173
+    }
+  ]
+}
