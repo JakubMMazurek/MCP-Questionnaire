@@ -1,16 +1,20 @@
 /**
  * The host bridge (§7.2) — everything that crosses the postMessage boundary.
  *
- * Context discipline is the rule that shapes this file: mid-fill pushes carry a
- * one-line SUMMARY and nothing else, the full structured payload goes over
- * exactly once, on submit. Drafts travel as an app-visible `tools/call`
- * (`save_draft`) because the iframe cannot POST anywhere — that is the point of
- * `connect-src 'none'` (§3), and it means autosave must tolerate the tool not
- * existing yet.
+ * The WIRE is not ours: `@modelcontextprotocol/ext-apps`' `App` owns the
+ * handshake, the JSON-RPC framing and every message shape, so what this file
+ * still owns is the etiquette above it. That etiquette is the whole point:
+ * mid-fill pushes carry a one-line SUMMARY and nothing else, the full
+ * structured payload goes over exactly once, on submit. Drafts travel as an
+ * app-visible `tools/call` (`save_draft`) because the iframe cannot POST
+ * anywhere — that is what `connect-src 'none'` means (§3), and it means
+ * autosave must tolerate the tool not existing yet.
  */
 
 import type { Answers } from "@mcpq/schema";
 import { validateForm } from "@mcpq/schema";
+import { App } from "@modelcontextprotocol/ext-apps";
+import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
 import {
   buildSubmission,
   type EngineStore,
@@ -23,14 +27,9 @@ import {
   type DisplayModeName,
   GET_FORM_STATE_TOOL,
   type HostContext,
-  type InitializeResult,
-  METHOD,
-  PROTOCOL_VERSION,
   SAVE_DRAFT_TOOL,
   type ToolCallResult,
 } from "./protocol.js";
-import { RpcPeer } from "./rpc.js";
-import type { Transport } from "./transport.js";
 
 /** §7.2 — debounced progress summary. */
 export const MODEL_CONTEXT_DEBOUNCE_MS = 2_000;
@@ -58,7 +57,13 @@ export type BridgeEvent =
   | { type: "submitted"; submission: Submission };
 
 export type BridgeOptions = {
-  transport: Transport;
+  /**
+   * An SDK transport. Omitted in the bundle, where the SDK's own default —
+   * `new PostMessageTransport(window.parent, window.parent)`, i.e. "talk to
+   * whatever framed us" — is exactly right. The tests and the dev harness pass
+   * one, and the app cannot tell the difference. That is the point.
+   */
+  transport?: Transport;
   store: EngineStore;
   /** Called for every host-context change, so React can re-render on theme. */
   onEvent?: (event: BridgeEvent) => void;
@@ -175,8 +180,9 @@ export function loadFormId(args: unknown): string | null {
  * render learns which store it is autosaving into. Ignoring it is what made
  * `save_draft` send `formId: null` forever.
  *
- * Both the bare `CallToolResult` and a `{ result: … }` wrapper are accepted:
- * hosts differ, and the cost of tolerating both is one line.
+ * The extension defines this notification's params as a bare `CallToolResult`,
+ * which is what the SDK now hands us. The `{ result: … }` wrapper is still
+ * tolerated: hosts differ, and the cost of accepting both is one line.
  */
 export function resultFormId(params: unknown): string | null {
   const outer = record(params);
@@ -227,7 +233,7 @@ export function draftOutcome(result: ToolCallResult | undefined): DraftOutcome {
 }
 
 export function createBridge(options: BridgeOptions): Bridge {
-  const { store, transport } = options;
+  const { store } = options;
   const apply = options.applyContext ?? applyHostContext;
   const emit = (event: BridgeEvent): void => options.onEvent?.(event);
 
@@ -248,21 +254,21 @@ export function createBridge(options: BridgeOptions): Bridge {
   let unsubscribeStore: (() => void) | null = null;
   let observer: ResizeObserver | null = null;
 
-  const peer = new RpcPeer(transport, {
-    onNotification: (method, params) => handleNotification(method, params),
-    onRequest: async (method) => {
-      if (method === METHOD.teardown) {
-        // A REQUEST, not a notification: the host waits, so the final draft
-        // flush happens before we answer (§7.2).
-        emit({ type: "teardown" });
-        await flushComplete();
-        frozen = true;
-        contextPush.cancel();
-        return {};
-      }
-      return {};
+  /**
+   * `autoResize: false` is deliberate. The SDK's own auto-resize observes
+   * `documentElement` and `body` and reports unconditionally; §7.3 says the app
+   * reports its height ONLY inline, because in fullscreen the viewport belongs
+   * to us and a height report would fight the host for it. So `observe()` below
+   * keeps our ResizeObserver, which measures the element we hand it and routes
+   * through the display-mode gate in `reportSize`.
+   */
+  const app = new App(
+    APP_INFO,
+    { availableDisplayModes: ["inline", "fullscreen"] },
+    {
+      autoResize: false,
     },
-  });
+  );
 
   /* ---------------------------- outbound pushes --------------------------- */
 
@@ -281,7 +287,7 @@ export function createBridge(options: BridgeOptions): Bridge {
     const submission = currentSubmission();
     if (!submission || !state.form) return;
     try {
-      await peer.request(METHOD.updateModelContext, {
+      await app.updateModelContext({
         content: [{ type: "text", text: summaryLine(state.form, submission.summary) }],
       });
     } catch {
@@ -308,7 +314,7 @@ export function createBridge(options: BridgeOptions): Bridge {
     completeFlush = false;
     const answers = complete ? (currentSubmission()?.answers ?? state.answers) : state.answers;
     try {
-      const result = await peer.request<ToolCallResult>(METHOD.toolsCall, {
+      const result = await app.callServerTool({
         name: SAVE_DRAFT_TOOL,
         arguments: {
           formId: state.form.formId ?? knownFormId,
@@ -386,7 +392,7 @@ export function createBridge(options: BridgeOptions): Bridge {
    */
   async function hydrateFromServer(formId: string): Promise<void> {
     try {
-      const result = await peer.request<ToolCallResult>(METHOD.toolsCall, {
+      const result = await app.callServerTool({
         name: GET_FORM_STATE_TOOL,
         arguments: { formId },
       });
@@ -409,58 +415,71 @@ export function createBridge(options: BridgeOptions): Bridge {
     }
   }
 
-  function handleNotification(method: string, params: unknown): void {
-    const args = (params as { arguments?: unknown } | undefined)?.arguments;
-    switch (method) {
-      case METHOD.toolInput: {
-        frozen = false;
-        const reopened = loadFormId(args);
-        if (reopened) {
-          knownFormId = reopened;
-          void hydrateFromServer(reopened);
-        } else {
-          loadFromArguments(args);
-        }
-        break;
-      }
-      case METHOD.toolInputPartial: {
-        // Best-effort: buffer, and render only once the prefix validates. A
-        // half-parsed schema must never flash a broken form (§6.3).
-        lastPartial = args;
-        const candidate = extractForm(lastPartial);
-        if (validateForm(candidate).ok) loadFromArguments(lastPartial);
-        break;
-      }
-      case METHOD.toolCancelled: {
-        frozen = true;
-        contextPush.cancel();
-        draftPush.cancel();
-        store.getState().cancel();
-        emit({
-          type: "cancelled",
-          reason: (params as { reason?: string } | undefined)?.reason ?? "cancelled",
-        });
-        break;
-      }
-      case METHOD.hostContextChanged: {
-        hostContext = mergeHostContext(hostContext, (params ?? {}) as HostContext);
-        apply(hostContext);
-        adoptContext();
-        emit({ type: "context", context: hostContext });
-        break;
-      }
-      case METHOD.toolResult: {
-        // The result is a stub by design (§3) — nothing to RENDER. But the stub
-        // carries the server-minted formId, and on a fresh render that is the
-        // only place the app can learn it, so `save_draft` stops sending null.
-        const learned = resultFormId(params);
-        if (learned) knownFormId = learned;
-        break;
-      }
-      default:
-        break;
+  /*
+   * Handlers are registered HERE, at construction, and never after `connect()`:
+   * the host may fire `tool-input` the instant it sees
+   * `ui/notifications/initialized`, and the SDK warns (and will one day throw)
+   * about a one-shot handler registered late.
+   */
+
+  app.addEventListener("toolinput", (params) => {
+    frozen = false;
+    const args = params.arguments;
+    const reopened = loadFormId(args);
+    if (reopened) {
+      knownFormId = reopened;
+      void hydrateFromServer(reopened);
+    } else {
+      loadFromArguments(args);
     }
-  }
+  });
+
+  app.addEventListener("toolinputpartial", (params) => {
+    // Best-effort: buffer, and render only once the prefix validates. Partial
+    // arguments are brace-HEALED JSON, so a half-parsed schema is not merely
+    // incomplete, it can be wrong — and must never flash a broken form (§6.3).
+    lastPartial = params.arguments;
+    const candidate = extractForm(lastPartial);
+    if (validateForm(candidate).ok) loadFromArguments(lastPartial);
+  });
+
+  app.addEventListener("toolresult", (params) => {
+    // The result is a stub by design (§3) — nothing to RENDER. But the stub
+    // carries the server-minted formId, and on a fresh render that is the
+    // only place the app can learn it, so `save_draft` stops sending null.
+    const learned = resultFormId(params);
+    if (learned) knownFormId = learned;
+  });
+
+  app.addEventListener("toolcancelled", (params) => {
+    frozen = true;
+    contextPush.cancel();
+    draftPush.cancel();
+    store.getState().cancel();
+    emit({ type: "cancelled", reason: params.reason ?? "cancelled" });
+  });
+
+  app.addEventListener("hostcontextchanged", (params) => {
+    // The SDK merges the patch into its own copy SHALLOWLY, which would drop a
+    // palette when a theme-only patch arrives. Ours is the merged copy that
+    // matters, and `mergeHostContext` merges `styles.variables` properly.
+    hostContext = mergeHostContext(hostContext, params);
+    apply(hostContext);
+    adoptContext();
+    emit({ type: "context", context: hostContext });
+  });
+
+  /**
+   * Teardown is a REQUEST, not a notification: the host waits for our response,
+   * so the final draft flush completes before the view is unmounted (§7.2).
+   */
+  app.onteardown = async () => {
+    emit({ type: "teardown" });
+    await flushComplete();
+    frozen = true;
+    contextPush.cancel();
+    return {};
+  };
 
   /* -------------------------------- public -------------------------------- */
 
@@ -468,21 +487,20 @@ export function createBridge(options: BridgeOptions): Bridge {
     if (frozen) return;
     // Inline auto-fit only: in fullscreen the viewport is ours (§7.3).
     if (store.getState().displayMode !== "inline") return;
-    peer.notify(METHOD.sizeChanged, { width, height });
+    try {
+      void app.sendSizeChanged({ width, height });
+    } catch {
+      // Not connected yet, or already closed. A size report is never worth a throw.
+    }
   };
 
   return {
     async start() {
-      const result = await peer.request<InitializeResult>(METHOD.initialize, {
-        protocolVersion: PROTOCOL_VERSION,
-        clientInfo: APP_INFO,
-        appCapabilities: { availableDisplayModes: ["inline", "fullscreen"] },
-      });
-      hostContext = result?.hostContext ?? {};
+      await app.connect(options.transport);
+      hostContext = app.getHostContext() ?? {};
       apply(hostContext);
       adoptContext();
       emit({ type: "context", context: hostContext });
-      peer.notify(METHOD.initialized, {});
 
       let revision = store.getState().revision;
       unsubscribeStore = store.subscribe((state) => {
@@ -506,19 +524,23 @@ export function createBridge(options: BridgeOptions): Bridge {
       // Full structured answers travel here, once (§7.2); `ui/message` is what
       // triggers the turn.
       try {
-        await peer.request(METHOD.updateModelContext, {
+        await app.updateModelContext({
           content: [{ type: "text", text: summaryLine(state.form, submission.summary) }],
           structuredContent: submission as unknown as Record<string, unknown>,
         });
       } catch {
         // Fall through: the message below still carries the payload.
       }
-      await peer.request(METHOD.message, {
+      // `content` is an ARRAY of content blocks. The hand-rolled layer sent a
+      // single block here and every strict host rejected the submit.
+      await app.sendMessage({
         role: "user",
-        content: {
-          type: "text",
-          text: `${summaryLine(state.form, submission.summary)}\n\n${JSON.stringify(submission)}`,
-        },
+        content: [
+          {
+            type: "text",
+            text: `${summaryLine(state.form, submission.summary)}\n\n${JSON.stringify(submission)}`,
+          },
+        ],
       });
       emit({ type: "submitted", submission });
       return submission;
@@ -526,9 +548,7 @@ export function createBridge(options: BridgeOptions): Bridge {
 
     async requestDisplayMode(mode) {
       try {
-        const result = await peer.request<{ mode?: DisplayModeName }>(METHOD.requestDisplayMode, {
-          mode,
-        });
+        const result = await app.requestDisplayMode({ mode });
         const granted = result?.mode ?? mode;
         if (granted !== "pip") store.getState().setDisplayMode(granted);
         return granted;
@@ -565,8 +585,7 @@ export function createBridge(options: BridgeOptions): Bridge {
       draftPush.cancel();
       unsubscribeStore?.();
       observer?.disconnect();
-      peer.close();
-      transport.stop();
+      void app.close();
     },
   };
 }

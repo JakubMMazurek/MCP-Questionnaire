@@ -8,12 +8,15 @@
 import { createRoot } from "react-dom/client";
 import { App } from "./App";
 import { createEngineStore } from "./engine/index.js";
-import { createBridge, parentTransport } from "./host/index.js";
+import { createBridge } from "./host/index.js";
 import { AppProvider } from "./state";
 import "./styles.css";
 
 const store = createEngineStore();
-const bridge = createBridge({ transport: parentTransport(), store });
+// No transport: the SDK's default is `PostMessageTransport(window.parent,
+// window.parent)` — talk to whatever framed us, and validate that the replies
+// come back from it.
+const bridge = createBridge({ store });
 const container = document.getElementById("root");
 
 if (container) {

@@ -1,27 +1,43 @@
 /**
- * The host bridge against a faked host over the same transport (§7.2).
+ * The host bridge against the SDK's OWN host side (§7.2).
  *
- * What these tests pin down is the etiquette, because getting it wrong is
- * invisible until it is deployed: the handshake order, that mid-fill pushes
- * carry a summary and not the payload, that teardown answers only after the
- * final draft flush, and that a missing `save_draft` tool is a non-event.
+ * Both ends now run `@modelcontextprotocol/ext-apps` — `App` here, `AppBridge`
+ * in `fake-host.ts` — so these tests are checked against the extension's real
+ * generated schemas rather than against a fake we wrote to match ourselves.
+ * That distinction is the whole reason this file exists: the hand-rolled layer
+ * this replaced sent `clientInfo` where `ui/initialize` requires `appInfo`, and
+ * a single content block where `ui/message` requires an array, and a suite with
+ * a hand-rolled host on the other end could never have caught either.
+ *
+ * What these tests pin down above the wire is the etiquette, because getting it
+ * wrong is invisible until it is deployed: the handshake order, that mid-fill
+ * pushes carry a summary and not the payload, that teardown answers only after
+ * the final draft flush, and that a missing `save_draft` tool is a non-event.
  */
 
 import type { Answers } from "@mcpq/schema";
 import { assumptionLedger } from "@mcpq/schema";
+import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
+import type { CallToolRequest } from "@modelcontextprotocol/sdk/types.js";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createEngineStore, type EngineStore } from "../engine/index.js";
 import { createBridge, MODEL_CONTEXT_DEBOUNCE_MS, SAVE_DRAFT_DEBOUNCE_MS } from "./bridge.js";
 import { createFakeHost, type FakeHost } from "./fake-host.js";
 import { type HostContext, METHOD } from "./protocol.js";
-import { memoryPair } from "./transport.js";
 
-/** Lets every queued microtask (the memory transport's delivery) run. */
-async function settle(times = 6): Promise<void> {
+/**
+ * Lets every queued microtask run. The SDK's `Protocol` puts a few more promise
+ * hops between a send and its response than the hand-rolled peer did, so this
+ * is generous rather than exact — it costs nothing and removes a class of
+ * flake.
+ */
+async function settle(times = 24): Promise<void> {
   for (let i = 0; i < times; i += 1) await new Promise<void>((resolve) => queueMicrotask(resolve));
 }
 
 const VERDICT = "assumptions[r_eu][verdict]";
+
+type ToolsCall = (params: CallToolRequest["params"]) => unknown | Error;
 
 type Harness = {
   store: EngineStore;
@@ -31,18 +47,18 @@ type Harness = {
 };
 
 async function connect(
-  options: { hostContext?: HostContext; onToolsCall?: (params: unknown) => unknown | Error } = {},
+  options: { hostContext?: HostContext; onToolsCall?: ToolsCall } = {},
 ): Promise<Harness> {
-  const pair = memoryPair();
+  const [appTransport, hostTransport] = InMemoryTransport.createLinkedPair();
   const store = createEngineStore();
   const applied: HostContext[] = [];
   const host = createFakeHost({
-    transport: pair.host,
+    transport: hostTransport,
     ...(options.hostContext ? { hostContext: options.hostContext } : {}),
     ...(options.onToolsCall ? { onToolsCall: options.onToolsCall } : {}),
   });
   const bridge = createBridge({
-    transport: pair.app,
+    transport: appTransport,
     store,
     applyContext: (context) => applied.push(context),
   });
@@ -71,6 +87,22 @@ describe("the handshake (§7.2)", () => {
       protocolVersion: "2026-01-26",
       appCapabilities: { availableDisplayModes: ["inline", "fullscreen"] },
     });
+  });
+
+  /**
+   * The regression that made the deployed app invisible in claude.ai. The
+   * extension names this field `appInfo`; we sent `clientInfo`, our own fake
+   * host did not care, and a host that validates rejects the connect — which
+   * per the MCP Apps troubleshooting guide renders as nothing at all.
+   */
+  it("identifies itself as appInfo, never clientInfo", async () => {
+    const { host } = await connect();
+    const params = host.seen[0]?.params as Record<string, unknown>;
+    expect(params.appInfo).toEqual({
+      name: "mcp-questionnaire-renderer",
+      version: "0.1.0",
+    });
+    expect(params).not.toHaveProperty("clientInfo");
   });
 
   it("consumes hostContext: variables, theme and display mode", async () => {
@@ -258,10 +290,31 @@ describe("submit (§5.6)", () => {
 
     const message = host.last(METHOD.message)?.params as {
       role: string;
-      content: { type: string; text: string };
+      content: { type: string; text: string }[];
     };
     expect(message.role).toBe("user");
-    expect(message.content.text).toContain('"state":"answered"');
+    expect(message.content[0]?.text).toContain('"state":"answered"');
+  });
+
+  /**
+   * `ui/message` params are `{ role, content: ContentBlock[] }`. The
+   * hand-rolled layer sent ONE block, unwrapped — schema-invalid, so a strict
+   * host drops the submit and the user's answers go nowhere.
+   */
+  it("sends ui/message content as an array of blocks", async () => {
+    const { host, store, bridge } = await connect();
+    host.sendToolInput(assumptionLedger);
+    await settle();
+    store.getState().setAnswer(VERDICT, "fix");
+
+    const promise = bridge.submit();
+    await vi.advanceTimersByTimeAsync(0);
+    await settle();
+    await promise;
+
+    const message = host.last(METHOD.message)?.params as { content: unknown };
+    expect(Array.isArray(message.content)).toBe(true);
+    expect(message.content).toMatchObject([{ type: "text" }]);
   });
 
   it("flushes a pending draft before the payload goes out", async () => {

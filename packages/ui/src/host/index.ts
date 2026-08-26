@@ -1,5 +1,10 @@
 /**
- * The host bridge — MCP Apps postMessage JSON-RPC (§7).
+ * The host bridge — MCP Apps postMessage JSON-RPC (§7), spoken through
+ * `@modelcontextprotocol/ext-apps`.
+ *
+ * `fake-host.ts` is deliberately NOT re-exported here. It pulls in the SDK's
+ * host-side `AppBridge`, which has no business in a bundle that only ever plays
+ * the app; the tests and the dev harness import it by path.
  */
 
 export {
@@ -16,7 +21,6 @@ export {
   SAVE_DRAFT_DEBOUNCE_MS,
 } from "./bridge.js";
 export { applyHostContext, mergeHostContext } from "./dom.js";
-export { createFakeHost, type FakeHost, type Seen } from "./fake-host.js";
 export {
   APP_INFO,
   type DisplayModeName,
@@ -29,12 +33,3 @@ export {
   type StyleVariables,
   type ToolCallResult,
 } from "./protocol.js";
-export { RpcError, type RpcHandlers, RpcPeer } from "./rpc.js";
-export {
-  isJsonRpc,
-  type JsonRpcMessage,
-  memoryPair,
-  parentTransport,
-  type Transport,
-  windowTransport,
-} from "./transport.js";

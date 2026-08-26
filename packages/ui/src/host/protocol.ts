@@ -1,85 +1,118 @@
 /**
- * MCP Apps wire protocol — extension `io.modelcontextprotocol/ui`, revision
- * 2026-01-26 (SEP-1865, Stable).
+ * The MCP Apps wire vocabulary — extension `io.modelcontextprotocol/ui`,
+ * revision 2026-01-26 (SEP-1865, Stable).
  *
- * Method names and shapes verified against
- * modelcontextprotocol/ext-apps `specification/2026-01-26/apps.mdx` on
- * 2026-08-26 rather than from memory (CLAUDE.md, currency rule). Notable
- * details that are easy to get wrong and are load-bearing here:
- *  - `ui/resource-teardown` is a REQUEST: the host waits for our response, so
- *    the final draft flush can complete before the view is torn down.
- *  - `ui/update-model-context` and `ui/message` are requests too (result `{}`),
- *    not notifications.
- *  - JSON-RPC objects are posted to the parent frame with no envelope.
- *  - The host must not send tool notifications before it has seen
- *    `ui/notifications/initialized`.
+ * This file used to hand-write the protocol. It no longer does: every constant
+ * and every type below now comes from `@modelcontextprotocol/ext-apps`, the
+ * official SDK, and this module is a thin naming layer over it so the rest of
+ * the package (and the tests, and the harness) can keep reading `METHOD.toolsCall`
+ * instead of a bare string.
+ *
+ * The reason for the swap is not tidiness. The hand-rolled `ui/initialize` sent
+ * `clientInfo` where the schema requires `appInfo`, and `ui/message` sent a
+ * single content block where the schema requires an array — our own fake host
+ * accepted both (same author on both sides), and Claude's host, which validates
+ * against these schemas, did not. A rejected connect is an invisible app.
+ *
+ * What the SDK does NOT give us is noted inline: two method strings have no
+ * exported constant, so they are spelled out here and nowhere else.
  */
 
-export const PROTOCOL_VERSION = "2026-01-26";
+import {
+  HOST_CONTEXT_CHANGED_METHOD,
+  INITIALIZE_METHOD,
+  INITIALIZED_METHOD,
+  LATEST_PROTOCOL_VERSION,
+  type McpUiDisplayMode,
+  type McpUiHostContext,
+  type McpUiHostCss,
+  type McpUiInitializeResult,
+  type McpUiStyles,
+  MESSAGE_METHOD,
+  REQUEST_DISPLAY_MODE_METHOD,
+  RESOURCE_TEARDOWN_METHOD,
+  SIZE_CHANGED_METHOD,
+  TOOL_CANCELLED_METHOD,
+  TOOL_INPUT_METHOD,
+  TOOL_INPUT_PARTIAL_METHOD,
+  TOOL_RESULT_METHOD,
+} from "@modelcontextprotocol/ext-apps";
+import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 
+/** `"2026-01-26"`, negotiated by the SDK — never by us. */
+export const PROTOCOL_VERSION = LATEST_PROTOCOL_VERSION;
+
+/** Sent as `ui/initialize` params `appInfo` (NOT `clientInfo` — that was the bug). */
 export const APP_INFO = { name: "mcp-questionnaire-renderer", version: "0.1.0" } as const;
 
-/** Every method this app sends or handles. */
+/**
+ * Every method this app sends or handles, named. The SDK exports a constant for
+ * all but two of them; those two are marked.
+ */
 export const METHOD = {
   /** app → host, request. Result carries `hostContext` + `hostCapabilities`. */
-  initialize: "ui/initialize",
+  initialize: INITIALIZE_METHOD,
   /** app → host, notification. Unblocks the host's tool notifications. */
-  initialized: "ui/notifications/initialized",
+  initialized: INITIALIZED_METHOD,
   /** host → app, notification: the tool arguments (the form schema). */
-  toolInput: "ui/notifications/tool-input",
-  /** host → app, notification: a streaming prefix of the same. */
-  toolInputPartial: "ui/notifications/tool-input-partial",
-  /** host → app, notification: the stub result (§3) — ignored. */
-  toolResult: "ui/notifications/tool-result",
+  toolInput: TOOL_INPUT_METHOD,
+  /** host → app, notification: a streaming, brace-healed prefix of the same. */
+  toolInputPartial: TOOL_INPUT_PARTIAL_METHOD,
+  /** host → app, notification: the stub result (§3) — carries the formId. */
+  toolResult: TOOL_RESULT_METHOD,
   /** host → app, notification: cancelled. Freeze, stop autosaving. */
-  toolCancelled: "ui/notifications/tool-cancelled",
+  toolCancelled: TOOL_CANCELLED_METHOD,
   /** host → app, notification: partial host context; merge it. */
-  hostContextChanged: "ui/notifications/host-context-changed",
+  hostContextChanged: HOST_CONTEXT_CHANGED_METHOD,
   /** host → app, REQUEST: respond when the final flush is done. */
-  teardown: "ui/resource-teardown",
-  /** app → host, request: plain MCP, proxied. How `save_draft` travels (§3). */
+  teardown: RESOURCE_TEARDOWN_METHOD,
+  /**
+   * app → host, request: plain MCP, proxied. How `save_draft` travels (§3).
+   * No SDK constant — it is core MCP, not part of the UI extension.
+   */
   toolsCall: "tools/call",
-  /** app → host, request: overwrites, does not trigger a turn (§7.2). */
+  /**
+   * app → host, request: overwrites, does not trigger a turn (§7.2).
+   * No SDK constant: `ext-apps` exports `MESSAGE_METHOD` and the rest, but not
+   * this one. Spelled out here rather than at every call site.
+   */
   updateModelContext: "ui/update-model-context",
   /** app → host, request: submit — triggers the next turn. */
-  message: "ui/message",
+  message: MESSAGE_METHOD,
   /** app → host, request: inline → fullscreen. */
-  requestDisplayMode: "ui/request-display-mode",
+  requestDisplayMode: REQUEST_DISPLAY_MODE_METHOD,
   /** app → host, notification: inline auto-fit. */
-  sizeChanged: "ui/notifications/size-changed",
+  sizeChanged: SIZE_CHANGED_METHOD,
 } as const;
 
-export type DisplayModeName = "inline" | "fullscreen" | "pip";
+/** `"inline" | "fullscreen" | "pip"`. */
+export type DisplayModeName = McpUiDisplayMode;
 
-/** `hostContext.styles.variables` — standardized `--color-*` / `--font-*` keys (§7.4). */
-export type StyleVariables = Record<string, string | undefined>;
+/**
+ * `hostContext.styles.variables` — the closed `--color-*` / `--font-*` keys (§7.4).
+ *
+ * `Partial`, deliberately. The SDK types this as `Record<Key, string |
+ * undefined>` — a TOTAL record — and says so in its own comment: the shape is
+ * chosen "for compatibility with Zod schema generation", and is "functionally
+ * equivalent for validation". It is not equivalent for TypeScript: a total
+ * record makes every partial palette a type error, and a partial palette is the
+ * normal case (§7.4 exists precisely because a host may send any subset).
+ */
+export type StyleVariables = Partial<McpUiStyles>;
 
+export type HostStyles = { variables?: StyleVariables; css?: McpUiHostCss };
+
+/**
+ * The host environment as the extension defines it, with `styles` relaxed per
+ * the note on {@link StyleVariables}. Written as a homomorphic mapped type so
+ * every other field — and the extension's forward-compatibility index
+ * signature — stays exactly the SDK's, and gains whatever the SDK gains.
+ */
 export type HostContext = {
-  toolInfo?: { id?: string | number; tool?: unknown };
-  theme?: "light" | "dark";
-  styles?: { variables?: StyleVariables; css?: { fonts?: string } };
-  displayMode?: DisplayModeName;
-  availableDisplayModes?: DisplayModeName[];
-  containerDimensions?: {
-    height?: number;
-    width?: number;
-    maxHeight?: number;
-    maxWidth?: number;
-  };
-  locale?: string;
-  timeZone?: string;
-  userAgent?: string;
-  platform?: "web" | "desktop" | "mobile";
-  deviceCapabilities?: { touch?: boolean; hover?: boolean };
-  safeAreaInsets?: { top: number; right: number; bottom: number; left: number };
+  [K in keyof McpUiHostContext]: K extends "styles" ? HostStyles | undefined : McpUiHostContext[K];
 };
 
-export type InitializeResult = {
-  protocolVersion?: string;
-  hostInfo?: { name?: string; version?: string };
-  hostCapabilities?: Record<string, unknown>;
-  hostContext?: HostContext;
-};
+export type InitializeResult = McpUiInitializeResult;
 
 /** The app-visible autosave tool (§3 — the iframe cannot POST anywhere). */
 export const SAVE_DRAFT_TOOL = "save_draft";
@@ -92,8 +125,4 @@ export const SAVE_DRAFT_TOOL = "save_draft";
 export const GET_FORM_STATE_TOOL = "get_form_state";
 
 /** What a proxied `tools/call` resolves to — plain MCP `CallToolResult`. */
-export type ToolCallResult = {
-  content?: { type: string; text?: string }[];
-  structuredContent?: Record<string, unknown>;
-  isError?: boolean;
-};
+export type ToolCallResult = CallToolResult;

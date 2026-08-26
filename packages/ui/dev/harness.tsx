@@ -1,28 +1,24 @@
 /**
- * The dev harness: a host, played over the same transport the real one uses.
+ * The dev harness: a host, played by the SDK's own host-side `AppBridge`.
  *
  * `pnpm --filter @mcpq/ui dev` then open http://localhost:5173/dev/. The app
- * runs in a real iframe and talks real postMessage JSON-RPC, so what this page
- * exercises is the actual bridge — the handshake, the tool-input notifications,
- * the debounced pushes, cancellation and teardown. Everything is local: the
- * harness runs with no network at all, which is the same constraint the bundle
- * itself lives under (§8).
+ * runs in a real iframe and talks real postMessage JSON-RPC through
+ * `@modelcontextprotocol/ext-apps` at BOTH ends, so what this page exercises is
+ * the genuine protocol — the handshake, the tool-input notifications, the
+ * debounced pushes, cancellation and teardown. Everything is local: the harness
+ * runs with no network at all, which is the same constraint the bundle itself
+ * lives under (§8).
  *
  * Not part of the production build (vite.config.ts pins the input to
  * index.html).
  */
 
 import { archetypes } from "@mcpq/schema";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { PostMessageTransport } from "@modelcontextprotocol/ext-apps";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
-import {
-  createFakeHost,
-  type FakeHost,
-  type HostContext,
-  METHOD,
-  type Seen,
-  windowTransport,
-} from "../src/host/index.js";
+import { createFakeHost, type FakeHost, type Seen } from "../src/host/fake-host.js";
+import { type HostContext, METHOD } from "../src/host/index.js";
 
 type FixtureKey = keyof typeof archetypes;
 type Theme = "light" | "dark";
@@ -205,11 +201,6 @@ function Harness() {
     };
   }, []);
 
-  const transport = useMemo(
-    () => windowTransport({ target: () => frame.current?.contentWindow ?? null }),
-    [],
-  );
-
   const sendSchema = useCallback(
     (key: FixtureKey) => {
       host.current?.sendToolInput(archetypes[key]);
@@ -235,20 +226,31 @@ function Harness() {
     [append],
   );
 
-  // One host for the life of the page; the iframe may reload under it.
+  /**
+   * One `AppBridge` per iframe. The SDK's `PostMessageTransport` binds to a
+   * specific `contentWindow` and validates `event.source` against it, so unlike
+   * the lazily-targeted transport this replaced, the bridge cannot be built
+   * before the frame exists — and "reload app" remounts the frame, which is
+   * also the right moment to start a fresh handshake rather than let the SDK
+   * warn about a second `ui/initialize`.
+   *
+   * `generation` is a real dependency even though the body never names it: it
+   * keys the iframe, so a bump means a new `contentWindow`, which the body
+   * reaches through the ref where the lint rule cannot follow.
+   */
+  // biome-ignore lint/correctness/useExhaustiveDependencies: generation keys the iframe; see above.
   useEffect(() => {
-    host.current = createFakeHost({
-      transport,
+    const target = frame.current?.contentWindow;
+    if (!target) return;
+    setSize(null);
+    const fake = createFakeHost({
+      transport: new PostMessageTransport(target, target),
       hostContext: context,
       onToolsCall: () =>
         settings.current.draftFails ? new Error("save_draft is not deployed yet") : { ok: true },
-      onRequest: (request) => {
-        if (request.method === METHOD.requestDisplayMode) {
-          const wanted = (request.params as { mode?: Mode }).mode ?? "inline";
-          setMode(wanted);
-          return { mode: wanted };
-        }
-        return undefined;
+      onDisplayMode: (wanted) => {
+        if (wanted !== "pip") setMode(wanted);
+        return wanted;
       },
       onSeen: (entry: Seen) => {
         if (entry.method === METHOD.sizeChanged) {
@@ -261,8 +263,9 @@ function Harness() {
         append({ direction: "in", method: entry.method, detail: summarise(entry.params) });
       },
     });
-    return () => host.current?.stop();
-  }, [transport, append, context, sendSchema]);
+    host.current = fake;
+    return () => fake.stop();
+  }, [generation, append, context, sendSchema]);
 
   const stream = async (key: FixtureKey) => {
     const steps = partials(archetypes[key]);
