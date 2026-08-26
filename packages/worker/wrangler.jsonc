@@ -17,10 +17,10 @@
   "compatibility_flags": ["nodejs_compat"],
 
   // The `ui://forms/renderer` body (§7.1). `run_worker_first` keeps the bundle
-  // OFF the public routes: the Worker answers every request, serves MCP under
-  // the unguessable base path and 404s everything else, and reads the bundle
-  // through the binding when a resources/read arrives. Without it the built
-  // HTML would also be a public page at `/`.
+  // OFF the public routes: the Worker answers every request, serves MCP behind
+  // the OAuth bearer token and 404s everything else, and reads the bundle
+  // through the binding when an authenticated resources/read arrives. Without
+  // it the built HTML would also be a public page at `/`.
   "assets": {
     "directory": "../ui/dist",
     "binding": "ASSETS",
@@ -48,19 +48,44 @@
   "observability": {
     "enabled": true,
     "head_sampling_rate": 1
-  }
+  },
 
-  // §3/§10 — the endpoint is public (custom connectors are reached from
-  // Anthropic's cloud), so the hardening is an unguessable path segment: all
-  // MCP traffic is served at `/<BASE_PATH>/mcp` and nothing else responds.
+  // OAuth grants, tokens and dynamically registered clients (build step 7).
+  // The binding name is fixed by `@cloudflare/workers-oauth-provider`, which
+  // reads `env.OAUTH_KV` directly.
   //
-  // BASE_PATH deliberately does NOT live in `vars`: a deploy-time var of the
-  // same name REPLACES the production secret (found out the hard way on the
-  // first deploy — the placeholder shipped, the Worker refused it off
-  // localhost, and the endpoint failed closed). The local placeholder lives in
-  // `.dev.vars` (committed — it is not a secret; the Worker refuses to serve
-  // it off localhost, see src/base-path.ts). Production sets BASE_PATH to a
-  // crypto-random segment —
-  //     openssl rand -hex 16
-  // — via `wrangler secret put BASE_PATH` (or the dashboard).
+  // This is NOT a walk-back of §3's "DO, not KV": that decision was about FORM
+  // DATA, where eventual consistency could prefill a chained form from a stale
+  // draft. Answers still live only in the per-form Durable Object. What is in
+  // here is short-lived OAuth bookkeeping that nothing reads twice in a second,
+  // which is the shape KV is actually good at — and the library gives no
+  // choice regardless.
+  "kv_namespaces": [
+    {
+      "binding": "OAUTH_KV",
+      // Title `mcp-questionnaire-OAUTH_KV`, created for this Worker.
+      "id": "1f649315f1e64c63bc86d3e34728f0f2"
+    }
+  ],
+
+  // §3/§10 — access control. Comma-separated GitHub logins, matched
+  // case-insensitively (src/allowlist.ts). Adding a teammate is an edit here
+  // plus `wrangler deploy`; removing one is the same edit in reverse, and it
+  // takes effect on the next authorization (existing tokens survive until they
+  // expire — revoke those with `wrangler kv key delete` on this namespace, or
+  // from the dashboard).
+  //
+  // In `vars` and NOT a secret, deliberately. The list is not a credential:
+  // the gate is "prove you ARE that GitHub account", which only GitHub can
+  // grant, so publishing the list costs nothing and reviewing it in a diff is
+  // worth a lot. This also sidesteps the step-4 trap — a `vars` entry REPLACES
+  // a same-named secret on deploy — by never making it a secret at all.
+  //
+  // The OAuth app's credentials ARE secrets and are set out of band:
+  //     wrangler secret put GITHUB_CLIENT_ID
+  //     wrangler secret put GITHUB_CLIENT_SECRET
+  // (obvious fakes live in `.dev.vars` for local runs and tests).
+  "vars": {
+    "GITHUB_ALLOWED_USERS": "JakubMMazurek"
+  }
 }

@@ -38,6 +38,8 @@ export type FormState = {
   answers: Answers;
   createdAt: number;
   updatedAt: number;
+  /** §10 audit attribution — the GitHub login of the LAST writer, or null. */
+  updatedBy: string | null;
 };
 
 export type SaveDraftInput = {
@@ -58,6 +60,15 @@ export type SaveDraftInput = {
    * rather than for ordinary editing.
    */
   complete?: boolean;
+  /**
+   * §10 audit attribution — the authenticated GitHub login behind this write,
+   * when there is one. Optional because the DO must not care: it is called
+   * directly by tests, and a write with no identity is a legitimate state, not
+   * an error. Absent leaves the previous writer in place rather than blanking
+   * it, so the column always answers "who last touched this", never "who last
+   * touched this while authenticated".
+   */
+  updatedBy?: string | null;
 };
 
 export type SaveDraftResult =
@@ -79,7 +90,7 @@ export type SaveDraftResult =
 export type FormStore = {
   exists(): Promise<boolean>;
   getState(): Promise<FormState | null>;
-  init(form: Form): Promise<{ createdAt: number }>;
+  init(form: Form, updatedBy?: string | null): Promise<{ createdAt: number }>;
   saveDraft(input: SaveDraftInput): Promise<SaveDraftResult>;
 };
 
@@ -88,6 +99,7 @@ type FormRow = {
   version: number;
   createdAt: number;
   updatedAt: number;
+  updatedBy: string | null;
   lastDraftAt: number;
 };
 type AnswerRow = { path: string; state: string; value: string | null; note: string | null };
@@ -121,7 +133,10 @@ export class FormDO extends DurableObject<WorkerEnv> {
         updatedAt   INTEGER NOT NULL,
         -- Separate from updatedAt so that stamping the schema in (init) never
         -- throttles the view's first autosave.
-        lastDraftAt INTEGER NOT NULL DEFAULT 0
+        lastDraftAt INTEGER NOT NULL DEFAULT 0,
+        -- §10 audit attribution (build step 7): the GitHub login of the last
+        -- writer. Nullable because a write can legitimately have no identity.
+        updatedBy   TEXT
       );
       CREATE TABLE IF NOT EXISTS answers (
         path  TEXT PRIMARY KEY,
@@ -139,6 +154,26 @@ export class FormDO extends DurableObject<WorkerEnv> {
       )
       .one();
     return row.n === 2;
+  }
+
+  /**
+   * Brings a form table created before build step 7 up to the current shape.
+   *
+   * `CREATE TABLE IF NOT EXISTS` is a no-op on an object that already has the
+   * table, so a column added to the DDL above never reaches a form that
+   * already exists — and every SELECT naming `updatedBy` would then throw on
+   * exactly the forms someone is still using. One `PRAGMA` per read is a
+   * trivially cheap price for that not happening.
+   *
+   * Only ever called when `#hasTables()` is true.
+   */
+  #migrate(): void {
+    const columns = this.ctx.storage.sql
+      .exec<{ name: string }>("PRAGMA table_info(form)")
+      .toArray();
+    if (!columns.some((column) => column.name === "updatedBy")) {
+      this.ctx.storage.sql.exec("ALTER TABLE form ADD COLUMN updatedBy TEXT");
+    }
   }
 
   /**
@@ -164,9 +199,10 @@ export class FormDO extends DurableObject<WorkerEnv> {
   #readForm(): FormRow | null {
     // Never initialised, or expired and wiped. Both are "no form".
     if (!this.#hasTables()) return null;
+    this.#migrate();
     const rows = this.ctx.storage.sql
       .exec<FormRow>(
-        "SELECT schema, version, createdAt, updatedAt, lastDraftAt FROM form WHERE id = 1",
+        "SELECT schema, version, createdAt, updatedAt, lastDraftAt, updatedBy FROM form WHERE id = 1",
       )
       .toArray();
     return rows[0] ?? null;
@@ -204,6 +240,7 @@ export class FormDO extends DurableObject<WorkerEnv> {
       answers: this.#readAnswers(),
       createdAt: row.createdAt,
       updatedAt: row.updatedAt,
+      updatedBy: row.updatedBy ?? null,
     };
     await this.#touch(Date.now());
     return state;
@@ -220,21 +257,27 @@ export class FormDO extends DurableObject<WorkerEnv> {
    * simply never resolved — the renderer is the view, and §4.6's "not rendered
    * = empty" makes stale rows inert.
    */
-  async init(form: Form): Promise<{ createdAt: number }> {
+  async init(form: Form, updatedBy: string | null = null): Promise<{ createdAt: number }> {
     const now = Date.now();
     const existing = this.#readForm();
     this.#createTables();
     const createdAt = existing?.createdAt ?? now;
     this.ctx.storage.sql.exec(
-      `INSERT INTO form (id, schema, version, createdAt, updatedAt) VALUES (1, ?, ?, ?, ?)
+      `INSERT INTO form (id, schema, version, createdAt, updatedAt, updatedBy) VALUES (1, ?, ?, ?, ?, ?)
        ON CONFLICT(id) DO UPDATE SET schema = excluded.schema, version = excluded.version,
-                                     updatedAt = excluded.updatedAt`,
+                                     updatedAt = excluded.updatedAt,
+                                     -- COALESCE, not assignment: a write with no
+                                     -- identity must not erase the last known one.
+                                     updatedBy = COALESCE(excluded.updatedBy, form.updatedBy)`,
       JSON.stringify(form),
       form.version,
       createdAt,
       now,
+      updatedBy,
     );
     await this.#touch(now);
+    // Counted, never named (§3): the login is data at rest in the row above,
+    // and it stays out of retained observability logs.
     logEvent({ event: "form_init", count: form.sections.length });
     return { createdAt };
   }
@@ -312,9 +355,12 @@ export class FormDO extends DurableObject<WorkerEnv> {
     }
 
     this.ctx.storage.sql.exec(
-      "UPDATE form SET updatedAt = ?, lastDraftAt = ? WHERE id = 1",
+      // COALESCE for the same reason as `init`: no identity leaves the last
+      // known writer in place rather than blanking the column.
+      "UPDATE form SET updatedAt = ?, lastDraftAt = ?, updatedBy = COALESCE(?, updatedBy) WHERE id = 1",
       now,
       now,
+      input.updatedBy ?? null,
     );
     await this.#touch(now);
     logEvent({ event: "draft_saved", count: paths.length });

@@ -8,7 +8,7 @@ import { describe, expect, it } from "vitest";
 import { MAX_DRAFT_BYTES } from "../src/form-do.js";
 import { FORM_ID_PATTERN } from "../src/form-id.js";
 import { RENDERER_MIME_TYPE, RENDERER_URI } from "../src/renderer-resource.js";
-import { connect, firstText } from "./harness.js";
+import { ALLOWED_LOGIN, connect, firstText } from "./harness.js";
 
 const ledger = () => structuredClone(assumptionLedger) as unknown as Record<string, unknown>;
 
@@ -365,5 +365,37 @@ describe("get_form_guide", () => {
     expect(result.isError).toBe(true);
     expect(firstText(result)).toContain("ledger");
     expect(firstText(result)).toContain("plan_confirmation");
+  });
+});
+
+/**
+ * The auth seam, end to end (build step 7).
+ *
+ * This is the assertion the whole OAuth wiring exists to make true. `props`
+ * travels: OAuthProvider decrypts the grant onto `ctx.props`, index.ts passes
+ * `ctx` to the agents handler's CALLABLE face, agents lifts a non-empty
+ * `ctx.props` into the AsyncLocalStorage `getMcpAuthContext()` reads, and the
+ * tool handler stamps the login on the write. Any one of those four links
+ * breaking shows up here as a null.
+ */
+describe("attribution through the OAuth seam (§10)", () => {
+  it("stamps the authenticated login on a form the agent creates", async () => {
+    const { formId } = await mintForm();
+    const { call, close } = await connect();
+    const state = await call("get_form_state", { formId });
+    await close();
+    expect((state.structuredContent as { updatedBy?: string }).updatedBy).toBe(ALLOWED_LOGIN);
+  });
+
+  it("stamps it on autosaves too", async () => {
+    const { formId } = await mintForm();
+    const { call, close } = await connect();
+    await call("save_draft", {
+      formId,
+      answers: { "assumptions[r_eu].verdict": { state: "answered", value: "fix" } },
+    });
+    const state = await call("get_form_state", { formId });
+    await close();
+    expect((state.structuredContent as { updatedBy?: string }).updatedBy).toBe(ALLOWED_LOGIN);
   });
 });

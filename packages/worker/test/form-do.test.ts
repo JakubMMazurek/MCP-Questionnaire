@@ -199,6 +199,59 @@ describe("the 30-day idle TTL (§3)", () => {
 });
 
 /**
+ * §10 "Audit attribution", un-parked by build step 7: an identity now exists,
+ * so writes record one. Latest writer only — a full history is a different
+ * feature with a different storage shape, and v1 does not need it.
+ */
+describe("attribution (§10)", () => {
+  it("is null when nothing authenticated the write", async () => {
+    const { rpc } = await seeded();
+    expect((await rpc.getState())?.updatedBy).toBeNull();
+  });
+
+  it("records the login that created the form", async () => {
+    const formId = mintFormId();
+    const { rpc } = store(formId);
+    await rpc.init(form(formId), "octocat");
+    expect((await rpc.getState())?.updatedBy).toBe("octocat");
+  });
+
+  it("moves to the latest writer on saveDraft", async () => {
+    const formId = mintFormId();
+    const { stub, rpc } = store(formId);
+    await rpc.init(form(formId), "octocat");
+    await bypassThrottle(stub);
+    await rpc.saveDraft({ answers: {}, updatedBy: "hubot" });
+    expect((await rpc.getState())?.updatedBy).toBe("hubot");
+  });
+
+  it("an unattributed write LEAVES the last known writer, it does not blank it", async () => {
+    const formId = mintFormId();
+    const { stub, rpc } = store(formId);
+    await rpc.init(form(formId), "octocat");
+    await bypassThrottle(stub);
+    await rpc.saveDraft({ answers: {} });
+    expect((await rpc.getState())?.updatedBy).toBe("octocat");
+    // Same rule on re-init.
+    await rpc.init(form(formId));
+    expect((await rpc.getState())?.updatedBy).toBe("octocat");
+  });
+
+  it("adds the column to a form table created before build step 7", async () => {
+    const { stub, rpc } = await seeded();
+    // Reproduce the pre-step-7 shape: the column simply is not there.
+    await runInDurableObject(stub, (_instance, state) => {
+      state.storage.sql.exec("ALTER TABLE form DROP COLUMN updatedBy");
+    });
+    // Every read names `updatedBy`, so without the migration this throws.
+    expect((await rpc.getState())?.updatedBy).toBeNull();
+    await bypassThrottle(stub);
+    await rpc.saveDraft({ answers: {}, updatedBy: "octocat" });
+    expect((await rpc.getState())?.updatedBy).toBe("octocat");
+  });
+});
+
+/**
  * Steps the form's throttle clock back so the next write is allowed.
  *
  * The alternative is a real `sleep(1000)` per assertion. The throttle itself is

@@ -18,8 +18,9 @@
 import type { Answers, Form } from "@mcpq/schema";
 import { validateAnswers, validateForm } from "@mcpq/schema";
 import { McpServer } from "@modelcontextprotocol/server";
+import { getMcpAuthContext } from "agents/mcp/server";
 import { z } from "zod";
-import type { WorkerEnv } from "./env.js";
+import { loginFromProps, type WorkerEnv } from "./env.js";
 import type { FormState, FormStore, SaveDraftResult } from "./form-do.js";
 import { isFormId, mintFormId } from "./form-id.js";
 import {
@@ -116,6 +117,23 @@ function formStore(env: WorkerEnv, formId: string): FormStore {
 const NOT_FOUND = (formId: string) =>
   `form ${formId} not found — it may have expired (30-day idle TTL, reset on every read or write). Forms are not recoverable once expired: render a fresh one with gather_decisions, prefilled from what you already know.`;
 
+/**
+ * Who is calling (§10 audit attribution, un-parked by build step 7).
+ *
+ * `getMcpAuthContext()` reads the AsyncLocalStorage the agents handler runs
+ * every request inside; its `props` are the ones OAuthProvider decrypted from
+ * the grant onto `ctx.props`. Read PER CALL rather than once per server: the
+ * server factory and the tool handler are both inside the same store, but only
+ * the handler is guaranteed to be, and a stale identity is worse than none.
+ *
+ * `null` is a legitimate answer, not an error — it is what a directly-driven
+ * handler (the DO tests) sees, and attribution marks, it never gates. Nothing
+ * downstream branches on the value; it is written to a column and that is all.
+ */
+function currentLogin(): string | null {
+  return loginFromProps(getMcpAuthContext()?.props);
+}
+
 /* -------------------------------------------------------------------------- */
 /* the server                                                                 */
 /* -------------------------------------------------------------------------- */
@@ -208,7 +226,7 @@ export function createServer(env: WorkerEnv): McpServer {
 
       const formId = mintFormId();
       const stored: Form = { ...validation.form, formId };
-      await formStore(env, formId).init(stored);
+      await formStore(env, formId).init(stored, currentLogin());
 
       /**
        * Warnings mark, they never gate — the form renders as authored. But the
@@ -333,6 +351,10 @@ export function createServer(env: WorkerEnv): McpServer {
           answers: state.answers,
           createdAt: state.createdAt,
           updatedAt: state.updatedAt,
+          // §10 attribution. App-visible only, and it is the viewer's own
+          // login in the single-user case — the renderer ignores it today, but
+          // "who last wrote this" is the question the column exists to answer.
+          updatedBy: state.updatedBy,
         },
       };
     },
@@ -393,6 +415,7 @@ export function createServer(env: WorkerEnv): McpServer {
 
       const result: SaveDraftResult = await formStore(env, formId).saveDraft({
         answers: shape.answers as Answers,
+        updatedBy: currentLogin(),
         ...(complete === undefined ? {} : { complete }),
       });
 

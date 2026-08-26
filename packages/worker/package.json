@@ -12,6 +12,7 @@
     "typecheck": "wrangler types && tsc --noEmit"
   },
   "dependencies": {
+    "@cloudflare/workers-oauth-provider": "^0.10.3",
     "@mcpq/schema": "workspace:*",
     "@modelcontextprotocol/server": "2.0.0",
     "agents": "^0.21.0",
