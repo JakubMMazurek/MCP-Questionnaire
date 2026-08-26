@@ -30,6 +30,13 @@ still capabilities internally — that part did not change.
     /plugin marketplace add JakubMMazurek/MCP-Questionnaire
     /plugin install mcp-questionnaire@mcp-questionnaire
 
+## Releasing changes
+
+The plugin updater ships by **version, not content**: any change under
+`packages/plugin/` (URL, skill text, anything) must bump `version` in
+`.claude-plugin/plugin.json` or `plugin update` will report "already at the
+latest version" and keep the old files.
+
 ## What's inside
 
 - `.mcp.json` — the remote connector (Streamable HTTP).
