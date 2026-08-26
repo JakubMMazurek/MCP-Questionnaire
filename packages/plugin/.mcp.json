@@ -1,6 +1,6 @@
 {
   "mcp-questionnaire": {
     "type": "http",
-    "url": "REPLACE_WITH_CONNECTOR_URL"
+    "url": "https://mcp-questionnaire.qba0550.workers.dev/c21b6f1bbb68535f3c0328b7811d7177/mcp"
   }
 }
