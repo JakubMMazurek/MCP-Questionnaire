@@ -1,0 +1,107 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`formatDiagnostics > renders a form with several errors 1`] = `
+"Form rejected — 2 errors. Nothing was rendered; fix the errors and call again.
+
+ERROR   unknown_field_type · sections[0].fields[0].type "env"
+  Unknown field type "single_selct". Field types are a closed vocabulary (§4.1) — the
+  renderer can only branch on what it understands. Use one of "single_select",
+  "multi_select", "boolean", "rank", "number", "slider", "allocation", "date", "date_range",
+  "matrix", "repeatable", "table", "short_text", "long_text", "info", "computed". Did you
+  mean "single_select"?
+
+ERROR   unknown_property · sections[1].fields[0] "cutover"
+  Unknown property "helpText". The meta-schema is closed: remove it, or move what it said
+  into free text — "label", "description" or a per-path note (§4.1/§4.4)."
+`;
+
+exports[`formatDiagnostics > renders a matrix that cannot be drawn 1`] = `
+"Form rejected — 3 errors. Nothing was rendered; fix the errors and call again.
+
+ERROR   matrix_cell_options_required · sections[1].fields[2].cellOptions "fls"
+  Matrix "fls" has cellType "single_select" but declares no "cellOptions". A select cell
+  needs the option set once for the whole grid — that is what makes cycle/paint possible
+  (§5.5). Add "cellOptions": [{ "value": "R", "label": "Read" }, …].
+
+ERROR   matrix_constraint_unknown_member · sections[1].fields[2].constraints[0] "fls"
+  Constraint 0 of matrix "fls" names row "Margin__c", which the matrix does not declare.
+  Matrix row and column ids are agent-declared and fixed for the life of the view (§4.5);
+  declared rows are "Discount__c".
+
+ERROR   matrix_constraint_empty · sections[1].fields[2].constraints[0] "fls"
+  Constraint 0 of matrix "fls" says nothing: it narrows no values and does not freeze the
+  cell. Add "allowed": [...] to restrict the cell, or "readOnly": true to freeze it — and a
+  free-text "reason", which is what the renderer shows when a bulk apply skips the cell
+  (§5.5)."
+`;
+
+exports[`formatDiagnostics > renders a rules-only failure, naming every index 1`] = `
+"Form rejected — 3 errors, 3 warnings. Nothing was rendered; fix the errors and call again.
+
+ERROR   rule_payload_required · rules[0].then
+  Rule 0 uses "filter_options" without saying which options survive. Add "options": [...]
+  listing the option values that remain — that is the half of the mechanic people forget,
+  and without it the rule does nothing (§4.6).
+
+ERROR   rule_in_requires_array · rules[1].when.value
+  Rule 1 uses op "in", so "value" must be an array of the option values that satisfy it, as
+  in "value": ["aws", "gcp"].
+
+ERROR   rule_default_not_an_option · rules[1].then.value
+  Rule 1 defaults "scopeChoice" to "half_of_it", which is not one of its declared values
+  ("accounts", "everything"). set_default writes only into empty fields (§4.6), and it can
+  only write a value the field can hold.
+
+WARNING rule_payload_ignored · rules[2].then.options
+  Rule 2 carries "options" but its action is "hide", which ignores them. Only
+  "filter_options" narrows an option set.
+
+WARNING rule_cycle · rules[1]
+  Rules 1 → 2 → 1 could cycle: each one changes a field the next one reads. Evaluation
+  re-runs the flat list until the view is stable and stops at an iteration cap (§4.6), so a
+  cycle means the rendered state may depend on where the cap lands. Break the loop — usually
+  one of these rules should read a different field, or be folded into the other.
+
+WARNING rule_cycle · rules[2]
+  Rules 2 → 3 → 2 could cycle: each one changes a field the next one reads. Evaluation
+  re-runs the flat list until the view is stable and stops at an iteration cap (§4.6), so a
+  cycle means the rendered state may depend on where the cap lands. Break the loop — usually
+  one of these rules should read a different field, or be folded into the other."
+`;
+
+exports[`formatDiagnostics > renders an answer map that came back malformed 1`] = `
+"Form rejected — 2 errors. Nothing was rendered; fix the errors and call again.
+
+ERROR   malformed · answers["env"].value
+  An answer with state "empty" must not carry a "value" — "not rendered = empty" means an
+  empty answer holds nothing (§4.6). Drop the value, or set the state to "answered".
+
+ERROR   unknown_answer_state · answers["notes"].state
+  Unknown answer state "pending". There are exactly two (§4.3): "answered", "empty" — defer
+  is an ordinary agent-defined option value, not a third state."
+`;
+
+exports[`formatDiagnostics > renders the ordinal teaching error — the §4.5 rule that prevents corruption 1`] = `
+"Form rejected — 1 error. Nothing was rendered; fix the errors and call again.
+
+ERROR   ordinal_path · prefill["stakeholders[2].owner"]
+  Path "stakeholders[2].owner" addresses row 2 of the repeatable "stakeholders" by position.
+  Rows of a repeatable are user-mutable, so positions shift: deleting a row would silently
+  re-point every path anchored at [2], including notes. Use the minted row id instead —
+  "stakeholders[r_7f3a].owner". Ordinals are for display, never for persistence (§4.5)."
+`;
+
+exports[`formatDiagnostics > renders warnings on a form that still renders 1`] = `
+"Form accepted — 2 warnings. It renders as-is; the warnings are smells worth a second look.
+
+WARNING no_prefill · (form root)
+  This form prefills nothing. Reviewing is cheap and authoring is expensive: the agent
+  should infer what it can and render a proposal with provenance on every value. "If there's
+  nothing to prefill, the form probably shouldn't exist" (§4.7) — consider asking in chat
+  instead.
+
+WARNING section_single_field · sections[1] "timing"
+  Section "timing" holds one field. "Never a section with one field" (§4.8) — a section is a
+  unit of the left rail and of section status, and one field does not earn a heading. Merge
+  it into a neighbouring section, or add the fields that belong with it."
+`;
