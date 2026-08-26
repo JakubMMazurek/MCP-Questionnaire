@@ -3,11 +3,25 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "STUB — MCP handler + form Durable Object (build step 4). Not implemented yet; see DESIGN.html §9.",
+  "description": "MCP handler (createMcpHandler + MCP SDK v2) + the per-form Durable Object + ui://forms/renderer (build step 4). See DESIGN.html §3, §6, §7.",
   "scripts": {
+    "dev": "wrangler dev",
+    "build:ui": "pnpm --filter @gather/ui build",
+    "check": "wrangler deploy --dry-run --outdir .wrangler/dry-run",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "typecheck": "tsc --noEmit"
   },
+  "dependencies": {
+    "@gather/schema": "workspace:*",
+    "@modelcontextprotocol/server": "2.0.0",
+    "agents": "^0.21.0",
+    "zod": "^4.4.3"
+  },
   "devDependencies": {
-    "typescript": "^7.0.2"
+    "@cloudflare/vitest-plugin": "^1.1.0",
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.11",
+    "wrangler": "^4.126.0"
   }
 }

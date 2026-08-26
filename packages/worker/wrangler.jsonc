@@ -1,0 +1,68 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "gather-decisions",
+  "main": "src/index.ts",
+
+  // ≥ 2026-02-24 is load-bearing, not cosmetic (DESIGN.html §3): from that date
+  // `ctx.storage.deleteAll()` also deletes the active alarm, so the form's TTL
+  // handler is a single call instead of deleteAll() + deleteAlarm().
+  // Verified: developers.cloudflare.com/durable-objects/api/storage-api/ —
+  // "For Workers with a compatibility date of 2026-02-24 or later, deleteAll()
+  // also deletes any active alarm."
+  "compatibility_date": "2026-08-01",
+
+  // Required, not optional: `agents/mcp/server` imports `node:async_hooks` to
+  // carry the per-request auth context, and without the flag the Worker throws
+  // at runtime. Verified from the dry-run build's own diagnostic.
+  "compatibility_flags": ["nodejs_compat"],
+
+  // The `ui://forms/renderer` body (§7.1). `run_worker_first` keeps the bundle
+  // OFF the public routes: the Worker answers every request, serves MCP under
+  // the unguessable base path and 404s everything else, and reads the bundle
+  // through the binding when a resources/read arrives. Without it the built
+  // HTML would also be a public page at `/`.
+  "assets": {
+    "directory": "../ui/dist",
+    "binding": "ASSETS",
+    "run_worker_first": true
+  },
+
+  // One Durable Object per form, addressed by the unguessable formId (§3).
+  "durable_objects": {
+    "bindings": [{ "name": "FORM_DO", "class_name": "FormDO" }]
+  },
+
+  // Declarative class lifecycle. The Wrangler configuration reference now says
+  // of the imperative `migrations` array — the `new_sqlite_classes` form — that
+  // it is "the legacy imperative configuration for managing Durable Object
+  // class lifecycle" and that new Workers should "prefer the declarative
+  // exports field"; the two are mutually exclusive. `storage: "sqlite"` is the
+  // SQLite backend §3 requires (answers as rows, not one blob).
+  "exports": {
+    "FormDO": { "type": "durable-object", "storage": "sqlite" }
+  },
+
+  // On, but nothing in this Worker ever logs an answer, a note or a schema
+  // (§3 — "No logging of payloads"). See src/log.ts: the only permitted fields
+  // are ids, counts, byte sizes and error codes.
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1
+  },
+
+  // §3/§10 — the endpoint is public (custom connectors are reached from
+  // Anthropic's cloud), so the hardening is an unguessable path segment: all
+  // MCP traffic is served at `/<BASE_PATH>/mcp` and nothing else responds.
+  //
+  // THIS VALUE IS THE LOCAL PLACEHOLDER AND IS NOT A SECRET. The Worker
+  // refuses to serve it off localhost (see src/base-path.ts), so a deploy that
+  // forgets to override it fails loudly instead of quietly exposing a
+  // guessable endpoint. Production sets BASE_PATH to a crypto-random segment —
+  //     openssl rand -hex 16
+  // — as an encrypted environment variable on the Worker (Workers Builds /
+  // dashboard "Variables and Secrets", or `wrangler secret put BASE_PATH`).
+  // Do not put the production value here: `vars` is plaintext in the repo.
+  "vars": {
+    "BASE_PATH": "local-dev"
+  }
+}

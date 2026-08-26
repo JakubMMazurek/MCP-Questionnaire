@@ -3,3 +3,6 @@ packages:
 
 onlyBuiltDependencies:
   - esbuild
+  # workerd's postinstall fetches the platform binary; without it the Worker
+  # cannot run locally (`wrangler dev`) nor under the vitest plugin.
+  - workerd
