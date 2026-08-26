@@ -42,7 +42,7 @@ import {
 } from "./renderer-resource.js";
 import { diagnosticsWithExample, serialiseExample } from "./worked-example.js";
 
-export const SERVER_INFO = { name: "mcp-questionnaire", version: "0.1.0" } as const;
+export const SERVER_INFO = { name: "mcp-questionnaire", version: "0.2.0" } as const;
 
 /* -------------------------------------------------------------------------- */
 /* _meta.ui (§7.1)                                                            */
