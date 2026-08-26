@@ -1,0 +1,902 @@
+<title>Gather Decisions</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:ital,wght@0,400..700;1,400..700&family=Source+Serif+4:ital,opsz,wght@0,8..60,400..700;1,8..60,400..700&family=IBM+Plex+Mono:ital,wght@0,400;0,500;0,600;1,400&display=swap">
+<style>
+  :root{
+    --bg:#F6F7F5; --surface:#FFFFFF; --surface2:#EDF0EC; --ink:#1B2320;
+    --muted:#5C6762; --line:#D8DDD7; --line-soft:#E4E8E2;
+    --accent:#0E6E66; --accent-contrast:#FFFFFF;
+    --ok:#3D7C4A; --warn:#9A6207; --err:#B04030; --info:#3B5E8C;
+    --code-bg:#202723; --code-ink:#D9E2DC; --code-key:#8FD3C7; --code-cm:#7E8C85;
+    --shadow:0 1px 2px rgba(20,28,24,.06),0 6px 20px rgba(20,28,24,.05);
+    --r:8px;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --bg:#121614; --surface:#1A201D; --surface2:#222A25; --ink:#E6EBE7;
+      --muted:#93A099; --line:#2F3934; --line-soft:#27302B;
+      --accent:#4CC2B4; --accent-contrast:#0F1512;
+      --ok:#7CC188; --warn:#D9A94E; --err:#D97A66; --info:#8AAED4;
+      --code-bg:#0E1311; --code-ink:#CBD6CF; --code-key:#7BC7BA; --code-cm:#66756D;
+      --shadow:0 1px 2px rgba(0,0,0,.35),0 8px 24px rgba(0,0,0,.28);
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#121614; --surface:#1A201D; --surface2:#222A25; --ink:#E6EBE7;
+    --muted:#93A099; --line:#2F3934; --line-soft:#27302B;
+    --accent:#4CC2B4; --accent-contrast:#0F1512;
+    --ok:#7CC188; --warn:#D9A94E; --err:#D97A66; --info:#8AAED4;
+    --code-bg:#0E1311; --code-ink:#CBD6CF; --code-key:#7BC7BA; --code-cm:#66756D;
+    --shadow:0 1px 2px rgba(0,0,0,.35),0 8px 24px rgba(0,0,0,.28);
+  }
+
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{
+    margin:0; background:var(--bg); color:var(--ink);
+    font-family:"Source Serif 4",Georgia,"Times New Roman",serif;
+    font-size:17px; line-height:1.65;
+  }
+  @media (prefers-reduced-motion: reduce){ html{scroll-behavior:auto} *{transition:none!important;animation:none!important} }
+
+  h1,h2,h3,h4,.sans{font-family:"Familjen Grotesk","Helvetica Neue",Arial,sans-serif}
+  code,pre,.mono{font-family:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace}
+  h1,h2,h3{text-wrap:balance;line-height:1.15}
+  h2{font-size:1.7rem;font-weight:650;margin:0 0 .35em}
+  h3{font-size:1.15rem;font-weight:650;margin:2.2em 0 .5em}
+  p{margin:.85em 0}
+  a{color:var(--accent)}
+  strong{font-weight:650}
+
+  .layout{display:grid;grid-template-columns:230px minmax(0,1fr);gap:0;max-width:1160px;margin:0 auto}
+  @media (max-width:900px){ .layout{grid-template-columns:minmax(0,1fr)} nav.rail{display:none} }
+
+  /* ---------- section rail ---------- */
+  nav.rail{position:sticky;top:0;align-self:start;height:100vh;overflow-y:auto;padding:36px 20px 36px 24px;border-right:1px solid var(--line-soft)}
+  nav.rail .brand{font-weight:650;font-size:.95rem;letter-spacing:.01em;margin-bottom:2px}
+  nav.rail .brand-sub{font-size:.72rem;color:var(--muted);letter-spacing:.08em;text-transform:uppercase;margin-bottom:22px}
+  nav.rail ol{list-style:none;margin:0;padding:0}
+  nav.rail li{margin:0}
+  nav.rail a{display:flex;align-items:baseline;gap:9px;padding:5px 8px;border-radius:6px;text-decoration:none;color:var(--muted);font-family:"Familjen Grotesk",sans-serif;font-size:.86rem;line-height:1.35}
+  nav.rail a .n{font-family:"IBM Plex Mono",monospace;font-size:.68rem;color:var(--muted);opacity:.7;min-width:1.3em}
+  nav.rail a:hover{background:var(--surface2);color:var(--ink)}
+  nav.rail a.active{color:var(--ink);background:var(--surface2)}
+  nav.rail a.active .n{color:var(--accent);opacity:1}
+  nav.rail .dot{width:7px;height:7px;border-radius:50%;background:var(--ok);flex:none;transform:translateY(-1px)}
+  nav.rail .dot.parked{background:var(--warn)}
+
+  main{padding:0 48px 120px;min-width:0}
+  @media (max-width:900px){ main{padding:0 20px 80px} }
+  .measure{max-width:66ch}
+
+  /* ---------- header ---------- */
+  header.doc{padding:56px 0 8px;border-bottom:1px solid var(--line);margin-bottom:8px}
+  .eyebrow{font-family:"IBM Plex Mono",monospace;font-size:.72rem;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin-bottom:14px}
+  .eyebrow b{color:var(--accent);font-weight:600}
+  header.doc h1{font-size:clamp(2.1rem,4.5vw,3rem);font-weight:700;letter-spacing:-.015em;margin:0 0 .3em}
+  header.doc .thesis{font-size:1.18rem;line-height:1.55;color:var(--muted);max-width:34em;margin:0 0 1.4em;font-style:italic}
+  header.doc .thesis em{color:var(--ink);font-style:italic}
+
+  section.sec{padding:44px 0 12px;border-bottom:1px solid var(--line-soft)}
+  .sec-eyebrow{font-family:"IBM Plex Mono",monospace;font-size:.7rem;letter-spacing:.14em;text-transform:uppercase;color:var(--accent);margin-bottom:10px}
+
+  /* ---------- chips: the product's own vocabulary ---------- */
+  .chip{display:inline-flex;align-items:center;gap:5px;font-family:"IBM Plex Mono",monospace;font-size:.66rem;font-weight:500;letter-spacing:.06em;text-transform:uppercase;padding:2px 8px;border-radius:99px;border:1px solid;white-space:nowrap;vertical-align:2px}
+  .chip.decided{color:var(--ok);border-color:color-mix(in srgb,var(--ok) 45%,transparent);background:color-mix(in srgb,var(--ok) 10%,transparent)}
+  .chip.parked{color:var(--warn);border-color:color-mix(in srgb,var(--warn) 45%,transparent);background:color-mix(in srgb,var(--warn) 10%,transparent)}
+  .chip.dissolved{color:var(--muted);border-color:var(--line);background:var(--surface2);text-decoration:none}
+  .chip.src{text-transform:none;letter-spacing:.02em;font-size:.68rem}
+  .chip.src.inferred{color:var(--warn);border-color:color-mix(in srgb,var(--warn) 40%,transparent);background:color-mix(in srgb,var(--warn) 9%,transparent)}
+  .chip.src.user{color:var(--info);border-color:color-mix(in srgb,var(--info) 40%,transparent);background:color-mix(in srgb,var(--info) 9%,transparent)}
+  .chip.src.existing{color:var(--muted);border-color:var(--line);background:var(--surface2)}
+
+  /* ---------- prose details ---------- */
+  ul.tight{padding-left:1.2em;margin:.6em 0}
+  ul.tight li{margin:.45em 0}
+  .callout{border:1px solid var(--line);border-left:3px solid var(--accent);border-radius:var(--r);background:var(--surface);padding:14px 18px;margin:1.4em 0;box-shadow:var(--shadow)}
+  .callout.warn{border-left-color:var(--warn)}
+  .callout p{margin:.4em 0}
+  .callout .callout-label{font-family:"IBM Plex Mono",monospace;font-size:.68rem;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);display:block;margin-bottom:4px}
+  .callout.warn .callout-label{color:var(--warn)}
+
+  table.spec{width:100%;border-collapse:collapse;font-size:.88rem;margin:1.1em 0;font-family:"Familjen Grotesk",sans-serif}
+  table.spec th{text-align:left;font-size:.7rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:600;padding:8px 12px;border-bottom:1px solid var(--line)}
+  table.spec td{padding:9px 12px;border-bottom:1px solid var(--line-soft);vertical-align:top;line-height:1.5}
+  table.spec td:first-child{white-space:nowrap}
+  table.spec code{font-size:.8rem}
+  .tablewrap{overflow-x:auto}
+
+  pre{background:var(--code-bg);color:var(--code-ink);border-radius:var(--r);padding:16px 18px;font-size:.8rem;line-height:1.6;overflow-x:auto;margin:1.1em 0}
+  pre .k{color:var(--code-key)}
+  pre .c{color:var(--code-cm);font-style:italic}
+  code{background:var(--surface2);border:1px solid var(--line-soft);border-radius:4px;padding:.08em .35em;font-size:.82em}
+  pre code{background:none;border:none;padding:0;font-size:inherit}
+
+  /* ---------- architecture diagram ---------- */
+  .arch{display:flex;flex-direction:column;gap:0;align-items:stretch;margin:1.6em 0;font-family:"Familjen Grotesk",sans-serif}
+  .arch-row{display:flex;gap:14px;align-items:stretch;flex-wrap:wrap}
+  .arch-box{flex:1;min-width:150px;border:1px solid var(--line);border-radius:var(--r);background:var(--surface);padding:12px 16px;box-shadow:var(--shadow)}
+  .arch-box .t{font-weight:650;font-size:.92rem}
+  .arch-box .d{font-size:.78rem;color:var(--muted);margin-top:3px;line-height:1.45}
+  .arch-box.hi{border-color:color-mix(in srgb,var(--accent) 55%,transparent)}
+  .arch-flow{display:flex;align-items:center;justify-content:center;padding:6px 0;color:var(--muted);font-family:"IBM Plex Mono",monospace;font-size:.7rem;gap:8px}
+  .arch-flow::before,.arch-flow::after{content:"";flex:0 0 24px;height:1px;background:var(--line)}
+  .arch-flow .arrow{color:var(--accent)}
+
+  /* ================= mockups ================= */
+  .mock{border:1px solid var(--line);border-radius:12px;background:var(--surface);box-shadow:var(--shadow);margin:1.6em 0;overflow:hidden;font-family:"Familjen Grotesk",sans-serif}
+  .mock-chrome{display:flex;align-items:center;gap:8px;padding:8px 14px;background:var(--surface2);border-bottom:1px solid var(--line-soft)}
+  .mock-chrome .m-label{font-family:"IBM Plex Mono",monospace;font-size:.66rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+  .mock-chrome .m-mode{margin-left:auto;font-family:"IBM Plex Mono",monospace;font-size:.64rem;color:var(--accent);border:1px solid color-mix(in srgb,var(--accent) 40%,transparent);border-radius:99px;padding:1px 8px}
+  .mock-body{padding:16px 18px}
+  .mock-note{font-family:"IBM Plex Mono",monospace;font-size:.68rem;color:var(--muted);text-align:center;padding:0 16px 12px}
+
+  .mock h4{margin:0 0 2px;font-size:1rem;font-weight:650}
+  .mock .sub{font-size:.78rem;color:var(--muted);margin:0 0 12px}
+  .counter{font-family:"IBM Plex Mono",monospace;font-size:.72rem;color:var(--warn);background:color-mix(in srgb,var(--warn) 9%,transparent);border:1px solid color-mix(in srgb,var(--warn) 35%,transparent);border-radius:99px;padding:2px 10px}
+  .counter.clear{color:var(--ok);background:color-mix(in srgb,var(--ok) 9%,transparent);border-color:color-mix(in srgb,var(--ok) 35%,transparent)}
+
+  /* ledger */
+  .ledger-head{display:flex;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap}
+  .ledger-head .grow{flex:1}
+  .lrow{display:flex;align-items:center;gap:12px;padding:9px 4px;border-top:1px solid var(--line-soft);flex-wrap:wrap}
+  .lrow .txt{flex:1 1 260px;font-size:.9rem;line-height:1.4}
+  .lrow .txt .why{display:block;font-size:.74rem;color:var(--muted);margin-top:1px;font-style:italic;font-family:"Source Serif 4",serif}
+  .seg{display:inline-flex;border:1px solid var(--line);border-radius:7px;overflow:hidden;flex:none}
+  .seg button{appearance:none;border:none;background:var(--surface);color:var(--muted);font-family:inherit;font-size:.76rem;font-weight:600;padding:5px 12px;cursor:pointer;border-left:1px solid var(--line-soft)}
+  .seg button:first-child{border-left:none}
+  .seg button:hover{background:var(--surface2)}
+  .seg button:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+  .seg button.on-ok{background:color-mix(in srgb,var(--ok) 14%,transparent);color:var(--ok)}
+  .seg button.on-err{background:color-mix(in srgb,var(--err) 14%,transparent);color:var(--err)}
+  .seg button.on-warn{background:color-mix(in srgb,var(--warn) 16%,transparent);color:var(--warn)}
+  .notebtn{appearance:none;border:1px solid var(--line);background:var(--surface);border-radius:6px;width:26px;height:26px;cursor:pointer;color:var(--muted);font-size:.8rem;line-height:1;flex:none}
+  .notebtn.filled{color:var(--warn);border-color:color-mix(in srgb,var(--warn) 45%,transparent);background:color-mix(in srgb,var(--warn) 10%,transparent)}
+  .bulkbar{display:flex;gap:10px;align-items:center;margin-top:12px;padding-top:12px;border-top:1px solid var(--line);flex-wrap:wrap}
+  .btn{appearance:none;font-family:inherit;font-size:.8rem;font-weight:600;border-radius:7px;padding:7px 14px;cursor:pointer;border:1px solid var(--line);background:var(--surface);color:var(--ink)}
+  .btn:hover{background:var(--surface2)}
+  .btn:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+  .btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-contrast)}
+  .btn.primary:hover{filter:brightness(1.06)}
+  .escape{font-size:.78rem;color:var(--muted);margin-left:auto;font-style:italic;font-family:"Source Serif 4",serif}
+  .escape a{color:var(--muted);text-decoration:underline dotted}
+
+  /* elicitation */
+  .efield{padding:10px 0;border-top:1px solid var(--line-soft)}
+  .efield:first-of-type{border-top:none}
+  .efield .elabel{display:flex;align-items:center;gap:8px;font-size:.84rem;font-weight:600;margin-bottom:7px;flex-wrap:wrap}
+  .slider-line{display:flex;align-items:center;gap:12px;font-size:.74rem;color:var(--muted)}
+  .slider-track{flex:1;height:4px;border-radius:99px;background:var(--line);position:relative}
+  .slider-track .fill{position:absolute;inset:0 65% 0 0;background:var(--accent);border-radius:99px}
+  .slider-track .thumb{position:absolute;left:35%;top:50%;transform:translate(-50%,-50%);width:16px;height:16px;border-radius:50%;background:var(--accent);border:2px solid var(--surface);box-shadow:var(--shadow)}
+  .presets{display:flex;gap:7px;flex-wrap:wrap}
+  .presets .p{font-size:.76rem;font-weight:600;border:1px solid var(--line);border-radius:99px;padding:4px 12px;background:var(--surface);cursor:pointer;color:var(--muted)}
+  .presets .p.on{border-color:var(--accent);color:var(--accent);background:color-mix(in srgb,var(--accent) 9%,transparent)}
+
+  /* matrix */
+  .mgrid{display:grid;grid-template-columns:150px repeat(4,minmax(64px,1fr));gap:3px;font-size:.76rem}
+  .mgrid .mh{font-weight:650;font-size:.7rem;letter-spacing:.03em;color:var(--muted);padding:6px 4px;text-align:center;cursor:pointer;border-radius:5px}
+  .mgrid .mh:hover{background:var(--surface2);color:var(--ink)}
+  .mgrid .mrl{font-family:"IBM Plex Mono",monospace;font-size:.7rem;color:var(--muted);padding:7px 6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .cell{appearance:none;border:1px solid var(--line-soft);border-radius:5px;background:var(--surface2);font-family:"IBM Plex Mono",monospace;font-size:.72rem;font-weight:600;padding:6px 0;cursor:pointer;color:var(--muted);position:relative;text-align:center}
+  .cell:focus-visible{outline:2px solid var(--accent);outline-offset:-1px}
+  .cell[data-v="R"]{color:var(--info);background:color-mix(in srgb,var(--info) 11%,transparent);border-color:color-mix(in srgb,var(--info) 30%,transparent)}
+  .cell[data-v="RW"]{color:var(--ok);background:color-mix(in srgb,var(--ok) 12%,transparent);border-color:color-mix(in srgb,var(--ok) 32%,transparent)}
+  .cell.dirty::after{content:"";position:absolute;top:3px;right:3px;width:5px;height:5px;border-radius:50%;background:var(--warn)}
+
+  /* decision log */
+  .dlog{display:grid;grid-template-columns:minmax(200px,4fr) minmax(240px,5fr);border:1px solid var(--line);border-radius:var(--r);overflow:hidden;font-size:.85rem;font-family:"Familjen Grotesk",sans-serif}
+  .dlog>div{padding:9px 14px;border-top:1px solid var(--line-soft);background:var(--surface)}
+  .dlog>div:nth-child(-n+2){border-top:none;background:var(--surface2);font-size:.68rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:600}
+  .dlog .r{color:var(--muted)}
+
+  .qa{margin:1.2em 0;border:1px solid var(--line);border-radius:var(--r);background:var(--surface);box-shadow:var(--shadow)}
+  .qa>div{padding:13px 18px;border-top:1px solid var(--line-soft)}
+  .qa>div:first-child{border-top:none}
+  .qa .q{font-family:"Familjen Grotesk",sans-serif;font-weight:650;font-size:.95rem;margin-bottom:3px;display:flex;gap:10px;align-items:baseline;flex-wrap:wrap}
+  .qa .a{font-size:.9rem;color:var(--muted);margin:0}
+  .qa .a b{color:var(--ink)}
+
+  footer.doc{padding:32px 0;color:var(--muted);font-size:.8rem;font-family:"IBM Plex Mono",monospace}
+</style>
+
+<div class="layout">
+<nav class="rail" aria-label="Sections">
+  <div class="brand sans">Gather Decisions</div>
+  <div class="brand-sub">design spec · v1</div>
+  <ol id="railList">
+    <li><a href="#idea"><span class="n">1</span>The idea<span class="dot" style="margin-left:auto"></span></a></li>
+    <li><a href="#nongoals"><span class="n">2</span>Non-goals<span class="dot" style="margin-left:auto"></span></a></li>
+    <li><a href="#arch"><span class="n">3</span>Architecture<span class="dot" style="margin-left:auto"></span></a></li>
+    <li><a href="#schema"><span class="n">4</span>Meta-schema<span class="dot" style="margin-left:auto"></span></a></li>
+    <li><a href="#archetypes"><span class="n">5</span>Archetypes<span class="dot" style="margin-left:auto"></span></a></li>
+    <li><a href="#guidance"><span class="n">6</span>Guidance<span class="dot" style="margin-left:auto"></span></a></li>
+    <li><a href="#host"><span class="n">7</span>Host integration<span class="dot" style="margin-left:auto"></span></a></li>
+    <li><a href="#stack"><span class="n">8</span>Stack<span class="dot" style="margin-left:auto"></span></a></li>
+    <li><a href="#build"><span class="n">9</span>Build order<span class="dot" style="margin-left:auto"></span></a></li>
+    <li><a href="#resolved"><span class="n">10</span>Resolved questions<span class="dot parked" style="margin-left:auto"></span></a></li>
+    <li><a href="#log"><span class="n">11</span>Decision log<span class="dot" style="margin-left:auto"></span></a></li>
+  </ol>
+</nav>
+
+<main>
+<header class="doc">
+  <div class="eyebrow">Design spec · <b>converged 2026-08-26</b> · not yet implemented</div>
+  <h1>Gather Decisions</h1>
+  <p class="thesis">Structured input surfaces inside the Claude conversation — an advanced <em>ask_user_input</em>. The agent infers everything it can, renders a form already prefilled with provenance on every value, and the user <em>audits a proposal</em> instead of authoring one.</p>
+  <p class="measure" style="font-size:.86rem;color:var(--muted);font-family:'Familjen Grotesk',sans-serif">This document is the input to implementation. Where a decision is marked <span class="chip decided">decided</span>, don't re-litigate it without a reason. One question remains <span class="chip parked">parked</span> until a write path exists. The mockups below are illustrative sketches — click around in them; they behave.</p>
+</header>
+
+<!-- ============ 1 THE IDEA ============ -->
+<section class="sec" id="idea">
+  <div class="sec-eyebrow">§1</div>
+  <h2>The idea</h2>
+  <div class="measure">
+  <p>An MCP App that renders <strong>structured input surfaces inside the Claude conversation</strong> — forms, matrices, review ledgers — instead of the agent asking six clarifying questions as prose bullets. It is a generic renderer driven entirely by a schema the agent emits at call time. It is not a Salesforce tool, not a planning tool, not a survey product. Those are schemas, not features.</p>
+  <p><strong>The core inversion.</strong> A blank intake form throws away everything chat is good at. The agent should infer as much as it can, then render a form <strong>already prefilled</strong>, with provenance visible on every inferred value. Reviewing is cheap; authoring is expensive.</p>
+  <p><strong>Why in-conversation rather than a web app:</strong></p>
+  <ul class="tight">
+    <li>Context preservation — the form lives in the thread that produced it.</li>
+    <li>The agent generates the schema, so the form is bespoke to the moment.</li>
+    <li>Answers flow back into model context, so the next turn is informed without the user re-narrating what they just clicked.</li>
+  </ul>
+  <p>That last point is the whole thesis. A standalone form collects data. <strong>This closes a loop.</strong></p>
+  </div>
+</section>
+
+<!-- ============ 2 NON-GOALS ============ -->
+<section class="sec" id="nongoals">
+  <div class="sec-eyebrow">§2</div>
+  <h2>Non-goals</h2>
+  <div class="measure">
+  <ul class="tight">
+    <li><strong>Not a form designer.</strong> No end-user schema authoring UI. The agent writes schemas.</li>
+    <li><strong>Not general-purpose expressiveness.</strong> Five opinionated archetypes beat an engine that can render anything mediocrely.</li>
+    <li><strong>No freeform-first forms.</strong> If the primary input is prose, it should have been a conversation. Freeform is allowed only <em>anchored to a specific item</em> (per-row correction, per-item note).</li>
+    <li><strong>No gating.</strong> Partial submit is a first-class path (§5). A form that requires completion is worse than chat.</li>
+    <li><strong>No domain credentials, no domain writes</strong> in v1 (§3).</li>
+    <li><strong>Mobile is view-only in practice</strong> for dense views. Don't design for phone editing of a matrix.</li>
+  </ul>
+  </div>
+</section>
+
+<!-- ============ 3 ARCHITECTURE ============ -->
+<section class="sec" id="arch">
+  <div class="sec-eyebrow">§3</div>
+  <h2>Architecture</h2>
+  <div class="measure">
+  <p>The server computes nothing about the domain and holds no credentials. It stores form state — schema plus answers — in one Durable Object per form, addressed by unguessable form id, and nothing else.</p>
+  </div>
+
+  <div class="arch">
+    <div class="arch-row">
+      <div class="arch-box"><div class="t">Claude</div><div class="d">emits the schema as <b>tool input</b> on <code>tools/call(gather_decisions)</code></div></div>
+      <div class="arch-box"><div class="t">Worker (Cloudflare)</div><div class="d">MCP handler + static bundle. Returns a stub text result — the schema is never echoed into context.</div></div>
+    </div>
+    <div class="arch-flow"><span>host fetches <code>ui://forms/renderer</code></span><span class="arrow">▼</span></div>
+    <div class="arch-row">
+      <div class="arch-box hi"><div class="t">iframe: renderer</div><div class="d">schema in ← <code>tool-input</code> · answers out → <code>update-model-context</code> · CSP: <code>default-src 'none'</code> — physically cannot phone home</div></div>
+      <div class="arch-box"><div class="t">Durable Object per form</div><div class="d"><code>idFromName(formId)</code>; SQLite answers, autosave via app-visible tool, alarm-based TTL; the id <b>is</b> the capability</div></div>
+    </div>
+    <div class="arch-flow"><span>answers go browser → model context; drafts autosave via the host bridge to the form's DO</span></div>
+  </div>
+
+  <div class="measure">
+  <h3>Decided <span class="chip decided">decided</span></h3>
+  <ul class="tight">
+    <li><strong>Host:</strong> Cloudflare Workers, <code>wrangler.jsonc</code>. <strong>Streamable HTTP transport</strong> (HTTP+SSE is deprecated); the bundle served via <strong>Workers Static Assets</strong>, not Workers Sites — Sites is the deprecated KV-based path, the same outdated-KV trap as the storage layer.</li>
+    <li><strong>MCP handler: <code>createMcpHandler</code> + MCP SDK v2.</strong> <span class="chip decided">decided 2026-08-26 · verified against CF docs</span> The Agents SDK's <code>McpAgent</code> is deprecated and feature-frozen (it put every MCP <em>session</em> in its own DO); the current recommendation is the stateless <code>createMcpHandler</code> from the <code>agents</code> package with <code>@modelcontextprotocol/server</code> v2 — one server instance per request, no session state, cross-request data "behind an authenticated handle in a Durable Object", which is exactly the per-form DO. Caveat accepted: server-pushed elicitation/sampling don't work on this path; client-initiated <code>tools/call</code> and <code>resources/read</code> — all this app uses — are unaffected.</li>
+    <li><strong>Server-minted form ids.</strong> <span class="chip decided">decided 2026-08-26</span> The Worker mints <code>formId</code> (crypto-random) and returns it in the stub tool result — which is also how the agent learns the id to pass to <code>load_form</code> and to chain forms. Agent-authored ids ("fls-review") would be low-entropy and guessable, which is fatal when the id is the only capability.</li>
+    <li><strong>Document mode.</strong> <span class="chip decided">decided 2026-08-26</span> Forms are re-openable documents, not one-shot events: <strong>one Durable Object per form</strong>, addressed with <code>idFromName(formId)</code>; <code>load_form(id)</code> re-renders with accumulated state. The id <em>is</em> the capability, so no auth is reintroduced. DO over KV because the pattern is per-entity and write-heavy: draft writes and the agent's reads arrive through different routes, and KV's eventual consistency (last-write-wins, up to ~60s propagation) could prefill a chained form from a stale draft. A DO routes every request for the id to one instance — strongly consistent, serialized writes. SQLite stores answers as rows (autosave updates changed paths, not the whole blob); an alarm makes the form self-expiring after <strong>30 days idle</strong> (clock resets on any read or write) — with compatibility date ≥ 2026-02-24, the expiry handler is a single <code>deleteAll()</code> (it clears the alarm too), and since DO storage is billed as of Jan 2026 the TTL has real cost benefit; WebSockets are there if live multi-device sync is ever wanted.</li>
+    <li><strong>Autosave transport: an app-visible tool, never a direct request.</strong> <span class="chip decided">decided 2026-08-26</span> The iframe cannot POST anywhere — that's the point of the CSP below. Drafts reach the server through a <code>visibility: ["app"]</code> tool (<code>save_draft</code>) called over the host bridge; the host mediates, the CSP stays <code>default-src 'none'</code>, and "the app cannot phone home" survives intact. Hardening: the DO caps answer-payload size and throttles per-form write rate, so a leaked id can't be spammed.</li>
+    <li><strong>No auth.</strong> No domain credentials; form state at rest is reachable only via its unguessable id. Custom connectors are reached from Anthropic's cloud, so the endpoint is public regardless — hardening is an <strong>unguessable base path, no IP allowlist</strong> (§10).</li>
+    <li><strong>No CSP domains declared.</strong> <span class="chip decided">corrected 2026-08-26 · verified vs spec</span> <code>ui.csp</code> omitted, so the host's restrictive default applies: <code>default-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; media-src 'self' data:; connect-src 'none'</code>. The conclusion holds — <code>connect-src 'none'</code> means the app physically cannot phone home — and inline scripts/styles and <code>data:</code> images are allowed, which the single-file bundle relies on. (The draft's stated value, bare <code>default-src 'none'</code>, would have blocked the bundle's own inline JS.) CSP is declared via structured fields (<code>connectDomains</code>, <code>resourceDomains</code>, …), not a raw string; hosts may tighten, never loosen. Self-contained bundle: no CDN, no external fonts.</li>
+    <li><strong>No logging of payloads.</strong> Document mode means answers <em>do</em> rest in the form's Durable Object, so the privacy story is stated honestly: stored only under the unguessable id, never logged, self-expiring via alarm. Weaker than "never touch the server" — accepted as the cost of re-openable forms.</li>
+    <li><strong>The schema arrives as tool input</strong>, not as a tool result. The tool result is a short stub (<code>"Form displayed; awaiting input."</code>) because result text lands in model context and must not echo the schema back into it.</li>
+    <li><strong>Build a real bundle.</strong> Claude's iframe sandbox blocks HTTP script sources, so a Vite dev server won't load. Serve a prebuilt production bundle; send <code>notifications/resources/list_changed</code> on change so the host re-fetches.</li>
+  </ul>
+  <div class="callout">
+    <span class="callout-label">Consequence of document mode</span>
+    <p>Autosave falls out for free — debounced writes to the form's DO kill the half-filled-form data-loss risk, and <code>ui/resource-teardown</code> becomes a final flush rather than the only one. The costs: a store to operate, and the weaker privacy story above.</p>
+  </div>
+  </div>
+</section>
+
+<!-- ============ 4 META-SCHEMA ============ -->
+<section class="sec" id="schema">
+  <div class="sec-eyebrow">§4</div>
+  <h2>The meta-schema</h2>
+
+  <div class="measure">
+  <h3>4.1 Closed vs free — the sorting rule <span class="chip decided">decided</span></h3>
+  <p>The single most useful constraint in the whole design:</p>
+  </div>
+  <div class="tablewrap"><table class="spec">
+    <tr><th></th><th>Contents</th><th>Validated</th></tr>
+    <tr><td><strong>Closed vocabularies</strong></td><td>field types, render hints, answer states, rule ops, rule actions, <code>source</code> values</td><td>Yes, strictly. The renderer switches on these.</td></tr>
+    <tr><td><strong>Free text</strong></td><td>labels, titles, descriptions, option display text, <code>rationale</code>, notes, placeholders</td><td>No, beyond length limits</td></tr>
+  </table></div>
+  <div class="measure">
+  <p>The agent gets total latitude over what the form <em>says</em>. The renderer only ever branches on things it can actually understand. If the renderer or a <code>computed</code> counter must act on it, it's typed. If a human reads it, it's free.</p>
+  <p>Corollary: the agent decides button labels <em>and</em> their values ("Confirm / Fix / Later", "Yep / Nope / TBD") — defer options are ordinary agent-defined options, not a fixed state (§4.3).</p>
+
+  <h3>4.2 Field types</h3>
+  <p>Deliberately biased toward structured input.</p>
+  </div>
+  <div class="tablewrap"><table class="spec">
+    <tr><th>Type</th><th>Shape / render</th><th>Notes</th></tr>
+    <tr><td><code>single_select</code></td><td><code>cards</code> · <code>segmented</code> · <code>radio</code> · <code>list</code></td><td>cards for ≤6 with descriptions; segmented for ≤4 short labels; searchable <code>list</code> above ~15</td></tr>
+    <tr><td><code>multi_select</code></td><td><code>chips</code> · <code>checkboxes</code> · <code>list</code></td><td></td></tr>
+    <tr><td><code>boolean</code></td><td><code>toggle</code> · <code>segmented</code></td><td></td></tr>
+    <tr><td><code>rank</code></td><td>drag to prioritise</td><td>position <em>is</em> the value — never use ordinals as addresses (§4.5)</td></tr>
+    <tr><td><code>number</code></td><td>min/max/step</td><td></td></tr>
+    <tr><td><code>slider</code></td><td></td><td>good for tradeoff elicitation (§5)</td></tr>
+    <tr><td><code>allocation</code></td><td>split N across members</td><td>constraint is on the <em>set</em>, not the field</td></tr>
+    <tr><td><code>date</code> / <code>date_range</code></td><td></td><td>named presets ("end of Q3") matter more than the picker</td></tr>
+    <tr><td><code>matrix</code></td><td><code>rows</code> × <code>cols</code>, one <code>cellType</code>, per-cell <code>constraints</code></td><td>row/col ids are agent-declared and fixed</td></tr>
+    <tr><td><code>repeatable</code></td><td>array of sub-field groups</td><td>"add another stakeholder". Rows are user-mutable → minted ids</td></tr>
+    <tr><td><code>table</code></td><td><strong>column definitions + data rows</strong></td><td>LWC-Datatable-shaped: type, options, render hint and constraints declared <strong>once per column</strong>; rows are plain data arrays. <code>multi_select</code> columns allowed <span class="chip decided">decided</span>. A 40-row form is 3 column defs + 40 short rows, and <code>filter_options</code> targets a column, not N fields</td></tr>
+    <tr><td><code>short_text</code></td><td></td><td>support, discourage</td></tr>
+    <tr><td><code>long_text</code></td><td></td><td>smell. If a form is mostly these, it should have been a conversation</td></tr>
+    <tr><td><code>info</code></td><td>markdown block</td><td>makes draft-review an ordinary form (§5)</td></tr>
+    <tr><td><code>computed</code></td><td>read-only derived value</td><td>totals, deltas, "4 unresolved, 2 marked 'let's talk'" — counts by equality on agent-declared values (§4.3). Counting <em>answers</em> rather than summing numbers is what makes a form feel alive</td></tr>
+  </table></div>
+
+  <div class="measure">
+  <h3>4.3 Answer shape <span class="chip decided">decided</span></h3>
+  <p>Flat map, path-keyed, uniform across values and notes:</p>
+  <pre><code><span class="k">type</span> AnswerState = <span class="k">"answered"</span> | <span class="k">"empty"</span>;
+
+<span class="k">type</span> Answer = {
+  state: AnswerState;
+  value?: unknown;      <span class="c">// absent when empty</span>
+  note?: string;        <span class="c">// free text, anchored to this path</span>
+};
+
+<span class="k">type</span> Answers = Record&lt;Path, Answer&gt;;</code></pre>
+  <p><strong>Defer is not a special state.</strong> <span class="chip decided">decided 2026-08-26</span> "You decide", "Let's talk" and "TBD" are ordinary agent-defined options: a field with four options accepts five states — each option plus <code>empty</code> — and that's it. The agent authors the label/value pairs at creation time and is the party that interprets them on the return trip; the renderer never assigns meaning to them. There is no <code>blocking</code> boolean — the agent knows what its own <code>lets_talk</code> value demands downstream because it authored it, and the recipes (§6.2) carry the conventions.</p>
+  <p>Two mechanics preserve what a special state would have provided:</p>
+  <ul class="tight">
+    <li><strong><code>skipOptions</code> on any field.</strong> Non-select fields (date, number, matrix cell) may declare agent-defined label/value pairs rendered as a skip affordance beside the input. "Let Claude decide" in an elicitation form and "TBD" in a ledger are the same mechanism with different agent-authored pairs.</li>
+    <li><strong><code>computed</code> counts by equality, never meaning.</strong> "Count answers where value = <code>lets_talk</code>" is an equality match on an agent-declared identifier — the same thing the renderer already does with field ids, so §4.1 holds.</li>
+  </ul>
+  <p>The open-questions register is therefore not an archetype — it's the agent filtering its own defer values across the session (which persist in the form document, §3).</p>
+
+  <h3>4.4 Notes</h3>
+  <p>Free-text <code>note</code> on any path. Sparse by design.</p>
+  <ul class="tight">
+    <li><strong>Rendering:</strong> an icon that expands, with a visually distinct filled state. Never forty visible textareas — that makes a form look like homework.</li>
+    <li><strong>Transport:</strong> push back as <code>{path, label, note}</code> triples so the agent can open directly on them ("you flagged rollout timing: 'depends on Legal'"), not as an opaque blob it must re-read. The anchor surviving is the entire value over prose.</li>
+  </ul>
+
+  <h3>4.5 Path grammar <span class="chip decided">decided</span></h3>
+  <p>Closed, parseable, validated against the schema. Not JSONPath — no wildcards, no filters.</p>
+  <pre><code>path    := segment ( "[" id "]" | "." id )*
+segment := id | "$self" | "$parent"
+
+<span class="c">// examples</span>
+region
+fls[Discount__c][SalesOps]
+stakeholders[r_7f3a].owner
+$self.detail</code></pre>
+  <p><strong>Ordinal vs stable id — the rule that prevents silent corruption:</strong></p>
+  </div>
+  <div class="tablewrap"><table class="spec">
+    <tr><th>Structure</th><th>Addressing</th><th>Why</th></tr>
+    <tr><td><code>matrix</code> rows/cols</td><td>agent-declared ids</td><td>fixed for the life of the view</td></tr>
+    <tr><td><code>repeatable</code>, <code>table</code> rows</td><td><strong>client-minted ids</strong> (<code>r_7f3a</code>)</td><td>user-mutable; deleting row 2 must not re-point notes anchored at <code>[3]</code></td></tr>
+    <tr><td><code>rank</code></td><td>minted ids</td><td>position is the value being edited, so it can't also be the address</td></tr>
+  </table></div>
+  <div class="measure">
+  <p><strong>Ordinals are for display, never for persistence.</strong> Nice side effect: this addressing scheme <em>is</em> the sparse-exception format the matrix needs. Dense grids are never serialised.</p>
+
+  <h3>4.6 Rules — flat list, <code>$self</code> for row scope <span class="chip decided">decided</span></h3>
+  <p>Nested boolean trees are where model-generated schemas fall apart. Flat list, evaluated in order:</p>
+  <pre><code><span class="k">type</span> Rule = {
+  when: {
+    field: Path;                                    <span class="c">// may use $self</span>
+    op: <span class="k">"eq"</span>|<span class="k">"neq"</span>|<span class="k">"in"</span>|<span class="k">"gt"</span>|<span class="k">"lt"</span>|<span class="k">"empty"</span>|<span class="k">"filled"</span>;
+    value?: unknown;
+  };
+  then: {
+    action: <span class="k">"show"</span>|<span class="k">"hide"</span>|<span class="k">"enable"</span>|<span class="k">"disable"</span>|<span class="k">"require"</span>|<span class="k">"optional"</span>
+          | <span class="k">"filter_options"</span>|<span class="k">"set_default"</span>|<span class="k">"clear"</span>;
+    targets: Path[];
+  };
+};</code></pre>
+  <div class="callout">
+    <span class="callout-label">Not rendered = empty · decided 2026-08-26</span>
+    <p><strong>The user submits exactly what they see.</strong> The submit payload is a function of the rendered view and nothing else. A hidden field contributes <code>empty</code> no matter what it held before; no cached or invisible state is ever submitted. If a re-shown field restores a prior value, that's fine <em>because the user sees it</em> before submitting.</p>
+    <p>Corollaries: <code>set_default</code> writes only into <code>empty</code> fields — it never overwrites a value the user entered; and rule evaluation re-runs the flat list after every change until the rendered state is stable (small iteration cap; the validator warns on rules that could cycle).</p>
+  </div>
+  <ul class="tight">
+    <li><strong><code>require</code>/<code>optional</code> mark, they never gate.</strong> Partial submit is always available (§5); required-ness renders as a marker and feeds <code>computed</code> counters and section status. Only malformed values block submit (§6.3).</li>
+    <li><strong><code>filter_options</code> is half the value</strong> and is the one people forget. Pick "AWS" → the region field only offers AWS regions. Without it you get invalid combinations and a form nobody trusts.</li>
+    <li>Rules target <strong>fields or sections</strong>, so whole sections appear from one answer.</li>
+    <li><strong><code>$self</code> resolves to the current row</strong> inside a <code>repeatable</code>/<code>table</code>. This is what makes per-row conditional follow-up work at all — the agent can't emit one rule per row when the user adds rows at runtime.</li>
+  </ul>
+
+  <h3>4.7 Prefill envelope <span class="chip decided">decided</span></h3>
+  <p>Every prefilled value carries provenance. This is what makes it a Claude-native form rather than a web form.</p>
+  <pre><code><span class="k">type</span> Prefill = {
+  value: unknown;
+  source: <span class="k">"user"</span> | <span class="k">"inferred"</span> | <span class="k">"default"</span> | <span class="k">"existing"</span>;
+  confidence?: <span class="k">"high"</span> | <span class="k">"low"</span>;
+  rationale?: string;      <span class="c">// "you mentioned EU customers"</span>
+  needsReview?: boolean;
+};</code></pre>
+  <ul class="tight">
+    <li>Render <code>inferred</code> + <code>low</code> visibly distinct, <code>rationale</code> on hover/expand.</li>
+    <li>Header shows a <code>computed</code> "N inferred values need review" counter.</li>
+    <li><code>existing</code> gives baseline-diff behaviour for free — dirty-cell rendering in a matrix, changed-value marks elsewhere.</li>
+  </ul>
+  <div class="callout warn">
+    <span class="callout-label">Never emit a blank form</span>
+    <p>If there's nothing to prefill, the form probably shouldn't exist.</p>
+  </div>
+
+  <h3>4.8 Sections</h3>
+  <pre><code><span class="k">type</span> Section = {
+  id: string;
+  title: string;
+  description?: string;
+  fields: Field[];
+  layout?: <span class="k">"stack"</span> | <span class="k">"two_col"</span>;
+  initially?: <span class="k">"expanded"</span> | <span class="k">"collapsed"</span>;
+};</code></pre>
+  <p>Persistent left rail in fullscreen, with per-section status: untouched / in progress / complete / has errors. That rail is the single biggest usability difference between this and a long scroll — this document's own left rail is the same idea. Guideline-compatible too: collapsible sidebars, tabs and pagination are the sanctioned disclosure patterns; floating panels are not.</p>
+  <p>Soft limit ~7 fields per section. Never a section with one field.</p>
+  </div>
+</section>
+
+<!-- ============ 5 ARCHETYPES ============ -->
+<section class="sec" id="archetypes">
+  <div class="sec-eyebrow">§5</div>
+  <h2>Archetypes</h2>
+  <div class="measure">
+  <p><span class="chip decided">decided</span> These are <strong>generation recipes, not code paths.</strong> One renderer, one meta-schema, N markdown recipes. Adding an archetype costs a file, not a deploy.</p>
+
+  <h3>5.1 Assumption ledger — <em>build this first</em></h3>
+  <p>The highest-value surface, and the one that justifies the project. The failure mode it fixes: a plan requires forty small inferences. The user catches two wrong ones on read-through and the other thirty-eight stay wrong <em>silently</em> — not agreed to, just invisible. Nobody audits a paragraph for premises.</p>
+  <p>Shape: dense list of inferences, each a <code>single_select</code> with <code>render: segmented</code>, plus agent-defined defer options ("You decide" / "TBD"), plus optional per-row <code>note</code> and a conditional correction input. Every row carries <code>source</code> + <code>rationale</code>. With forty rows of identical shape, generate it columns+data (§4.2 <code>table</code>): the segmented options are declared once as a column definition, rows are data.</p>
+  </div>
+
+  <div class="mock" id="ledgerMock">
+    <div class="mock-chrome"><span class="m-label">mockup · assumption ledger</span><span class="m-mode">fullscreen</span></div>
+    <div class="mock-body">
+      <div class="ledger-head">
+        <div class="grow">
+          <h4>Before I draft the rollout plan…</h4>
+          <p class="sub" style="margin:0">I inferred these from our conversation. Fix anything wrong — or confirm the lot.</p>
+        </div>
+        <span class="counter" id="ledgerCounter">5 unresolved</span>
+      </div>
+      <div id="ledgerRows"></div>
+      <div class="bulkbar">
+        <button class="btn primary" id="bulkAffirm">Confirm all high-confidence</button>
+        <button class="btn">Submit as-is</button>
+        <span class="escape">…or <a href="#archetypes" onclick="return false">just tell me in chat</a></span>
+      </div>
+    </div>
+    <div class="mock-note">click the segments — the counter is a <code>computed</code> field counting by value equality</div>
+  </div>
+
+  <div class="measure">
+  <p>Requirements it drives: per-row conditional follow-up → <code>$self</code> (§4.6); <strong>bulk affirm</strong> — with forty rows where thirty-eight are right, <em>this is the primary interaction</em>; the <code>computed</code> header counter. Small enough to be v1 on its own.</p>
+
+  <h3>5.2 Elicitation</h3>
+  <p>Agent needs input to start. 4–8 fields, 1–2 sections, <strong>inline card, never fullscreen</strong> — it's replacing three turns of Q&amp;A, not running a project kickoff. Mostly <code>single_select</code> and <code>boolean</code>, defaults prefilled. Include a <strong>tradeoff control</strong> where relevant — sliders or <code>allocation</code> over speed / cost / thoroughness. Forced tradeoffs beat stated preferences; asking "what matters?" in prose returns "all of them".</p>
+  </div>
+
+  <div class="mock">
+    <div class="mock-chrome"><span class="m-label">mockup · elicitation</span><span class="m-mode">inline card</span></div>
+    <div class="mock-body" style="max-width:560px">
+      <h4>Quick setup for the data migration</h4>
+      <p class="sub">I've guessed where I could — check the two amber ones.</p>
+      <div class="efield">
+        <div class="elabel">Scope <span class="chip src user">you said</span></div>
+        <div class="seg" data-single>
+          <button class="on-ok">Accounts only</button><button>+ Contacts</button><button>Everything</button>
+        </div>
+      </div>
+      <div class="efield">
+        <div class="elabel">Environment <span class="chip src inferred" title="you mentioned the July sandbox refresh">inferred · low</span></div>
+        <div class="seg" data-single>
+          <button class="on-warn">Sandbox</button><button>Production</button><button>You decide</button>
+        </div>
+      </div>
+      <div class="efield">
+        <div class="elabel">Speed ↔ thoroughness</div>
+        <div class="slider-line"><span>fast</span>
+          <div class="slider-track"><div class="fill"></div><div class="thumb"></div></div>
+        <span>exhaustive</span></div>
+      </div>
+      <div class="efield">
+        <div class="elabel">Cutover <span class="chip src inferred" title="you mentioned end of quarter twice">inferred · high</span></div>
+        <div class="presets">
+          <button class="p on">End of Q3</button><button class="p">Next weekend</button><button class="p">Pick a date…</button><button class="p">TBD</button>
+        </div>
+      </div>
+      <div class="bulkbar" style="border-top:none;margin-top:4px;padding-top:8px">
+        <button class="btn primary">Looks right — go</button>
+        <span class="escape">…or just tell me</span>
+      </div>
+    </div>
+    <div class="mock-note">amber chips = <code>source: inferred</code>; "You decide" / "TBD" are ordinary agent-defined options</div>
+  </div>
+
+  <div class="measure">
+  <h3>5.3 Brainstorm convergence</h3>
+  <p>The agent has just produced fifteen options in prose and the user must prune, rank and combine. Options <strong>come from the conversation</strong>, not a catalog. <code>multi_select</code> over generated candidates + <code>rank</code> for priority + <code>allocation</code> for effort split + <code>repeatable</code> "add your own".</p>
+  <p><strong>Capture rejection reasons.</strong> When twelve options become two, <em>why the other ten died</em> is more informative than the pick — it reveals the shape of the constraint. One-tap reasons: too expensive / too slow / wrong team / already tried / not the problem. Cheap for the user, disproportionately useful for the agent.</p>
+
+  <h3>5.4 Plan confirmation / draft review</h3>
+  <p>Fully prefilled, diff-shaped, fullscreen. Everything <code>source: "inferred"</code> with rationale, <code>computed</code> totals, explicit commit action. Draft review collapses into this: <strong>plan sections are <code>info</code> fields with ids</strong>, each with approve/revise + note. "The third bit is off" is unresolvable in prose; a note anchored to section three is not. No separate renderer needed.</p>
+
+  <h3>5.5 Matrix</h3>
+  <p>The hard field type, and the best single argument for the whole pattern. Awkward in chat (inherently 2D), awkward in the source system (per-field clicking), awkward in a spreadsheet (the spreadsheet doesn't know the rules).</p>
+  </div>
+
+  <div class="mock" id="matrixMock">
+    <div class="mock-chrome"><span class="m-label">mockup · field-level security matrix</span><span class="m-mode">fullscreen</span></div>
+    <div class="mock-body">
+      <div class="ledger-head">
+        <div class="grow"><h4>Discount fields — profile access</h4><p class="sub" style="margin:0">click a cell to cycle – / R / RW · click a column header to bulk-apply</p></div>
+        <span class="counter clear" id="matrixCounter">0 changes</span>
+      </div>
+      <div class="mgrid" id="matrixGrid" role="grid" aria-label="Field level security matrix mockup"></div>
+    </div>
+    <div class="mock-note">amber dots = dirty vs <code>source: "existing"</code> baseline — the diff is what gets summarised to the model, never the grid</div>
+  </div>
+
+  <div class="measure">
+  <ul class="tight">
+    <li><strong>Tri-state click-to-cycle cells</strong>, not dropdowns. Two clicks × 800 cells is untenable, and dropdowns clip. Cycling is faster, keyboard-friendly, and drag-fills well.</li>
+    <li><strong>Header-click bulk apply</strong> (column, row) — 90% of real editing.</li>
+    <li><strong>Rectangle fill</strong> — shift-click or drag to paint a region.</li>
+    <li><strong>Diff against baseline</strong> — <code>source: "existing"</code> renders dirty cells distinctly, with an N-changes counter and per-cell revert.</li>
+    <li><strong>Column collapsing</strong> — 30 columns don't fit; group, and offer "hide columns with no exceptions".</li>
+    <li><strong>Keyboard nav</strong> — arrows + space. Required for accessibility anyway.</li>
+    <li><strong>Per-cell constraints in the schema</strong>, so illegal combinations auto-correct and explain themselves. (Domain example: Edit implies Read; required and master-detail fields can't be hidden; formula fields are read-only.) The renderer enforces; it doesn't know the domain.</li>
+    <li><strong>Never send the grid to the model.</strong> <code>content</code> gets a policy <em>summary</em> ("38 fields; default read-only; Edit for Sales Ops and Rev Ops; 4 exceptions"). Dumping 1,000 cells burns thousands of tokens and invites hallucinated cells.</li>
+    <li>Direct DOM mutation on changed cells — per-cell memoized components (§8). No full reconcile per click; hosts impose resource limits on views.</li>
+  </ul>
+
+  <h3>5.6 Cross-archetype mechanics <span class="chip decided">decided</span></h3>
+  <p>More important than any field type.</p>
+  <ul class="tight">
+    <li><strong>Partial submit.</strong> "Answered three of ten, continue." Unanswered fields are enumerated as <code>empty</code> in the submit payload; the agent decides whether to pick for them or ask. Preserving the chat affordance of "just pick something for the rest" is what keeps this better than software.</li>
+    <li><strong>Always leave the chat escape hatch.</strong> A line in the card — "or just tell me" — costs nothing and turns a mistriggered form from a dead end into a minor annoyance.</li>
+    <li><strong>Forms chain.</strong> elicitation → draft → convergence → plan → confirmation. Continuity is twofold: <code>ui/update-model-context</code> for what the <em>agent</em> must know, and the form's Durable Object for exact state (§3) — the agent passes <code>formId</code>s forward instead of re-serialising answer maps and minted row ids through its own context. <strong>Push back structured state, not a prose summary</strong>, or form three can't be prefilled from form one.</li>
+  </ul>
+  </div>
+</section>
+
+<!-- ============ 6 GUIDANCE ============ -->
+<section class="sec" id="guidance">
+  <div class="sec-eyebrow">§6</div>
+  <h2>Guidance: five layers</h2>
+  <div class="measure">
+  <p>The trigger is a <em>conversational moment</em>, not a topic — the user asks for clarification, a brainstorm, or plan confirmation. They will <strong>never</strong> say "questionnaire". This breaks skill-description matching as the primary trigger, so the layers split by what's in context when.</p>
+
+  <h3>6.1 Tool description — carries the trigger</h3>
+  <p>Always in context, so it costs tokens every conversation. Keep it minimal but put the <strong>trigger logic</strong> here, because nothing else is loaded at decision time. Write it <strong>behaviourally and negatively</strong> — fire on something the model can notice itself doing:</p>
+  <div class="callout"><p style="font-style:italic">If you are about to write clarifying questions as prose bullets, stop — those go in this tool instead. Same if you are about to list options for the user to pick from, or summarise a plan for approval.</p></div>
+  <p>And the <strong>don'ts</strong>, which matter more, because a needless 18-field form reads as bureaucracy. False positives cost more than false negatives:</p>
+  <ul class="tight">
+    <li>One question → just ask it.</li>
+    <li>"A or B?" → they want analysis, not their options back as radio buttons.</li>
+    <li>User already gave detailed constraints → don't second-guess with an intake form.</li>
+    <li>Venting, exploring, thinking out loud → a form is a wall.</li>
+  </ul>
+  <p><strong>Name the tool for the behaviour.</strong> <code>gather_decisions</code> gets selected at the right moments. <code>render_questionnaire</code> gets selected when someone says "questionnaire", which never happens.</p>
+
+  <h3>6.2 <code>get_form_guide(archetype)</code> — carries the craft <span class="chip decided">decided</span></h3>
+  <p><strong>This, not a skill, is the primary guidance channel.</strong> A model-visible tool returning the archetype recipe + two worked examples. The render tool says: <em>"If you have not called <code>get_form_guide</code> in this conversation, call it first."</em></p>
+  <p>Why it beats a skill pointer: a tool call is far more reliably performed than a file read — it's what the model is already doing. Host-agnostic: no plugin, no install, no Claude-only dependency. Updated by deploying a Worker, not by asking teammates to re-upload a skill. Zero standing token cost. Costs one round trip, which is nothing next to a human filling a form.</p>
+
+  <h3>6.3 Validator — enforces, and teaches</h3>
+  <p><strong>Two loops, both required.</strong></p>
+  <p><em>Schema validation (agent → app).</em> Malformed definitions come back as text in the tool result: <code>unknown field type 'slider_group'</code>, <code>rule 3 references missing field 'region'</code>, <code>path 'stakeholders[2].owner' uses an ordinal — use a minted row id</code>. The agent self-corrects on the next call. Without this the tool silently renders garbage and you never learn why. Return the <strong>matching worked example alongside the errors</strong> — that makes convergence work even with no skill and no guide call. Design the <code>inputSchema</code> <strong>loose</strong> and validate <strong>strict</strong> in the app: deeply nested recursive JSON Schema degrades model output quality.</p>
+  <p><em>Answer validation (user → app).</em> <strong>Format only gates.</strong> <span class="chip decided">decided 2026-08-26</span> Malformed values — wrong type, out of range, failed regex — block submit and jump the section rail to the error, because submitting garbage helps nobody. Required-ness never gates: partial submit is the norm (§5.6), <code>require</code> is a marker that feeds the rail, the asterisk and <code>computed</code> counters, and unanswered required fields simply return <code>empty</code>. The agent reads "3 of 4 required fields empty" in the payload and decides what to do — that decision is its business, not the renderer's.</p>
+
+  <h3>6.4 Skill — carries the <em>whether</em></h3>
+  <p>Not examples; the server serves those. The skill's job is the thing the server can't see: the §6.1 negative rules about the agent's own output, loaded before any tool is selected. Metadata is ~100 tokens always-loaded; the body loads on trigger.</p>
+  <p>Package as a <strong>plugin</strong> (connector + skill + <code>/…</code> command) so a teammate installs one thing. Plugins can pull from a git repo, which matters for a skill iterated weekly; org-level skills must be uploaded and updated manually. Plugins are Claude-specific — the portable equivalent is the MCP prompts primitive. <strong>Write the skill after the validator:</strong> its error log tells you which mistakes to write guidance against, instead of guessing.</p>
+
+  <h3>6.5 Memory / CLAUDE.md — carries the user's process <span class="chip decided">decided</span></h3>
+  <p>How the agent <em>interprets</em> answers is not the server's business. "When I defer, just pick something", "anything marked 'let's talk' means stop and ask", "never render a form for fewer than 3 questions" — these are per-user/per-team process preferences and live in CLAUDE.md or agent memory, not in recipes.</p>
+  <p>The split: recipes (§6.2) ship user-agnostic <em>defaults</em> so a fresh user with an empty CLAUDE.md gets coherent behaviour; memory/CLAUDE.md <em>overrides</em> them. Repeated form sessions are high-signal preference data — "this user defers all budget questions every time" — and memory is the intended place for that learning to accumulate.</p>
+  </div>
+</section>
+
+<!-- ============ 7 HOST INTEGRATION ============ -->
+<section class="sec" id="host">
+  <div class="sec-eyebrow">§7</div>
+  <h2>Host integration (MCP Apps)</h2>
+  <div class="measure">
+  <p>Extension <code>io.modelcontextprotocol/ui</code> (SEP-1865, Stable 2026-01-26).</p>
+
+  <h3>7.1 Declaration</h3>
+  <pre><code><span class="c">// resource</span>
+{
+  uri: <span class="k">"ui://forms/renderer"</span>,
+  name: <span class="k">"Structured input renderer"</span>,
+  mimeType: <span class="k">"text/html;profile=mcp-app"</span>,
+  _meta: { ui: { prefersBorder: <span class="k">true</span> <span class="c">/* per display mode */</span> } }
+}
+
+<span class="c">// tool</span>
+{
+  name: <span class="k">"gather_decisions"</span>,
+  description: <span class="k">"…trigger logic from §6.1…"</span>,
+  inputSchema: { <span class="c">/* loose */</span> },
+  _meta: { ui: { resourceUri: <span class="k">"ui://forms/renderer"</span>, visibility: [<span class="k">"model"</span>,<span class="k">"app"</span>] } }
+}</code></pre>
+  <p>One UI resource serves every form type forever: <strong>rendering engine ships in the bundle, schema arrives as data.</strong> Host reviews the template once; new archetypes are server-side only. Use <code>visibility: ["app"]</code> for anything the UI needs but the model shouldn't see (<code>save_draft</code>, validation helpers); visibility defaults to <code>["model","app"]</code>. App-scope is per-server; hosts MUST reject app calls to tools lacking <code>"app"</code>, and cross-server calls from apps are blocked. Verified nuances: the <code>_meta.ui</code> block is served with the resource <em>contents</em> via <code>resources/read</code>; use the nested <code>_meta.ui.resourceUri</code> form — the flat <code>_meta["ui/resourceUri"]</code> key is deprecated. The app calls tools with plain MCP <code>tools/call</code> over a postMessage JSON-RPC transport; the host proxies to the server.</p>
+
+  <h3>7.2 Messages used</h3>
+  </div>
+  <div class="tablewrap"><table class="spec">
+    <tr><th>Direction</th><th>Method</th><th>Use here</th></tr>
+    <tr><td>app ↔ host</td><td><code>ui/initialize</code> → <code>ui/notifications/initialized</code></td><td>handshake; the result carries <code>hostContext</code> (§7.4)</td></tr>
+    <tr><td>host → app</td><td><code>ui/notifications/tool-input</code></td><td>the schema</td></tr>
+    <tr><td>host → app</td><td><code>ui/notifications/tool-input-partial</code></td><td>render sections progressively while a long schema streams</td></tr>
+    <tr><td>host → app</td><td><code>ui/notifications/tool-result</code></td><td>stub; largely ignored</td></tr>
+    <tr><td>host → app</td><td><code>ui/notifications/tool-cancelled</code></td><td>host MUST send on cancellation — stop autosaving, show cancelled state</td></tr>
+    <tr><td>host → app</td><td><code>ui/notifications/host-context-changed</code></td><td>theme, resize, display mode, orientation (partial updates; merge)</td></tr>
+    <tr><td>host → app</td><td><code>ui/resource-teardown</code></td><td><strong>a request, not a notification</strong> — the host waits for the response, so the final flush can complete before teardown</td></tr>
+    <tr><td>app → host</td><td><code>tools/call</code></td><td>plain MCP, proxied by the host — how <code>save_draft</code> travels (§3)</td></tr>
+    <tr><td>app → host</td><td><code>ui/update-model-context</code></td><td>debounced progress summary; full answers on submit. Overwrites each time; does not trigger a turn</td></tr>
+    <tr><td>app → host</td><td><code>ui/message</code></td><td>submit — triggers the next turn</td></tr>
+    <tr><td>app → host</td><td><code>ui/request-display-mode</code></td><td>inline → fullscreen</td></tr>
+    <tr><td>app → host</td><td><code>ui/notifications/size-changed</code></td><td>inline auto-fit</td></tr>
+  </table></div>
+  <div class="measure">
+  <p><strong>Context discipline:</strong> debounced mid-fill pushes carry a <em>summary</em> ("section 2 of 5 complete; 3 inferred values unreviewed"), not the payload. Full structured answers only on submit. <code>ui/update-model-context</code> overwrites each time and does not trigger a turn — exactly the semantics wanted.</p>
+
+  <h3>7.3 Display modes and constraints</h3>
+  <p>The spec defines three modes — <code>inline</code>, <code>fullscreen</code>, <code>pip</code>. This app uses the first two.</p>
+  <p><strong>Inline card</strong> — progress/summary surface and small elicitation forms. Auto-fit height, no nested vertical scroll, ~2 actions at the bottom, 4–5 data points, no drill-ins, <strong>no menus or popovers</strong> (clipped by the host container, z-index conflicts).</p>
+  <p><strong>Fullscreen</strong> — everything dense. Composer stays visible. No floating panels; use the section rail, tabs or pagination. The app supplies its own fullscreen button; the host supplies close. Menus in fullscreen: the hard prohibition is scoped to inline cards; in fullscreen it's a <em>preference</em>. Your view is the viewport, so host clipping mostly disappears — but <strong>your own</strong> <code>overflow: auto</code> still clips, and there's no portaling out of the sandbox. Use the Popover API / CSS anchor positioning / top-layer <code>&lt;dialog&gt;</code>, which escape ancestor overflow within your document. Keep menus to genuinely secondary actions; never the core loop.</p>
+  <p><strong>Mobile</strong> — native WebView, not an iframe. No camera/mic/geolocation. Connectors must be added on web or desktop first. Critically: <strong>vertical pan gestures inside an inline app go to the conversation scroll</strong>, so inline apps must fit their content height; request fullscreen if you need your own scroll viewport. 44pt tap targets, honour <code>hostContext.safeAreaInsets</code> (not mobile-only — the composer can overlay the bottom of an inline app on web too). Dense matrix on a phone: render a per-field summary list instead. Editing is a desktop/tablet affordance.</p>
+
+  <h3>7.4 Theming</h3>
+  <p>Host supplies CSS custom properties via <code>hostContext.styles.variables</code> (standardized <code>--color-*</code>, <code>--font-*</code>, <code>--border-radius-*</code>, <code>--shadow-*</code> keys) — plus <code>theme</code>, <code>locale</code>, <code>timeZone</code>, <code>containerDimensions</code>, <code>safeAreaInsets</code>, <code>platform</code>, <code>deviceCapabilities</code>, <code>displayMode</code> / <code>availableDisplayModes</code>, <code>toolInfo</code>, and <code>styles.css.fonts</code> (host-injected <code>@font-face</code> CSS).</p>
+  <p><strong>Never hardcode colors.</strong> Structural elements (backgrounds, text, borders, icons) use host tokens; brand colors only for accents. Set your own <code>:root</code> fallbacks for every variable used, since hosts may supply a partial set. Support light and dark; test both. Skeleton loaders, not spinners.</p>
+
+  <h3>7.5 Claude-specific constraints <span class="chip decided">verified 2026-08-26</span></h3>
+  <ul class="tight">
+    <li>Rendering requires a per-app user permission prompt ("Always allow") on first use.</li>
+    <li>App-initiated <code>tools/call</code> is proxied through Claude's backend (egress from Anthropic IP ranges) — consistent with §3's threat model.</li>
+    <li>Tool results over ~150k characters get spilled to the code-execution sandbox as a file pointer — never applicable here (stub results and <code>save_draft</code> acks are tiny), but a reason to keep it that way.</li>
+    <li><code>ui/open-link</code> shows a confirmation modal; <code>frameDomains</code> (nested third-party iframes) is restricted in Claude — both unused by this app.</li>
+    <li><code>_meta.ui.domain</code> (stable sandbox origin for in-app OAuth) exists but is irrelevant — no auth (§3).</li>
+  </ul>
+  <p><strong>Draft-spec watchlist</strong> (in <code>ext-apps</code> draft, not yet in a dated release): app-provided tools the agent can call (a pull-based complement to <code>ui/update-model-context</code> — could let the agent query form state instead of being pushed summaries), <code>ui/download-file</code> (host-mediated downloads — a future "export answers as CSV"), and <code>sampling/createMessage</code> from apps. Revisit when the extension cuts its next release.</p>
+  </div>
+</section>
+
+<!-- ============ 8 STACK ============ -->
+<section class="sec" id="stack">
+  <div class="sec-eyebrow">§8</div>
+  <h2>Stack <span class="chip decided">decided 2026-08-26</span></h2>
+  <div class="measure">
+  <p><strong>React, bundled by Vite into the single <code>ui://</code> HTML resource. React libraries are allowed, with one hard constraint: nothing may fetch at runtime.</strong></p>
+  <p>Why React over vanilla: the renderer is a schema-driven component tree with conditional visibility, per-row rules, computed counters and re-evaluation on every change — exactly the shape React exists for. Vanilla JS here means hand-rolling a worse reconciler. The framework is invisible to the host either way: everything is compiled into one self-contained bundle, so the choice costs nothing at the MCP boundary.</p>
+  <p>Why the constraint is absolute: <code>_meta.ui.csp</code> is omitted (§3), so the iframe runs under <code>default-src 'none'; connect-src 'none'</code>. A library that loads CSS from a CDN, pulls a font, or phones telemetry home doesn't degrade — it <strong>breaks silently</strong>. Everything must survive being inlined at build time.</p>
+  <ul class="tight">
+    <li><strong>Prefer headless libraries:</strong> <strong>TanStack Table</strong> for the <code>table</code>/ledger archetypes — its column-defs + data-rows model maps 1:1 onto §4.2; TanStack Virtual if matrices outgrow naive rendering; dnd-kit (rank, drag-fill); Radix primitives (portals stay in-document, which is fine inside the iframe; top-layer <code>&lt;dialog&gt;</code>/Popover API for fullscreen menus per §7.3); Zod shared between Worker and client so the validator is one codebase (§6.3).</li>
+    <li><strong>Skip TanStack Form</strong> — not disallowed, redundant. The path-keyed answer map, minted ids, rules engine and <code>computed</code> evaluation <em>are</em> the form-state library, and they're build step 1 either way; a second field-state store means two sources of truth.</li>
+    <li><strong>shadcn/ui — yes.</strong> It's vendored source, not a dependency: components are copied into the repo (on Radix), so nothing can phone home and anything can be stripped. Its theming is entirely CSS-custom-property-driven, so its tokens (<code>--background</code>, <code>--primary</code>, …) are pointed at <code>hostContext.styles.variables</code> with <code>:root</code> fallbacks — §7.4 satisfied <em>by</em> the component system. Tailwind is fine because it's build-time static CSS, not a runtime; no external <code>@import</code>s or fonts in its config. Inline cards still get no menus (§7.3 — a host rule, not a library one).</li>
+    <li><strong>Avoid styled component kits</strong> (MUI, AntD): bundle weight, font fetching, and they fight §7.4 — host tokens must own all structural color, and a themed kit wants to own it instead.</li>
+    <li><strong>Matrix performance:</strong> the §5.5 "direct DOM mutation" requirement is satisfied with per-cell memoized components — a click re-renders one cell, not 800. If bundle size ever becomes a problem, Preact + <code>preact/compat</code> is a near-drop-in ~40KB saving; decide at build step 3, not now.</li>
+    <li><strong>Styling:</strong> shadcn's Tailwind output plus plain CSS where clearer, all over host custom properties with <code>:root</code> fallbacks. No CSS-in-JS runtime.</li>
+  </ul>
+  </div>
+</section>
+
+<!-- ============ 9 BUILD ORDER ============ -->
+<section class="sec" id="build">
+  <div class="sec-eyebrow">§9</div>
+  <h2>Build order</h2>
+  <div class="measure">
+  <ol style="padding-left:1.3em">
+    <li style="margin:.6em 0"><strong>Meta-schema + validator.</strong> TypeScript types, Zod validator, path parser and resolver. No UI. Includes two items easy to lose: the <strong>closed vocabulary of <code>computed</code> ops</strong> (count-by-value, sum, delta-vs-baseline, …) — the same §4.1 treatment as rules, since an implicit expression language is where model-generated schemas fall apart — and a <strong>version field on the schema envelope</strong>, cheap now, painful to retrofit. Get the error messages good — they're a product surface (§6.3).</li>
+    <li style="margin:.6em 0"><strong>Archetype audit.</strong> Write all five archetypes as JSON against the meta-schema and run them through the validator. <strong>Do this before the renderer.</strong> One archetype surfaced three gaps in a minute of conversation; the other four will surface the rest. This is how the real primitive set gets found instead of guessed.</li>
+    <li style="margin:.6em 0"><strong>Renderer v1 — assumption ledger only.</strong> One field type (<code>single_select</code> segmented) + defer options + notes + bulk affirm + <code>computed</code> counter. Inline and fullscreen. Proves the whole loop end to end.</li>
+    <li style="margin:.6em 0"><strong>Worker + MCP handler.</strong> <code>gather_decisions</code>, <code>get_form_guide</code>, <code>load_form</code>, the app-visible <code>save_draft</code>, the form Durable Object, <code>ui://forms/renderer</code>. Deploy. Connect as a custom connector.</li>
+    <li style="margin:.6em 0"><strong>Remaining archetypes</strong>, in order of use: elicitation → confirmation → convergence → matrix.</li>
+    <li style="margin:.6em 0"><strong>Skill + plugin packaging</strong>, last, informed by the validator's error log.</li>
+  </ol>
+  </div>
+</section>
+
+<!-- ============ 10 RESOLVED QUESTIONS ============ -->
+<section class="sec" id="resolved">
+  <div class="sec-eyebrow">§10</div>
+  <h2>Resolved questions</h2>
+  <div class="qa">
+    <div>
+      <div class="q">Composite table cells <span class="chip decided">decided · allowed</span></div>
+      <p class="a">With the columns+data pattern the options live once in the column definition, so a <b>multi_select column is cheap</b>. Costs one extra path level in the answer map — accepted.</p>
+    </div>
+    <div>
+      <div class="q">Form as event or document <span class="chip decided">decided · document</span></div>
+      <p class="a">Forms are re-openable and re-renderable with accumulated state — <b>the session's shared artifact</b>. Stable formIds and one Durable Object per form follow (§3). Draft persistence is subsumed: the DO addressed by an unguessable id is in from the start; the id <b>is</b> the capability, so no auth is reintroduced.</p>
+    </div>
+    <div>
+      <div class="q">Endpoint exposure <span class="chip decided">decided · unguessable path only</span></div>
+      <p class="a">No IP allowlist — Anthropic's egress ranges are shared infrastructure, so allowlisting never isolated to one org and adds maintenance for little benefit.</p>
+    </div>
+    <div>
+      <div class="q">Audit attribution <span class="chip parked">parked</span></div>
+      <p class="a">With no domain-write path nothing needs attribution. <b>Revisit the moment one is added.</b></p>
+    </div>
+    <div>
+      <div class="q">Deferred label taxonomy <span class="chip dissolved">dissolved</span></div>
+      <p class="a">No <code>blocking</code> boolean, no special deferred state: defer options are ordinary agent-defined label/value pairs the agent interprets itself (§4.3).</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 11 DECISION LOG ============ -->
+<section class="sec" id="log" style="border-bottom:none">
+  <div class="sec-eyebrow">§11</div>
+  <h2>Decision log</h2>
+  <div class="tablewrap">
+  <div class="dlog">
+    <div>Decision</div><div>Rationale</div>
+    <div>Generic renderer, schema as tool input</div><div class="r">one UI resource serves every form type; new archetypes need no deploy</div>
+    <div>No credentials, no auth</div><div class="r">form state rests in per-form Durable Objects under unguessable ids; nothing else touches the server</div>
+    <div>Document mode + one Durable Object per form</div><div class="r">re-openable forms as session artifacts; idFromName(formId) is the capability; strong consistency where KV's eventual consistency could prefill from a stale draft; autosave, TTL-by-alarm and future live sync for free</div>
+    <div>Autosave via app-visible tool over the host bridge</div><div class="r">iframe CSP stays default-src 'none'; the app still physically cannot phone home</div>
+    <div>Server-minted formIds, returned in the stub result</div><div class="r">the id is the only capability — agent-authored names would be guessable; the stub is how the agent learns the id for load_form and chaining</div>
+    <div>Streamable HTTP + Workers Static Assets</div><div class="r">HTTP+SSE and Workers Sites are both deprecated; the draft predated both moves</div>
+    <div><code>createMcpHandler</code> + MCP SDK v2, stateless</div><div class="r">McpAgent is deprecated and feature-frozen (a DO per MCP session); docs now endorse exactly this design — stateless handler, cross-request state behind a per-entity DO handle</div>
+    <div>Compat date ≥ 2026-02-24, wrangler.jsonc</div><div class="r">deleteAll() then also clears the expiry alarm, so the TTL handler is one call; jsonc is the current config default</div>
+    <div>30-day idle TTL on form documents</div><div class="r">survives multi-week chained work; abandoned drafts don't accumulate billed storage; clock resets on any access</div>
+    <div><code>table</code> = column definitions + data rows</div><div class="r">LWC Datatable shape; options declared once per column; 40-row schemas stay small; multi_select columns cheap</div>
+    <div>Closed vocabularies / free labels</div><div class="r">renderer only branches on what it can understand; agent keeps expressive latitude</div>
+    <div>Defer options are ordinary agent-defined options</div><div class="r">agent authors and interprets its own values; renderer matches by equality, never meaning</div>
+    <div><code>skipOptions</code> on any field</div><div class="r">non-select fields get the same defer affordance without a special state</div>
+    <div>Path-keyed flat answer map</div><div class="r">one addressing scheme for values, notes and states; sparse matrix format falls out free</div>
+    <div>Minted row ids, never ordinals</div><div class="r">user-mutable rows would silently re-point anchored notes</div>
+    <div>Flat rule list + <code>$self</code></div><div class="r">nested trees degrade model output; $self is the only way to scope per-row rules at runtime</div>
+    <div>Not rendered = empty; submit = what the user sees</div><div class="r">no invisible state: hiding clears, defaults never clobber user input, evaluation settles to a stable view</div>
+    <div>Required marks, only malformed gates</div><div class="r">required-ness feeds counters and the rail; the agent decides what empty means</div>
+    <div>Loose inputSchema, strict app validation</div><div class="r">deep recursive JSON Schema hurts generation quality</div>
+    <div>Guidance via <code>get_form_guide</code>, not just a skill</div><div class="r">tool calls are more reliably performed than file reads; host-agnostic; deploy to update</div>
+    <div>Validator returns errors + example</div><div class="r">guarantees convergence with no skill and no guide call</div>
+    <div>Interpretation conventions live in memory/CLAUDE.md</div><div class="r">per-user process preference; recipes ship user-agnostic defaults, memory overrides</div>
+    <div>Trigger logic in the tool description</div><div class="r">the moment is conversational; only the tool description is in context at decision time</div>
+    <div>Archetypes as recipes, not code paths</div><div class="r">draft review and the open-questions register already collapsed into the meta-schema</div>
+    <div>Prefill always, with provenance</div><div class="r">reviewing is cheap, authoring is expensive; makes inferences auditable</div>
+    <div>Partial submit is first-class</div><div class="r">a form that gates progress is worse than chat</div>
+    <div>React + headless libs, bundled, zero runtime fetches</div><div class="r">schema-driven tree is React's shape; CSP default-src 'none' breaks anything that phones home</div>
+    <div>Assumption ledger first</div><div class="r">highest value, smallest surface, proves the loop</div>
+  </div>
+  </div>
+  <footer class="doc">gather decisions · design v1 · converged 2026-08-26 · supersedes DESIGN.md</footer>
+</section>
+</main>
+</div>
+
+<script>
+(function(){
+  /* ---------- assumption ledger mockup ---------- */
+  var rows = [
+    {txt:"Rollout targets the EU org only", why:"you mentioned EU customers twice", src:"inferred · high", cls:"inferred", state:1},
+    {txt:"Sales Ops keeps edit access during migration", why:"current profile config", src:"existing", cls:"existing", state:0},
+    {txt:"Cutover happens outside UK business hours", why:"inferred from your timezone", src:"inferred · low", cls:"inferred", state:0, note:true},
+    {txt:"Legacy discount codes are frozen, not migrated", why:"you said “we never cleaned those up”", src:"you said", cls:"user", state:0},
+    {txt:"Rev Ops signs off before production deploy", why:"assumed from previous projects", src:"inferred · low", cls:"inferred", state:0}
+  ];
+  var host = document.getElementById('ledgerRows');
+  var counter = document.getElementById('ledgerCounter');
+  var LBL = ["Confirm","Fix","TBD"], CLS = ["on-ok","on-err","on-warn"];
+  function renderCounter(){
+    var un = rows.filter(function(r){return r.state===0}).length;
+    var tbd = rows.filter(function(r){return r.state===3}).length;
+    if(un===0 && tbd===0){ counter.textContent = "all resolved"; counter.className="counter clear"; }
+    else { counter.textContent = un+" unresolved"+(tbd? " · "+tbd+" marked TBD":""); counter.className="counter"; }
+  }
+  rows.forEach(function(r,i){
+    var d = document.createElement('div'); d.className='lrow';
+    var t = document.createElement('div'); t.className='txt';
+    t.innerHTML = r.txt+' <span class="chip src '+r.cls+'">'+r.src+'</span><span class="why">'+r.why+'</span>';
+    d.appendChild(t);
+    var seg = document.createElement('div'); seg.className='seg';
+    LBL.forEach(function(l,j){
+      var b = document.createElement('button'); b.type='button'; b.textContent=l;
+      if(r.state===j+1) b.className=CLS[j];
+      b.addEventListener('click',function(){
+        r.state = (r.state===j+1)? 0 : j+1;
+        Array.prototype.forEach.call(seg.children,function(bb,k){ bb.className = (r.state===k+1)? CLS[k] : ''; });
+        renderCounter();
+      });
+      seg.appendChild(b);
+    });
+    d.appendChild(seg);
+    var n = document.createElement('button'); n.type='button'; n.className='notebtn'+(r.note?' filled':''); n.title=r.note?'note: “depends on whether Legal signs off”':'add a note'; n.textContent='✎';
+    d.appendChild(n);
+    host.appendChild(d);
+  });
+  document.getElementById('bulkAffirm').addEventListener('click',function(){
+    rows.forEach(function(r,i){
+      if(r.state===0 && r.src.indexOf('low')===-1){
+        r.state=1;
+        var seg = host.children[i].querySelector('.seg');
+        Array.prototype.forEach.call(seg.children,function(bb,k){ bb.className = k===0? CLS[0]:''; });
+      }
+    });
+    renderCounter();
+  });
+  renderCounter();
+
+  /* ---------- matrix mockup ---------- */
+  var cols = ["Sales Ops","Rev Ops","Support","Read Only"];
+  var fields = ["Discount__c","Discount_Reason__c","Approval_Level__c","Margin_Floor__c","Legacy_Code__c"];
+  var base = [
+    ["RW","RW","R","R"],
+    ["RW","R","R","-"],
+    ["R","RW","-","-"],
+    ["R","R","-","-"],
+    ["R","R","R","R"]
+  ];
+  var cur = base.map(function(r){return r.slice()});
+  var CYCLE = ["-","R","RW"];
+  var grid = document.getElementById('matrixGrid');
+  var mc = document.getElementById('matrixCounter');
+  function changes(){ var n=0; cur.forEach(function(r,i){ r.forEach(function(v,j){ if(v!==base[i][j]) n++; }); }); return n; }
+  function paintCounter(){ var n=changes(); mc.textContent = n+" change"+(n===1?"":"s"); mc.className = n? "counter":"counter clear"; }
+  function paintCell(btn,i,j){
+    var v = cur[i][j];
+    btn.textContent = v==="-"?"–":v;
+    btn.setAttribute('data-v',v);
+    btn.classList.toggle('dirty', v!==base[i][j]);
+  }
+  grid.appendChild(document.createElement('div'));
+  cols.forEach(function(c,j){
+    var h = document.createElement('div'); h.className='mh sans'; h.textContent=c; h.title='bulk-apply to column';
+    h.addEventListener('click',function(){
+      var col = cur.map(function(r){return r[j]});
+      var next = CYCLE[(CYCLE.indexOf(col[0])+1)%3];
+      cur.forEach(function(r,i){ cur[i][j]=next; });
+      Array.prototype.forEach.call(grid.querySelectorAll('[data-col="'+j+'"]'),function(btn,i){ paintCell(btn,i,j); });
+      paintCounter();
+    });
+    grid.appendChild(h);
+  });
+  fields.forEach(function(f,i){
+    var l = document.createElement('div'); l.className='mrl'; l.textContent=f; grid.appendChild(l);
+    cols.forEach(function(c,j){
+      var b = document.createElement('button'); b.type='button'; b.className='cell'; b.setAttribute('data-col',j);
+      b.addEventListener('click',function(){
+        cur[i][j] = CYCLE[(CYCLE.indexOf(cur[i][j])+1)%3];
+        paintCell(b,i,j); paintCounter();
+      });
+      paintCell(b,i,j);
+      grid.appendChild(b);
+    });
+  });
+  paintCounter();
+
+  /* ---------- rail scrollspy ---------- */
+  var links = document.querySelectorAll('#railList a');
+  var map = {};
+  links.forEach(function(a){ map[a.getAttribute('href').slice(1)] = a; });
+  if('IntersectionObserver' in window){
+    var obs = new IntersectionObserver(function(entries){
+      entries.forEach(function(e){
+        if(e.isIntersecting){
+          links.forEach(function(a){a.classList.remove('active')});
+          var a = map[e.target.id]; if(a) a.classList.add('active');
+        }
+      });
+    },{rootMargin:"-15% 0px -70% 0px"});
+    document.querySelectorAll('section.sec').forEach(function(s){obs.observe(s)});
+  }
+})();
+</script>
