@@ -1,0 +1,15 @@
+{
+  "name": "mcp-questionnaire",
+  "owner": { "name": "Jakub Mazurek" },
+  "plugins": [
+    {
+      "name": "gather-decisions",
+      "source": {
+        "source": "git-subdir",
+        "url": "https://github.com/JakubMMazurek/MCP-Questionnaire.git",
+        "path": "packages/plugin"
+      },
+      "description": "Structured input surfaces inside the Claude conversation — connector + skill in one install."
+    }
+  ]
+}

@@ -1,0 +1,6 @@
+{
+  "gather-decisions": {
+    "type": "http",
+    "url": "REPLACE_WITH_CONNECTOR_URL"
+  }
+}
