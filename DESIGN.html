@@ -548,7 +548,7 @@ $self.detail</code></pre>
     <div class="mock-chrome"><span class="m-label">mockup · field-level security matrix</span><span class="m-mode">fullscreen</span></div>
     <div class="mock-body">
       <div class="ledger-head">
-        <div class="grow"><h4>Discount fields — profile access</h4><p class="sub" style="margin:0">click a cell to cycle – / R / RW · click a column header to bulk-apply</p></div>
+        <div class="grow"><h4>Discount fields — profile access</h4><p class="sub" style="margin:0">click a cell to cycle – / R / RW (the ≤4-option <code>cycle</code> mode; 5+ options get a paint palette) · click a column header to bulk-apply</p></div>
         <span class="counter clear" id="matrixCounter">0 changes</span>
       </div>
       <div class="mgrid" id="matrixGrid" role="grid" aria-label="Field level security matrix mockup"></div>
@@ -558,7 +558,7 @@ $self.detail</code></pre>
 
   <div class="measure">
   <ul class="tight">
-    <li><strong>Tri-state click-to-cycle cells</strong>, not dropdowns. Two clicks × 800 cells is untenable, and dropdowns clip. Cycling is faster, keyboard-friendly, and drag-fills well.</li>
+    <li><strong>No dropdowns in cells — interaction scales with option count.</strong> <span class="chip decided">decided 2026-08-26</span> Two clicks × 800 cells is untenable, and dropdowns clip. Two closed modes, picked by the renderer from the cell's option count, overridable via render hint: <code>cycle</code> (≤4 options — click/space advances, drag-fill paints the current value; the mockup above) and <code>paint</code> (5+ — a value <em>palette</em> in the matrix toolbar: select the value once, click or drag cells to apply, number keys 1–9 pick palette entries). Cycling degrades past ~4 options (a wrong click costs ~n/2 more, and the next value stops being predictable); painting is also the better bulk model at high cardinality. A per-cell popover is a secondary affordance, fullscreen only (§7.3).</li>
     <li><strong>Header-click bulk apply</strong> (column, row) — 90% of real editing.</li>
     <li><strong>Rectangle fill</strong> — shift-click or drag to paint a region.</li>
     <li><strong>Diff against baseline</strong> — <code>source: "existing"</code> renders dirty cells distinctly, with an N-changes counter and per-cell revert.</li>
@@ -781,6 +781,7 @@ $self.detail</code></pre>
     <div>Prefill always, with provenance</div><div class="r">reviewing is cheap, authoring is expensive; makes inferences auditable</div>
     <div>Partial submit is first-class</div><div class="r">a form that gates progress is worse than chat</div>
     <div>React + headless libs, bundled, zero runtime fetches</div><div class="r">schema-driven tree is React's shape; CSP default-src 'none' breaks anything that phones home</div>
+    <div>Matrix cells: cycle ≤4 options, paint palette above</div><div class="r">cycling stops being predictable past ~4; a select-once-apply-many brush scales to any option count and bulk-edits better</div>
     <div>Assumption ledger first</div><div class="r">highest value, smallest surface, proves the loop</div>
   </div>
   </div>
