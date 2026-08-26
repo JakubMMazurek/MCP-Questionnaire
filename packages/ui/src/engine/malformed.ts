@@ -48,6 +48,19 @@ export function malformedReason(field: Field, value: unknown): string | null {
     if (field.max !== undefined && value > field.max) return `is above the maximum of ${field.max}`;
     return null;
   }
+  if (field.type === "matrix" && field.cellType === "number") {
+    // Only actual numbers are checked: a skip option's value is an
+    // agent-declared scalar (§4.3), never malformed — same rule as presets.
+    if (typeof value !== "number") return null;
+    if (Number.isNaN(value)) return "is not a number";
+    if (field.cellMin !== undefined && value < field.cellMin) {
+      return `is below the minimum of ${field.cellMin}`;
+    }
+    if (field.cellMax !== undefined && value > field.cellMax) {
+      return `is above the maximum of ${field.cellMax}`;
+    }
+    return null;
+  }
   if (field.type === "date" || field.type === "date_range") {
     // A preset or a skip option is an agent-declared scalar, not a date — the
     // agent authored it and reads it back itself (§4.3), so it is never

@@ -27,6 +27,17 @@ const form = {
         },
         { type: "number", id: "days", label: "Days", min: 1, max: 30 },
         { type: "short_text", id: "free", label: "Anything" },
+        {
+          type: "matrix",
+          id: "hours",
+          label: "Hours",
+          cellType: "number",
+          cellMin: 0,
+          cellMax: 40,
+          rows: [{ id: "week1", label: "Week 1" }],
+          cols: [{ id: "alice", label: "Alice" }],
+          skipOptions: [{ value: "tbd", label: "TBD" }],
+        },
       ],
     },
   ],
@@ -62,6 +73,20 @@ describe("malformedValues", () => {
     expect(offences(store)[0]?.reason).toBe("is above the maximum of 30");
     store.getState().setAnswer("days", 0);
     expect(offences(store)[0]?.reason).toBe("is below the minimum of 1");
+  });
+
+  it("flags a matrix number cell outside its declared cell bounds", () => {
+    const store = loaded(form);
+    store.getState().setAnswer("hours[week1][alice]", 55);
+    expect(offences(store)[0]?.reason).toBe("is above the maximum of 40");
+    store.getState().setAnswer("hours[week1][alice]", 40);
+    expect(offences(store)).toEqual([]);
+  });
+
+  it("never flags an agent-declared skip scalar in a number cell", () => {
+    const store = loaded(form);
+    store.getState().setAnswer("hours[week1][alice]", "tbd");
+    expect(offences(store)).toEqual([]);
   });
 
   it("never blocks on an empty answer, however required", () => {
