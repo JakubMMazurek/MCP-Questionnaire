@@ -54,15 +54,13 @@
   // Anthropic's cloud), so the hardening is an unguessable path segment: all
   // MCP traffic is served at `/<BASE_PATH>/mcp` and nothing else responds.
   //
-  // THIS VALUE IS THE LOCAL PLACEHOLDER AND IS NOT A SECRET. The Worker
-  // refuses to serve it off localhost (see src/base-path.ts), so a deploy that
-  // forgets to override it fails loudly instead of quietly exposing a
-  // guessable endpoint. Production sets BASE_PATH to a crypto-random segment —
+  // BASE_PATH deliberately does NOT live in `vars`: a deploy-time var of the
+  // same name REPLACES the production secret (found out the hard way on the
+  // first deploy — the placeholder shipped, the Worker refused it off
+  // localhost, and the endpoint failed closed). The local placeholder lives in
+  // `.dev.vars` (committed — it is not a secret; the Worker refuses to serve
+  // it off localhost, see src/base-path.ts). Production sets BASE_PATH to a
+  // crypto-random segment —
   //     openssl rand -hex 16
-  // — as an encrypted environment variable on the Worker (Workers Builds /
-  // dashboard "Variables and Secrets", or `wrangler secret put BASE_PATH`).
-  // Do not put the production value here: `vars` is plaintext in the repo.
-  "vars": {
-    "BASE_PATH": "local-dev"
-  }
+  // — via `wrangler secret put BASE_PATH` (or the dashboard).
 }
