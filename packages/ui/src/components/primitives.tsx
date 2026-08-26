@@ -159,6 +159,20 @@ export function Button({
   );
 }
 
+/**
+ * One line of plumbing news — a draft that will not save, a form that could not
+ * be reopened. Deliberately quiet: it is never the user's problem to solve, and
+ * their answers still reach the model on submit (§3).
+ */
+export function StatusLine({ message }: { message: string | null }) {
+  if (!message) return null;
+  return (
+    <p role="status" className="why m-0">
+      {message}
+    </p>
+  );
+}
+
 /** Skeletons, never spinners (§7.4). */
 export function Skeleton({ className }: { className?: string }) {
   return <div className={cn("skeleton", className)} aria-hidden="true" />;

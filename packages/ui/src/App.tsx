@@ -13,22 +13,32 @@
  */
 
 import { useEffect, useRef } from "react";
-import { Button, Pill, Skeleton } from "./components/primitives";
+import { Button, Pill, Skeleton, StatusLine } from "./components/primitives";
 import { FormShell } from "./FormShell";
 import { CounterPill, isComputedField } from "./fields/field";
-import { useBridge, useEngine, useFrozen } from "./state";
+import { useBridge, useDraftStatus, useEngine, useFrozen } from "./state";
 
 function Loading() {
+  // A reopened form pulls its own state (§7.2); if that pull fails the
+  // skeletons stay and the status line says so, rather than flashing a wrong
+  // form or an empty one.
+  const status = useDraftStatus();
   return (
-    <div className="mx-auto flex max-w-[980px] flex-col gap-3 p-4" aria-busy="true">
-      <Skeleton className="h-5 w-2/5" />
-      <Skeleton className="h-3 w-3/5" />
-      <div className="mt-2 flex flex-col gap-2">
-        {[0, 1, 2, 3, 4].map((row) => (
-          <Skeleton key={row} className="h-8 w-full" />
-        ))}
-      </div>
-      <span className="sr-only">Waiting for the form</span>
+    <div className="mx-auto flex max-w-[980px] flex-col gap-3 p-4" aria-busy={!status}>
+      {status ? (
+        <StatusLine message={status} />
+      ) : (
+        <>
+          <Skeleton className="h-5 w-2/5" />
+          <Skeleton className="h-3 w-3/5" />
+          <div className="mt-2 flex flex-col gap-2">
+            {[0, 1, 2, 3, 4].map((row) => (
+              <Skeleton key={row} className="h-8 w-full" />
+            ))}
+          </div>
+          <span className="sr-only">Waiting for the form</span>
+        </>
+      )}
     </div>
   );
 }

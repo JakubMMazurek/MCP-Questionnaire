@@ -7,6 +7,7 @@
  * final draft flush, and that a missing `save_draft` tool is a non-event.
  */
 
+import type { Answers } from "@gather/schema";
 import { assumptionLedger } from "@gather/schema";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createEngineStore, type EngineStore } from "../engine/index.js";
@@ -275,6 +276,263 @@ describe("submit (§5.6)", () => {
     await promise;
     const order = host.seen.map((entry) => entry.method);
     expect(order.indexOf(METHOD.toolsCall)).toBeLessThan(order.indexOf(METHOD.message));
+  });
+});
+
+describe("the load_form round trip (§7.2, step 5 stage A)", () => {
+  /** `get_form_state`'s real result shape (packages/worker/src/mcp-server.ts). */
+  const formState = (answers: Answers = {}) => ({
+    content: [{ type: "text", text: "form f_x: 1 section(s)" }],
+    structuredContent: {
+      form: { ...assumptionLedger, formId: "f_reopened" },
+      answers,
+      createdAt: 1,
+      updatedAt: 2,
+    },
+  });
+
+  it("pulls its own schema when the tool input carries only a formId", async () => {
+    const calls: { name: string; arguments: Record<string, unknown> }[] = [];
+    const { host, store } = await connect({
+      onToolsCall: (params) => {
+        const call = params as { name: string; arguments: Record<string, unknown> };
+        calls.push(call);
+        return call.name === "get_form_state" ? formState() : { structuredContent: { ok: true } };
+      },
+    });
+
+    host.sendToolInput({ formId: "f_reopened" });
+    await settle();
+
+    expect(calls[0]).toMatchObject({ name: "get_form_state", arguments: { formId: "f_reopened" } });
+    expect(store.getState().status).toBe("ready");
+    expect(store.getState().form?.formId).toBe("f_reopened");
+  });
+
+  it("replays the answers that came back with it", async () => {
+    const { host, store } = await connect({
+      onToolsCall: (params) =>
+        (params as { name: string }).name === "get_form_state"
+          ? formState({ [VERDICT]: { state: "answered", value: "tbd" } })
+          : { structuredContent: { ok: true } },
+    });
+    host.sendToolInput({ formId: "f_reopened" });
+    await settle();
+    expect(store.getState().answers[VERDICT]).toEqual({ state: "answered", value: "tbd" });
+  });
+
+  it("still renders a form that arrives whole, without asking the server", async () => {
+    const calls: unknown[] = [];
+    const { host, store } = await connect({
+      onToolsCall: (params) => {
+        calls.push(params);
+        return { structuredContent: { ok: true } };
+      },
+    });
+    // `gather_decisions` input carries the envelope AND (harmlessly) an id.
+    host.sendToolInput({ formId: "f_x", form: assumptionLedger });
+    await settle();
+    expect(calls).toHaveLength(0);
+    expect(store.getState().status).toBe("ready");
+  });
+
+  it("stays on the skeletons and says so when the pull fails", async () => {
+    const { host, store } = await connect({
+      onToolsCall: () => new Error("form f_gone not found — it may have expired"),
+    });
+    host.sendToolInput({ formId: "f_gone" });
+    await settle();
+    expect(store.getState().status).toBe("loading");
+    expect(store.getState().draftStatus).toContain("could not be reopened");
+  });
+});
+
+describe("learning the formId (§3, step 5 stage A)", () => {
+  it("takes it from the tool-result stub, so save_draft stops sending null", async () => {
+    const { host, store } = await connect();
+    host.sendToolInput(assumptionLedger);
+    host.sendToolResult({
+      content: [{ type: "text", text: "Form displayed; awaiting input. formId: f_minted" }],
+      structuredContent: { formId: "f_minted" },
+    });
+    await settle();
+
+    store.getState().setAnswer(VERDICT, "fix");
+    await vi.advanceTimersByTimeAsync(SAVE_DRAFT_DEBOUNCE_MS);
+    await settle();
+
+    const call = host.last(METHOD.toolsCall)?.params as { arguments: { formId: unknown } };
+    expect(call.arguments.formId).toBe("f_minted");
+  });
+
+  it("accepts a host that wraps the result, and reports what it learned", async () => {
+    const { host, bridge } = await connect();
+    host.sendToolResult({ result: { structuredContent: { formId: "f_wrapped" } } });
+    await settle();
+    expect(bridge.formId()).toBe("f_wrapped");
+  });
+
+  it("sends null when nothing ever told it an id — a documented non-event", async () => {
+    const { host, store } = await connect();
+    host.sendToolInput(assumptionLedger);
+    await settle();
+    store.getState().setAnswer(VERDICT, "fix");
+    await vi.advanceTimersByTimeAsync(SAVE_DRAFT_DEBOUNCE_MS);
+    await settle();
+    const call = host.last(METHOD.toolsCall)?.params as { arguments: { formId: unknown } };
+    expect(call.arguments.formId).toBeNull();
+  });
+});
+
+describe("draft throttle semantics (§3, step 5 stage A)", () => {
+  /** The Worker's refusal shapes, verbatim from mcp-server.ts. */
+  const throttled = {
+    content: [{ type: "text", text: "draft not saved — too many writes" }],
+    structuredContent: { ok: false, code: "throttled", retryAfterMs: 900 },
+    isError: true,
+  };
+  const tooLarge = {
+    content: [{ type: "text", text: "draft not saved — too big" }],
+    structuredContent: {
+      ok: false,
+      code: "too_large",
+      bytes: 300_000,
+      limit: 262_144,
+    },
+    isError: true,
+  };
+
+  it("backs off by retryAfterMs and retries, without counting a failure", async () => {
+    let refusals = 0;
+    const { host, store } = await connect({
+      onToolsCall: () => {
+        refusals += 1;
+        return refusals <= 4 ? throttled : { structuredContent: { ok: true, saved: 1 } };
+      },
+    });
+    host.sendToolInput(assumptionLedger);
+    await settle();
+    store.getState().setAnswer(VERDICT, "fix");
+
+    await vi.advanceTimersByTimeAsync(SAVE_DRAFT_DEBOUNCE_MS);
+    await settle();
+    expect(host.of(METHOD.toolsCall)).toHaveLength(1);
+
+    // Nothing before the interval the DO asked for, one call after it.
+    await vi.advanceTimersByTimeAsync(899);
+    await settle();
+    expect(host.of(METHOD.toolsCall)).toHaveLength(1);
+    await vi.advanceTimersByTimeAsync(1);
+    await settle();
+    expect(host.of(METHOD.toolsCall)).toHaveLength(2);
+
+    // Four throttles is past SAVE_DRAFT_GIVE_UP_AFTER: a plain rejection would
+    // have stopped asking by now. A throttle is not a failure, so it keeps going
+    // and eventually saves.
+    for (let i = 0; i < 4; i += 1) {
+      await vi.advanceTimersByTimeAsync(900);
+      await settle();
+    }
+    expect(host.of(METHOD.toolsCall).length).toBeGreaterThanOrEqual(5);
+    expect(store.getState().draftStatus).toBeNull();
+  });
+
+  it("stops retrying an oversized draft and surfaces it in the status line", async () => {
+    const { host, store } = await connect({ onToolsCall: () => tooLarge });
+    host.sendToolInput(assumptionLedger);
+    await settle();
+
+    store.getState().setAnswer(VERDICT, "fix");
+    await vi.advanceTimersByTimeAsync(SAVE_DRAFT_DEBOUNCE_MS);
+    await settle();
+    expect(host.of(METHOD.toolsCall)).toHaveLength(1);
+    expect(store.getState().draftStatus).toContain("Too much to autosave");
+    expect(store.getState().draftStatus).toContain("293 kB");
+
+    for (let i = 0; i < 3; i += 1) {
+      store.getState().setAnswer(VERDICT, `attempt ${i}`);
+      await vi.advanceTimersByTimeAsync(SAVE_DRAFT_DEBOUNCE_MS * 2);
+      await settle();
+    }
+    expect(host.of(METHOD.toolsCall)).toHaveLength(1);
+  });
+
+  it("treats formId: null as a non-event, not a failure", async () => {
+    const noStore = {
+      content: [{ type: "text", text: "no formId" }],
+      structuredContent: { ok: false, code: "no_form_id" },
+    };
+    const { host, store } = await connect({ onToolsCall: () => noStore });
+    host.sendToolInput(assumptionLedger);
+    await settle();
+    for (let i = 0; i < 5; i += 1) {
+      store.getState().setAnswer(VERDICT, `attempt ${i}`);
+      await vi.advanceTimersByTimeAsync(SAVE_DRAFT_DEBOUNCE_MS);
+      await settle();
+    }
+    expect(host.of(METHOD.toolsCall)).toHaveLength(5);
+    expect(store.getState().draftStatus).toBeNull();
+  });
+});
+
+describe("complete drafts (§3, step 5 stage A)", () => {
+  it("marks the submit flush complete, and sends the whole rendered view", async () => {
+    const { host, store, bridge } = await connect();
+    host.sendToolInput(assumptionLedger);
+    await settle();
+    store.getState().setAnswer(VERDICT, "fix");
+
+    const promise = bridge.submit();
+    await vi.advanceTimersByTimeAsync(0);
+    await settle();
+    await promise;
+
+    const call = host.last(METHOD.toolsCall)?.params as {
+      arguments: { complete?: boolean; answers: Record<string, unknown> };
+    };
+    expect(call.arguments.complete).toBe(true);
+    // Every leaf, not just the touched one: on a complete write the DO deletes
+    // paths absent from the payload.
+    expect(Object.keys(call.arguments.answers).length).toBe(10);
+  });
+
+  it("marks the teardown flush complete too", async () => {
+    const { host, store } = await connect();
+    host.sendToolInput(assumptionLedger);
+    await settle();
+    store.getState().setAnswer(VERDICT, "fix");
+
+    const promise = host.teardown();
+    await vi.advanceTimersByTimeAsync(0);
+    await settle();
+    await promise;
+
+    const call = host.last(METHOD.toolsCall)?.params as { arguments: { complete?: boolean } };
+    expect(call.arguments.complete).toBe(true);
+  });
+
+  it("leaves incremental autosaves incremental", async () => {
+    const { host, store } = await connect();
+    host.sendToolInput(assumptionLedger);
+    await settle();
+    store.getState().setAnswer(VERDICT, "fix");
+    await vi.advanceTimersByTimeAsync(SAVE_DRAFT_DEBOUNCE_MS);
+    await settle();
+
+    const call = host.last(METHOD.toolsCall)?.params as {
+      arguments: { complete?: boolean; answers: Record<string, unknown> };
+    };
+    expect(call.arguments.complete).toBeUndefined();
+    expect(Object.keys(call.arguments.answers)).toEqual([VERDICT]);
+  });
+
+  it("does not spend a round trip flushing an untouched form", async () => {
+    const { host, bridge } = await connect();
+    host.sendToolInput(assumptionLedger);
+    await settle();
+    await bridge.flush();
+    await settle();
+    expect(host.of(METHOD.toolsCall)).toHaveLength(0);
   });
 });
 

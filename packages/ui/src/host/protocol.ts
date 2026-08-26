@@ -83,3 +83,17 @@ export type InitializeResult = {
 
 /** The app-visible autosave tool (§3 — the iframe cannot POST anywhere). */
 export const SAVE_DRAFT_TOOL = "save_draft";
+
+/**
+ * The app-visible state pull. Forced by §7.2: the host delivers only tool INPUT
+ * to the app, so a `load_form` render arrives knowing nothing but the formId and
+ * has to fetch its own schema and answers.
+ */
+export const GET_FORM_STATE_TOOL = "get_form_state";
+
+/** What a proxied `tools/call` resolves to — plain MCP `CallToolResult`. */
+export type ToolCallResult = {
+  content?: { type: string; text?: string }[];
+  structuredContent?: Record<string, unknown>;
+  isError?: boolean;
+};

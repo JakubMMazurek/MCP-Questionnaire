@@ -13,7 +13,7 @@
 
 import type { Form, Section } from "@gather/schema";
 import { memo, useState } from "react";
-import { Button } from "./components/primitives";
+import { Button, StatusLine } from "./components/primitives";
 import {
   computeContext,
   effectiveValue,
@@ -23,7 +23,14 @@ import {
   needsReviewPaths,
 } from "./engine/index.js";
 import { CounterPill, FieldView, isComputedField } from "./fields/field";
-import { useBridge, useEngine, useEngineStore, useFrozen, useVisible } from "./state";
+import {
+  useBridge,
+  useDraftStatus,
+  useEngine,
+  useEngineStore,
+  useFrozen,
+  useVisible,
+} from "./state";
 
 const SECTION_STATUS_DOT = {
   untouched: "bg-line",
@@ -106,6 +113,7 @@ function ActionBar({ form }: { form: Form }) {
   const store = useEngineStore();
   const bridge = useBridge();
   const frozen = useFrozen();
+  const status = useDraftStatus();
   const [sent, setSent] = useState(false);
 
   const affirmable = useEngine(
@@ -154,6 +162,7 @@ function ActionBar({ form }: { form: Form }) {
           {firstBlocking}
         </span>
       ) : null}
+      <StatusLine message={status} />
       <span className="escape">…or just tell me in chat</span>
     </div>
   );

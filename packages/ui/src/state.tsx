@@ -129,3 +129,8 @@ export function useComputed(compute: Computed): number {
 export function useFrozen(): boolean {
   return useEngine((state) => state.status !== "ready");
 }
+
+/** The bridge's one line of plumbing news, or null (§3 — autosave refusals). */
+export function useDraftStatus(): string | null {
+  return useEngine((state) => state.draftStatus);
+}

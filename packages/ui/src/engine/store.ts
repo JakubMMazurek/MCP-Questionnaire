@@ -56,6 +56,13 @@ export type EngineState = {
   displayMode: DisplayMode;
   /** What the host told us, if it has. */
   hostDisplayMode: DisplayMode | null;
+  /**
+   * One line of plumbing news worth showing the user: a draft that will not
+   * save (§3's size cap), a form that could not be pulled back. Written by the
+   * bridge, rendered in the action bar. Never bumps `revision` — it is not an
+   * answer, and a status write must not trigger another push.
+   */
+  draftStatus: string | null;
   /** Bumps on every answer mutation. What the bridge's debouncers watch. */
   revision: number;
 };
@@ -71,6 +78,7 @@ export type EngineActions = {
   addRow: (containerPath: string) => string | null;
   removeRow: (containerPath: string, rowId: string) => void;
   setDisplayMode: (mode: DisplayMode) => void;
+  setDraftStatus: (message: string | null) => void;
   cancel: () => void;
 };
 
@@ -88,6 +96,7 @@ const INITIAL: EngineState = {
   priorConditions: {},
   displayMode: "inline",
   hostDisplayMode: null,
+  draftStatus: null,
   revision: 0,
 };
 
@@ -261,6 +270,7 @@ export function createEngineStore(): EngineStore {
           // The host's mode wins if it has told us one; the form's `display` is
           // only the fallback (§7.3).
           displayMode: get().hostDisplayMode ?? form.display ?? "inline",
+          draftStatus: null,
           revision: 0,
         });
       },
@@ -403,6 +413,11 @@ export function createEngineStore(): EngineStore {
       },
 
       setDisplayMode: (mode) => set({ displayMode: mode, hostDisplayMode: mode }),
+
+      setDraftStatus: (message) => {
+        if (get().draftStatus === message) return;
+        set({ draftStatus: message });
+      },
 
       cancel: () => set({ status: "cancelled" }),
     };

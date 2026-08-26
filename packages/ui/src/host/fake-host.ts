@@ -27,6 +27,8 @@ export type FakeHost = {
   last: (method: string) => Seen | undefined;
   sendToolInput: (args: unknown) => void;
   sendPartial: (args: unknown) => void;
+  /** The stub result (§3) — the channel the formId travels on. */
+  sendToolResult: (result: unknown) => void;
   sendCancelled: (reason?: string) => void;
   sendContextChange: (patch: HostContext) => void;
   /** Sends the teardown REQUEST and resolves when the app answers. */
@@ -106,6 +108,7 @@ export function createFakeHost(options: FakeHostOptions): FakeHost {
     last: (method) => [...seen].reverse().find((entry) => entry.method === method),
     sendToolInput: (args) => notify(METHOD.toolInput, { arguments: args }),
     sendPartial: (args) => notify(METHOD.toolInputPartial, { arguments: args }),
+    sendToolResult: (result) => notify(METHOD.toolResult, result),
     sendCancelled: (reason = "user cancelled") => notify(METHOD.toolCancelled, { reason }),
     sendContextChange: (patch) => notify(METHOD.hostContextChanged, patch),
     teardown(reason = "navigated away") {
