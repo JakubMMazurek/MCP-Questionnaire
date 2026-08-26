@@ -50,6 +50,8 @@ export type FakeHost = {
   sendToolResult: (result: unknown) => void;
   sendCancelled: (reason?: string) => void;
   sendContextChange: (patch: HostContext) => void;
+  /** Reject the NEXT request of `method` — e.g. a context push that fails. */
+  failNext: (method: string) => void;
   /** Sends the teardown REQUEST and resolves when the app answers. */
   teardown: () => Promise<Seen[]>;
   stop: () => void;
@@ -101,7 +103,16 @@ export function createFakeHost(options: FakeHostOptions): FakeHost {
     return (outcome ?? { content: [{ type: "text", text: "saved" }] }) as CallToolResult;
   };
 
-  bridge.onupdatemodelcontext = async () => ({});
+  const failing = new Set<string>();
+  const failIfArmed = (method: string) => {
+    if (!failing.delete(method)) return;
+    throw new Error(`fake host: ${method} armed to fail`);
+  };
+
+  bridge.onupdatemodelcontext = async () => {
+    failIfArmed("ui/update-model-context");
+    return {};
+  };
   bridge.onmessage = async () => ({});
   bridge.onrequestdisplaymode = async ({ mode }) => ({
     mode: options.onDisplayMode?.(mode) ?? mode,
@@ -132,6 +143,9 @@ export function createFakeHost(options: FakeHostOptions): FakeHost {
     // diffs against its own copy instead.
     sendContextChange: (patch) => {
       void bridge.sendHostContextChange(patch as McpUiHostContext);
+    },
+    failNext: (method) => {
+      failing.add(method);
     },
     async teardown() {
       // `ui/resource-teardown` params are `{}` — the extension defines no

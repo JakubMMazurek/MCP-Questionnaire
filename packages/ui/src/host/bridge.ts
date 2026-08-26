@@ -523,22 +523,31 @@ export function createBridge(options: BridgeOptions): Bridge {
       await flushComplete();
       // Full structured answers travel here, once (§7.2); `ui/message` is what
       // triggers the turn.
+      let contextCarried = true;
       try {
         await app.updateModelContext({
           content: [{ type: "text", text: summaryLine(state.form, submission.summary) }],
           structuredContent: submission as unknown as Record<string, unknown>,
         });
       } catch {
-        // Fall through: the message below still carries the payload.
+        // The message below becomes the payload carrier of last resort.
+        contextCarried = false;
       }
       // `content` is an ARRAY of content blocks. The hand-rolled layer sent a
       // single block here and every strict host rejected the submit.
+      //
+      // The text is a human-readable receipt — `ui/message` lands VISIBLY in
+      // the conversation, so raw JSON here reads as noise to the user (§7.2:
+      // the context channel above carries the payload; this only triggers the
+      // turn). The serialized submission is appended ONLY when the context
+      // push failed, so the answers can never be lost outright.
+      const receipt = summaryLine(state.form, submission.summary);
       await app.sendMessage({
         role: "user",
         content: [
           {
             type: "text",
-            text: `${summaryLine(state.form, submission.summary)}\n\n${JSON.stringify(submission)}`,
+            text: contextCarried ? receipt : `${receipt}\n\n${JSON.stringify(submission)}`,
           },
         ],
       });

@@ -293,6 +293,29 @@ describe("submit (§5.6)", () => {
       content: { type: string; text: string }[];
     };
     expect(message.role).toBe("user");
+    // The message lands VISIBLY in the conversation, so it is a human-readable
+    // receipt — the structured payload travelled on the context channel above,
+    // never as JSON in the chat.
+    expect(message.content[0]?.text).toContain("answered");
+    expect(message.content[0]?.text).not.toContain('"state"');
+  });
+
+  it("falls back to JSON in the message only when the context push fails", async () => {
+    const { host, store, bridge } = await connect();
+    host.sendToolInput(assumptionLedger);
+    await settle();
+    store.getState().setAnswer(VERDICT, "fix");
+    host.failNext(METHOD.updateModelContext);
+
+    const promise = bridge.submit();
+    await vi.advanceTimersByTimeAsync(0);
+    await settle();
+    await promise;
+
+    const message = host.last(METHOD.message)?.params as {
+      content: { text: string }[];
+    };
+    // Last-resort carrier: the answers must never be lost outright.
     expect(message.content[0]?.text).toContain('"state":"answered"');
   });
 
