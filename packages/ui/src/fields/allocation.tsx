@@ -109,8 +109,11 @@ export const AllocationFieldView = memo(function AllocationFieldView({
               : `${remaining}${unit} of ${field.total}${unit} left to allocate`
           }
         >
-          <strong>{remaining < 0 ? `+${-remaining}` : remaining}</strong>
-          <span>{remaining < 0 ? `${unit || " "}over` : `${unit || " "}left`}</span>
+          <strong>
+            {remaining < 0 ? `+${-remaining}` : remaining}
+            {field.unit ?? ""}
+          </strong>
+          <span>{remaining < 0 ? "over" : "left"}</span>
         </Pill>
       </div>
       {field.members.map((member) => (

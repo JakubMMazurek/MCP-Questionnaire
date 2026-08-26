@@ -50,6 +50,35 @@ describe("archetype audit (§5 → §4)", () => {
     expectAccepted("convergence");
   });
 
+  it("5.3 convergence, form two — the chained rank + allocation (§5.6)", () => {
+    // Added at build step 5. Audit notes:
+    //  - This is the form the step-2 audit said had to exist: `rank` items are
+    //    declared at authoring time, so the survivors cannot be ranked in the
+    //    same form that prunes them. Continuity is IDS — the rank items and the
+    //    allocation members reuse the prune's row ids — plus the formId the
+    //    agent passes forward (§5.6), not a prose summary.
+    //  - `sum` over an allocation names the FIELD, not its members: the target
+    //    expands to cells, the same container expansion `count_changed` needs.
+    //  - `set_default` over the allocation shows the §4.6 overlay doing real
+    //    work: an even split is PROPOSED without writing answers, so a user
+    //    edit still wins and the proposal vanishes when the condition flips.
+    expectAccepted("convergenceRank");
+
+    const form = archetypes.convergenceRank;
+    const rank = form.sections[0]?.fields[2];
+    const allocation = form.sections[1]?.fields[2];
+    const ids = (entries: readonly { id: string }[]) => entries.map((entry) => entry.id);
+    if (rank?.type !== "rank" || allocation?.type !== "allocation") {
+      throw new Error("the chained form must carry a rank and an allocation");
+    }
+    // The hand-off, asserted rather than described: same ids on both sides, and
+    // the same ids the prune's table rows used.
+    expect(ids(rank.items)).toEqual(ids(allocation.members));
+    const kept = archetypes.convergence.sections[0]?.fields[1];
+    if (kept?.type !== "table") throw new Error("the prune must be a table");
+    expect(ids(kept.rows)).toEqual(expect.arrayContaining(ids(rank.items)));
+  });
+
   it("5.4 plan confirmation — info-with-id + verdict select per section", () => {
     // Audit note: expressible and correct, but verbose — info + verdict +
     // conditional revision text per plan part, plus one rule each. A 10-part

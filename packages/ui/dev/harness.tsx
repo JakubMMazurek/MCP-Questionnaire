@@ -27,11 +27,13 @@ import {
 type FixtureKey = keyof typeof archetypes;
 type Theme = "light" | "dark";
 type Mode = "inline" | "fullscreen";
+type Platform = "web" | "mobile";
 
 const FIXTURES: { key: FixtureKey; label: string }[] = [
   { key: "assumptionLedger", label: "§5.1 assumption ledger" },
   { key: "elicitation", label: "§5.2 elicitation" },
-  { key: "convergence", label: "§5.3 convergence" },
+  { key: "convergence", label: "§5.3 convergence — prune" },
+  { key: "convergenceRank", label: "§5.3/§5.6 convergence — chained rank" },
   { key: "planConfirmation", label: "§5.4 plan confirmation" },
   { key: "matrixFls", label: "§5.5 matrix (FLS)" },
 ];
@@ -165,6 +167,7 @@ function Harness() {
   const [fixture, setFixture] = useState<FixtureKey>("assumptionLedger");
   const [theme, setTheme] = useState<Theme>("light");
   const [mode, setMode] = useState<Mode>("fullscreen");
+  const [platform, setPlatform] = useState<Platform>("web");
   const [sendPalette, setSendPalette] = useState(true);
   const [draftFails, setDraftFails] = useState(false);
   const [log, setLog] = useState<LogEntry[]>([]);
@@ -173,8 +176,8 @@ function Harness() {
 
   const frame = useRef<HTMLIFrameElement | null>(null);
   const host = useRef<FakeHost | null>(null);
-  const settings = useRef({ theme, mode, sendPalette, draftFails, fixture });
-  settings.current = { theme, mode, sendPalette, draftFails, fixture };
+  const settings = useRef({ theme, mode, platform, sendPalette, draftFails, fixture });
+  settings.current = { theme, mode, platform, sendPalette, draftFails, fixture };
 
   const append = useCallback(
     (entry: Omit<LogEntry, "at">) =>
@@ -192,10 +195,13 @@ function Harness() {
       availableDisplayModes: ["inline", "fullscreen"],
       ...(current.sendPalette ? { styles: { variables: PALETTE[current.theme] } } : {}),
       safeAreaInsets: { top: 0, right: 0, bottom: 0, left: 0 },
-      platform: "web",
+      platform: current.platform,
       locale: "en-GB",
       timeZone: "Europe/London",
-      deviceCapabilities: { touch: false, hover: true },
+      deviceCapabilities:
+        current.platform === "mobile"
+          ? { touch: true, hover: false }
+          : { touch: false, hover: true },
     };
   }, []);
 
@@ -208,6 +214,15 @@ function Harness() {
     (key: FixtureKey) => {
       host.current?.sendToolInput(archetypes[key]);
       append({ direction: "out", method: METHOD.toolInput, detail: key });
+      // The stub result, exactly as the Worker returns it (§3). This is the ONLY
+      // channel by which the app learns the server-minted formId, so without it
+      // every save_draft in the harness would carry `formId: null`.
+      const formId = `f_${key.toLowerCase()}_demo`;
+      host.current?.sendToolResult({
+        content: [{ type: "text", text: `Form displayed; awaiting input. formId: ${formId}` }],
+        structuredContent: { formId },
+      });
+      append({ direction: "out", method: METHOD.toolResult, detail: formId });
     },
     [append],
   );
@@ -272,9 +287,10 @@ function Harness() {
     pushContext({
       theme,
       displayMode: mode,
+      platform,
       ...(sendPalette ? { styles: { variables: PALETTE[theme] } } : {}),
     });
-  }, [theme, mode, sendPalette, pushContext]);
+  }, [theme, mode, platform, sendPalette, pushContext]);
 
   const toggle = (on: boolean) => ({ ...styles.button, ...(on ? styles.active : {}) });
 
@@ -345,6 +361,27 @@ function Harness() {
               onClick={() => setMode("fullscreen")}
             >
               fullscreen
+            </button>
+          </div>
+        </div>
+
+        <div>
+          <div style={styles.label}>platform</div>
+          <div style={styles.group}>
+            <button
+              type="button"
+              style={toggle(platform === "web")}
+              onClick={() => setPlatform("web")}
+            >
+              web
+            </button>
+            <button
+              type="button"
+              style={toggle(platform === "mobile")}
+              onClick={() => setPlatform("mobile")}
+              title="§7.3 — a dense matrix becomes a read-only summary list"
+            >
+              mobile
             </button>
           </div>
         </div>

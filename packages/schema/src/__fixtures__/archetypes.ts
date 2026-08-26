@@ -355,6 +355,155 @@ export const convergence = {
 } satisfies Form;
 
 /**
+ * §5.3 + §5.6 Brainstorm convergence, FORM TWO — the chained rank.
+ *
+ * This is the archetype the audit found could not be one form: `rank` items are
+ * declared at authoring time, and the survivors are not known until the prune
+ * (`convergence`, above) comes back. So ranking and resourcing them is the NEXT
+ * form in the chain, and this fixture is what that hand-off actually looks like.
+ *
+ * What makes it a chained form rather than a fresh one:
+ *  - The rank items and the allocation members carry the SAME ids the prune's
+ *    table rows had (`r_selfserve`, `r_pricing`, `r_partner`). Continuity is
+ *    ids, not prose: the agent passes the first form's `formId` forward and
+ *    reads its answers, so form two can be prefilled from form one (§5.6).
+ *  - Every prefill here is a first-form OUTCOME wearing its provenance — the
+ *    proposed order is `inferred` from what the user kept, the effort split is a
+ *    `default` proposal, and the `info` block quotes what came back, so the user
+ *    can see the premise they are ranking under.
+ *  - The `set_default` rule shows the §4.6 overlay doing real work: choosing to
+ *    run all three in parallel proposes an even split without writing an answer,
+ *    and the proposal disappears the moment the condition flips.
+ */
+export const convergenceRank = {
+  version: FORM_SCHEMA_VERSION,
+  title: "Three survived — now order and resource them",
+  description:
+    "From the prune. Drag to set the order, then split the effort. Or just tell me in chat.",
+  display: "fullscreen",
+  submitLabel: "Lock the plan",
+  sections: [
+    {
+      id: "order",
+      title: "Priority",
+      fields: [
+        {
+          type: "computed",
+          id: "unreviewed",
+          label: "needing review",
+          compute: { op: "count_needs_review", targets: ["survivors", "sequencing"] },
+        },
+        {
+          type: "info",
+          id: "carried",
+          label: "What came back from the prune",
+          markdown:
+            "**Kept:** self-serve onboarding, usage-based pricing, partner-led implementation.\n\n**Killed:** docs overhaul (*too slow*), dedicated CSM (*too expensive*). Both reasons point the same way — you are optimising for time-to-value, not for coverage.",
+        },
+        {
+          type: "rank",
+          id: "survivors",
+          label: "Order of attack",
+          description: "Position is the answer — drag, or use the handle and the arrow keys.",
+          items: [
+            {
+              id: "r_selfserve",
+              label: "Self-serve onboarding flow",
+              description: "cuts support load at the source",
+            },
+            {
+              id: "r_pricing",
+              label: "Usage-based pricing tier",
+              description: "aligns cost with the small accounts",
+            },
+            {
+              id: "r_partner",
+              label: "Partner-led implementation",
+              description: "offloads services work",
+            },
+          ],
+        },
+      ],
+    },
+    {
+      id: "resource",
+      title: "Effort",
+      fields: [
+        {
+          type: "computed",
+          id: "allocated",
+          label: "% of effort allocated",
+          compute: { op: "sum", targets: ["effort"] },
+        },
+        {
+          type: "single_select",
+          id: "sequencing",
+          label: "How do these run?",
+          render: "segmented",
+          options: [
+            { value: "one_at_a_time", label: "One at a time" },
+            { value: "parallel", label: "All three in parallel" },
+          ],
+          skipOptions: [{ value: "you_decide", label: "You decide" }],
+        },
+        {
+          type: "allocation",
+          id: "effort",
+          label: "Engineering effort",
+          description: "Under-allocate freely — I will read the remainder as slack.",
+          total: 100,
+          unit: "%",
+          members: [
+            { id: "r_selfserve", label: "Self-serve onboarding flow" },
+            { id: "r_pricing", label: "Usage-based pricing tier" },
+            { id: "r_partner", label: "Partner-led implementation" },
+          ],
+        },
+        {
+          type: "date",
+          id: "first_checkpoint",
+          label: "First checkpoint",
+          presets: [
+            { value: "2026-09-30", label: "End of Q3" },
+            { value: "2026-10-31", label: "End of October" },
+          ],
+          skipOptions: [{ value: "tbd", label: "TBD" }],
+        },
+      ],
+    },
+  ],
+  rules: [
+    {
+      when: { field: "sequencing", op: "eq", value: "one_at_a_time" },
+      then: { action: "show", targets: ["first_checkpoint"] },
+    },
+    {
+      when: { field: "sequencing", op: "eq", value: "parallel" },
+      then: { action: "set_default", targets: ["effort"], value: 33 },
+    },
+  ],
+  prefill: {
+    survivors: {
+      value: ["r_selfserve", "r_pricing", "r_partner"],
+      source: "inferred",
+      confidence: "high",
+      rationale: "you kept returning to support load, and priced second",
+      needsReview: true,
+    },
+    sequencing: {
+      value: "one_at_a_time",
+      source: "inferred",
+      confidence: "low",
+      rationale: "your team of four cannot run three tracks; say so if I have that wrong",
+      needsReview: true,
+    },
+    "effort[r_selfserve]": { value: 60, source: "default" },
+    "effort[r_pricing]": { value: 25, source: "default" },
+    "effort[r_partner]": { value: 15, source: "default" },
+  },
+} satisfies Form;
+
+/**
  * §5.4 Plan confirmation / draft review — plan sections are `info` fields with
  * ids; approve/revise anchors to each. Fully prefilled, diff-shaped, explicit
  * commit action. Verbose but expressible: one info + one verdict select per
@@ -589,6 +738,7 @@ export const archetypes = {
   assumptionLedger,
   elicitation,
   convergence,
+  convergenceRank,
   planConfirmation,
   matrixFls,
 } as const;

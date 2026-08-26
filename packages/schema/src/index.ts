@@ -9,6 +9,7 @@ export {
   archetypes,
   assumptionLedger,
   convergence,
+  convergenceRank,
   elicitation,
   matrixFls,
   planConfirmation,

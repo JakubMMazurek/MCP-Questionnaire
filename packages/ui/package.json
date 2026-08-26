@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "Renderer bundle (build step 3 — renderer v1, assumption ledger): rules engine, host bridge, React ledger renderer. Vite single-file output.",
+  "description": "Renderer bundle: rules engine, host bridge, and a control for every §4.2 field type including the matrix. Vite single-file output.",
   "scripts": {
     "dev": "vite",
     "build": "vite build && node scripts/verify-bundle.mjs",

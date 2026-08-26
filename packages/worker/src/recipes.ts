@@ -20,6 +20,7 @@
 import {
   assumptionLedger,
   convergence,
+  convergenceRank,
   elicitation,
   FORM_SCHEMA_VERSION,
   type Form,
@@ -257,6 +258,11 @@ const EXAMPLES: Record<ArchetypeName, WorkedExample[]> = {
       title: "Convergence — prune, with reasons",
       note: "A table with a keep boolean and a $self-scoped rejection reason, plus repeatable 'add your own'. Ranking is the next form.",
       form: convergence,
+    },
+    {
+      title: "Convergence — form two: rank and resource the survivors",
+      note: "The chained second form (§5.6). Rank items and allocation members reuse the prune's row ids, every prefill is a first-form outcome wearing its provenance, and set_default proposes an even split without writing answers. Send the prune first, then this, prefilled from what came back.",
+      form: convergenceRank,
     },
   ],
   plan_confirmation: [

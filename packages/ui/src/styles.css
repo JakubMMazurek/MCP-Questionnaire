@@ -510,6 +510,7 @@ body {
   }
 
   .tile-description {
+    display: block;
     color: var(--color-text-secondary);
     font-family: var(--font-serif);
     font-size: var(--font-text-sm-size);
@@ -672,6 +673,9 @@ body {
   .combo-dialog {
     width: min(420px, 92vw);
     max-height: 70vh;
+    /* Tailwind's preflight zeroes every margin, which also kills the UA's
+       `margin: auto` centring for a top-layer dialog. Put it back. */
+    margin: auto;
     padding: 0;
     border: var(--border-width-regular) solid var(--color-border-primary);
     border-radius: var(--border-radius-md);
