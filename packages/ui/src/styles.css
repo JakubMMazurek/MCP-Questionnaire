@@ -1,0 +1,450 @@
+@import "tailwindcss";
+
+/*
+ * Theming (§7.4). The host owns every structural color, type size, radius and
+ * shadow; we consume its standardized custom properties and declare a `:root`
+ * fallback for EVERY variable we use, because a host may supply a partial set.
+ * The host's values arrive as inline properties on the root element, which
+ * outrank these declarations.
+ *
+ * Semantic color is rationed (§8.2): provenance chips (amber = inferred,
+ * blue = user-said, neutral = existing) and the counter pills. The selected
+ * state of a segmented control is deliberately NEUTRAL — colouring it by option
+ * position would mean the renderer assigning meaning to agent-authored values,
+ * which §4.1 forbids.
+ */
+
+:root {
+  /* backgrounds */
+  --color-background-primary: #ffffff;
+  --color-background-secondary: #f6f7f5;
+  --color-background-tertiary: #edf0ec;
+  --color-background-inverse: #1b2320;
+  --color-background-info: #eaf0f8;
+  --color-background-warning: #fbf2e3;
+  --color-background-success: #eaf3ec;
+  --color-background-danger: #f9ecea;
+  --color-background-disabled: #f1f2f0;
+
+  /* text */
+  --color-text-primary: #1b2320;
+  --color-text-secondary: #5c6762;
+  --color-text-tertiary: #7d8a84;
+  --color-text-inverse: #ffffff;
+  --color-text-info: #3b5e8c;
+  --color-text-warning: #9a6207;
+  --color-text-success: #3d7c4a;
+  --color-text-danger: #b04030;
+  --color-text-disabled: #9aa5a0;
+
+  /* borders + rings */
+  --color-border-primary: #d8ddd7;
+  --color-border-secondary: #e4e8e2;
+  --color-border-info: #b9cbe4;
+  --color-border-warning: #e4c894;
+  --color-border-success: #b6d6bd;
+  --color-ring-primary: #0e6e66;
+
+  /* type */
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Helvetica, Arial, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --font-serif: Georgia, "Times New Roman", serif;
+  --font-text-xs-size: 0.6875rem;
+  --font-text-sm-size: 0.8125rem;
+  --font-text-md-size: 0.9375rem;
+  --font-text-xs-line-height: 1.4;
+  --font-text-sm-line-height: 1.45;
+  --font-text-md-line-height: 1.5;
+  --font-heading-sm-size: 1rem;
+  --font-heading-md-size: 1.125rem;
+  --font-weight-normal: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+
+  /* shape */
+  --border-radius-sm: 6px;
+  --border-radius-md: 8px;
+  --border-radius-lg: 12px;
+  --border-radius-full: 999px;
+  --border-width-regular: 1px;
+  --shadow-sm: 0 1px 2px rgb(20 28 24 / 6%);
+  --shadow-md: 0 1px 2px rgb(20 28 24 / 6%), 0 6px 20px rgb(20 28 24 / 5%);
+
+  /* ours, not the host's */
+  --safe-area-inset-top: 0px;
+  --safe-area-inset-right: 0px;
+  --safe-area-inset-bottom: 0px;
+  --safe-area-inset-left: 0px;
+
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --color-background-primary: #1a201d;
+    --color-background-secondary: #121614;
+    --color-background-tertiary: #222a25;
+    --color-background-inverse: #e6ebe7;
+    --color-background-info: #1d2833;
+    --color-background-warning: #2e2617;
+    --color-background-success: #1c2a20;
+    --color-background-danger: #2f1f1c;
+    --color-background-disabled: #1f2521;
+    --color-text-primary: #e6ebe7;
+    --color-text-secondary: #93a099;
+    --color-text-tertiary: #78857e;
+    --color-text-inverse: #0f1512;
+    --color-text-info: #8aaed4;
+    --color-text-warning: #d9a94e;
+    --color-text-success: #7cc188;
+    --color-text-danger: #d97a66;
+    --color-text-disabled: #6b756f;
+    --color-border-primary: #2f3934;
+    --color-border-secondary: #27302b;
+    --color-border-info: #3a5573;
+    --color-border-warning: #5c4a25;
+    --color-border-success: #35543c;
+    --color-ring-primary: #4cc2b4;
+    --shadow-sm: 0 1px 2px rgb(0 0 0 / 35%);
+    --shadow-md: 0 1px 2px rgb(0 0 0 / 35%), 0 8px 24px rgb(0 0 0 / 28%);
+
+    color-scheme: dark;
+  }
+}
+
+:root[data-theme="dark"] {
+  --color-background-primary: #1a201d;
+  --color-background-secondary: #121614;
+  --color-background-tertiary: #222a25;
+  --color-background-inverse: #e6ebe7;
+  --color-background-info: #1d2833;
+  --color-background-warning: #2e2617;
+  --color-background-success: #1c2a20;
+  --color-background-danger: #2f1f1c;
+  --color-background-disabled: #1f2521;
+  --color-text-primary: #e6ebe7;
+  --color-text-secondary: #93a099;
+  --color-text-tertiary: #78857e;
+  --color-text-inverse: #0f1512;
+  --color-text-info: #8aaed4;
+  --color-text-warning: #d9a94e;
+  --color-text-success: #7cc188;
+  --color-text-danger: #d97a66;
+  --color-text-disabled: #6b756f;
+  --color-border-primary: #2f3934;
+  --color-border-secondary: #27302b;
+  --color-border-info: #3a5573;
+  --color-border-warning: #5c4a25;
+  --color-border-success: #35543c;
+  --color-ring-primary: #4cc2b4;
+  --shadow-sm: 0 1px 2px rgb(0 0 0 / 35%);
+  --shadow-md: 0 1px 2px rgb(0 0 0 / 35%), 0 8px 24px rgb(0 0 0 / 28%);
+
+  color-scheme: dark;
+}
+
+/* Tailwind utilities point at the host tokens (`inline`: no second hop). */
+@theme inline {
+  --color-surface: var(--color-background-primary);
+  --color-surface-2: var(--color-background-secondary);
+  --color-surface-3: var(--color-background-tertiary);
+  --color-inverse: var(--color-background-inverse);
+  --color-ink: var(--color-text-primary);
+  --color-muted: var(--color-text-secondary);
+  --color-faint: var(--color-text-tertiary);
+  --color-on-inverse: var(--color-text-inverse);
+  --color-line: var(--color-border-primary);
+  --color-line-soft: var(--color-border-secondary);
+  --radius-sm: var(--border-radius-sm);
+  --radius-md: var(--border-radius-md);
+  --radius-lg: var(--border-radius-lg);
+  --radius-full: var(--border-radius-full);
+}
+
+html,
+body {
+  margin: 0;
+  background: var(--color-background-primary);
+  color: var(--color-text-primary);
+  font-family: var(--font-sans);
+  font-size: var(--font-text-md-size);
+  line-height: var(--font-text-md-line-height);
+  -webkit-font-smoothing: antialiased;
+}
+
+#root {
+  padding-top: var(--safe-area-inset-top);
+  padding-right: var(--safe-area-inset-right);
+  padding-bottom: var(--safe-area-inset-bottom);
+  padding-left: var(--safe-area-inset-left);
+}
+
+/* Motion is minimal by design (§8.2): the skeleton pulse is the only animation. */
+@media (prefers-reduced-motion: reduce) {
+  .skeleton {
+    animation: none;
+  }
+}
+
+@layer components {
+  /* ---------------- provenance chips: the one semantic system ------------- */
+  .chip {
+    display: inline-flex;
+    gap: 5px;
+    align-items: center;
+    padding: 1px 8px;
+    border: var(--border-width-regular) solid transparent;
+    border-radius: var(--border-radius-full);
+    font-size: var(--font-text-xs-size);
+    font-weight: var(--font-weight-medium);
+    line-height: 1.5;
+    white-space: nowrap;
+  }
+
+  .chip-inferred {
+    border-color: var(--color-border-warning);
+    background: var(--color-background-warning);
+    color: var(--color-text-warning);
+  }
+
+  .chip-user {
+    border-color: var(--color-border-info);
+    background: var(--color-background-info);
+    color: var(--color-text-info);
+  }
+
+  .chip-existing {
+    border-color: var(--color-border-primary);
+    background: var(--color-background-tertiary);
+    color: var(--color-text-secondary);
+  }
+
+  /* ---------------- counter pills ---------------------------------------- */
+  .pill {
+    display: inline-flex;
+    gap: 6px;
+    align-items: baseline;
+    padding: 2px 10px;
+    border: var(--border-width-regular) solid var(--color-border-warning);
+    border-radius: var(--border-radius-full);
+    background: var(--color-background-warning);
+    color: var(--color-text-warning);
+    font-family: var(--font-mono);
+    font-size: var(--font-text-xs-size);
+    white-space: nowrap;
+  }
+
+  .pill-clear {
+    border-color: var(--color-border-success);
+    background: var(--color-background-success);
+    color: var(--color-text-success);
+  }
+
+  .pill-neutral {
+    border-color: var(--color-border-primary);
+    background: var(--color-background-tertiary);
+    color: var(--color-text-secondary);
+  }
+
+  /* ---------------- segmented control (the default affordance) ----------- */
+  .seg {
+    display: inline-flex;
+    flex: none;
+    overflow: hidden;
+    border: var(--border-width-regular) solid var(--color-border-primary);
+    border-radius: var(--border-radius-sm);
+    background: var(--color-background-primary);
+  }
+
+  .seg > button {
+    padding: 5px 12px;
+    border: 0;
+    border-left: var(--border-width-regular) solid var(--color-border-secondary);
+    background: transparent;
+    color: var(--color-text-secondary);
+    font: inherit;
+    font-size: var(--font-text-sm-size);
+    font-weight: var(--font-weight-semibold);
+    line-height: 1.35;
+    white-space: nowrap;
+    cursor: pointer;
+    appearance: none;
+  }
+
+  .seg > button:first-child {
+    border-left: 0;
+  }
+
+  .seg > button:hover:not(:disabled) {
+    background: var(--color-background-secondary);
+  }
+
+  .seg > button[aria-checked="true"] {
+    background: var(--color-background-tertiary);
+    color: var(--color-text-primary);
+    box-shadow: inset 0 0 0 1px var(--color-border-primary);
+  }
+
+  .seg > button:disabled {
+    color: var(--color-text-disabled);
+    cursor: not-allowed;
+  }
+
+  .seg > button.seg-skip {
+    border-left-style: dashed;
+    font-weight: var(--font-weight-medium);
+    font-style: italic;
+  }
+
+  /* ---------------- buttons ---------------------------------------------- */
+  .btn {
+    padding: 7px 14px;
+    border: var(--border-width-regular) solid var(--color-border-primary);
+    border-radius: var(--border-radius-sm);
+    background: var(--color-background-primary);
+    color: var(--color-text-primary);
+    font: inherit;
+    font-size: var(--font-text-sm-size);
+    font-weight: var(--font-weight-semibold);
+    cursor: pointer;
+    appearance: none;
+  }
+
+  .btn:hover:not(:disabled) {
+    background: var(--color-background-secondary);
+  }
+
+  .btn:disabled {
+    color: var(--color-text-disabled);
+    cursor: not-allowed;
+  }
+
+  /* The one accent on the surface (§8.2). */
+  .btn-primary {
+    border-color: var(--color-background-inverse);
+    background: var(--color-background-inverse);
+    color: var(--color-text-inverse);
+  }
+
+  .btn-primary:hover:not(:disabled) {
+    background: var(--color-background-inverse);
+    filter: brightness(1.15);
+  }
+
+  .btn-icon {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    padding: 0;
+    border: var(--border-width-regular) solid var(--color-border-primary);
+    border-radius: var(--border-radius-sm);
+    background: var(--color-background-primary);
+    color: var(--color-text-secondary);
+    font-size: var(--font-text-sm-size);
+    line-height: 1;
+    cursor: pointer;
+    appearance: none;
+  }
+
+  .btn-icon[data-filled="true"] {
+    border-color: var(--color-border-warning);
+    background: var(--color-background-warning);
+    color: var(--color-text-warning);
+  }
+
+  /* ---------------- inputs ----------------------------------------------- */
+  .field-input {
+    width: 100%;
+    padding: 6px 11px;
+    border: var(--border-width-regular) solid var(--color-border-primary);
+    border-radius: var(--border-radius-sm);
+    background: var(--color-background-secondary);
+    color: var(--color-text-primary);
+    font: inherit;
+    font-size: var(--font-text-sm-size);
+  }
+
+  .note-input {
+    font-family: var(--font-serif);
+    font-style: italic;
+  }
+
+  .field-input::placeholder {
+    color: var(--color-text-tertiary);
+  }
+
+  /* ---------------- ledger density (§5.1 mockup is normative) ------------ */
+  .ledger-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    align-items: center;
+    padding: 9px 4px;
+    border-top: var(--border-width-regular) solid var(--color-border-secondary);
+  }
+
+  .ledger-row > .grow {
+    flex: 1 1 260px;
+    font-size: var(--font-text-md-size);
+    line-height: 1.4;
+  }
+
+  .why {
+    display: block;
+    margin-top: 1px;
+    color: var(--color-text-secondary);
+    font-family: var(--font-serif);
+    font-size: var(--font-text-sm-size);
+    font-style: italic;
+  }
+
+  .subrow {
+    flex-basis: 100%;
+    padding: 2px 0 4px;
+  }
+
+  .escape {
+    margin-left: auto;
+    color: var(--color-text-secondary);
+    font-family: var(--font-serif);
+    font-size: var(--font-text-sm-size);
+    font-style: italic;
+  }
+
+  .bar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    align-items: center;
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: var(--border-width-regular) solid var(--color-border-primary);
+  }
+
+  /* ---------------- skeletons, never spinners (§7.4) --------------------- */
+  .skeleton {
+    border-radius: var(--border-radius-sm);
+    background: var(--color-background-tertiary);
+    animation: pulse 1.4s ease-in-out infinite;
+  }
+
+  @keyframes pulse {
+    0%,
+    100% {
+      opacity: 1;
+    }
+
+    50% {
+      opacity: 0.45;
+    }
+  }
+}
+
+:where(button, input, a, [tabindex]):focus-visible {
+  outline: 2px solid var(--color-ring-primary);
+  outline-offset: 1px;
+}

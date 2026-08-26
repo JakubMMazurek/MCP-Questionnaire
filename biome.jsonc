@@ -39,5 +39,12 @@
       "semicolons": "always",
       "trailingCommas": "all"
     }
+  },
+  "css": {
+    "parser": {
+      // packages/ui styles the renderer with Tailwind 4 (build-time CSS, no
+      // runtime — §8), so `@import "tailwindcss"` and `@theme` must parse.
+      "tailwindDirectives": true
+    }
   }
 }
