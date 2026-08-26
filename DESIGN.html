@@ -153,6 +153,11 @@
   .seg button.on-warn{background:color-mix(in srgb,var(--warn) 16%,transparent);color:var(--warn)}
   .notebtn{appearance:none;border:1px solid var(--line);background:var(--surface);border-radius:6px;width:26px;height:26px;cursor:pointer;color:var(--muted);font-size:.8rem;line-height:1;flex:none}
   .notebtn.filled{color:var(--warn);border-color:color-mix(in srgb,var(--warn) 45%,transparent);background:color-mix(in srgb,var(--warn) 10%,transparent)}
+  .noterow{flex-basis:100%;display:none;padding:2px 0 4px}
+  .noterow.open{display:block}
+  .noterow input{width:100%;box-sizing:border-box;font-family:"Source Serif 4",serif;font-style:italic;font-size:.84rem;padding:6px 11px;border:1px solid var(--line);border-radius:6px;background:var(--surface2);color:var(--ink)}
+  .noterow input:focus-visible{outline:2px solid var(--accent);outline-offset:-1px}
+  .noterow input::placeholder{color:var(--muted)}
   .bulkbar{display:flex;gap:10px;align-items:center;margin-top:12px;padding-top:12px;border-top:1px solid var(--line);flex-wrap:wrap}
   .btn{appearance:none;font-family:inherit;font-size:.8rem;font-weight:600;border-radius:7px;padding:7px 14px;cursor:pointer;border:1px solid var(--line);background:var(--surface);color:var(--ink)}
   .btn:hover{background:var(--surface2)}
@@ -820,8 +825,14 @@ $self.detail</code></pre>
       seg.appendChild(b);
     });
     d.appendChild(seg);
-    var n = document.createElement('button'); n.type='button'; n.className='notebtn'+(r.note?' filled':''); n.title=r.note?'note: “depends on whether Legal signs off”':'add a note'; n.textContent='✎';
-    d.appendChild(n);
+    var n = document.createElement('button'); n.type='button'; n.className='notebtn'+(r.note?' filled':''); n.title='add a note — anchored to this row'; n.textContent='✎';
+    var nr = document.createElement('div'); nr.className='noterow';
+    var ni = document.createElement('input'); ni.placeholder='note for Claude, anchored to this row…';
+    if(r.note) ni.value='depends on whether Legal signs off';
+    ni.addEventListener('input',function(){ n.classList.toggle('filled', ni.value.trim().length>0); });
+    nr.appendChild(ni);
+    n.addEventListener('click',function(){ nr.classList.toggle('open'); if(nr.classList.contains('open')) ni.focus(); });
+    d.appendChild(n); d.appendChild(nr);
     host.appendChild(d);
   });
   document.getElementById('bulkAffirm').addEventListener('click',function(){
