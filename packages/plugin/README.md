@@ -4,16 +4,14 @@ One install gives a teammate the connector (the remote MCP server) and the
 skill that carries the *whether* — the negative rules about when a form is
 wrong (DESIGN.html §6.4).
 
-## One-time setup before distributing
+## The URL is the capability
 
-`.mcp.json` ships with a placeholder. Replace `REPLACE_WITH_CONNECTOR_URL` with
-the deployed connector URL:
-
-    https://mcp-questionnaire.<account>.workers.dev/<BASE_PATH>/mcp
-
-The `<BASE_PATH>` segment IS the capability (DESIGN.html §3): anyone with the
-URL can reach the server, so this repo must stay private, and rotating the
-`BASE_PATH` secret (`wrangler secret put BASE_PATH`) revokes every copy.
+`.mcp.json` carries the deployed connector URL
+(`https://mcp-questionnaire.<account>.workers.dev/<BASE_PATH>/mcp`). The
+`<BASE_PATH>` segment IS the capability (DESIGN.html §3): anyone with the URL
+can reach the server, so this repo must stay private, and rotating the
+`BASE_PATH` secret (`wrangler secret put BASE_PATH`) revokes every copy —
+then update `.mcp.json` and teammates pick it up on plugin update.
 
 ## Install (teammates)
 
