@@ -1,15 +1,19 @@
 # MCP Questionnaire — build rules
 
-**Status (2026-08-26): all six §9 build steps are DONE** — 334 tests across
+**Status (2026-08-26): all seven §9 build steps are DONE** — 356 tests across
 `packages/{schema,ui,worker}` (`@mcpq/*` scope), deployed to
-`mcp-questionnaire.qba0550.workers.dev` under a secret `BASE_PATH` (the URL
-path IS the capability: never log or commit it outside `packages/plugin/.mcp.json`,
-which is why this repo stays private). Plugin + marketplace live in
-`packages/plugin` and `.claude-plugin/`. Dev harness:
-`pnpm --filter @mcpq/ui dev` → localhost:5173/dev/. Deploy traps to know:
-a wrangler `vars` entry replaces a same-named secret (dev value lives in
-`.dev.vars`), and a trailing newline piped into `wrangler secret put` fails the
-Worker's closed BASE_PATH pattern.
+`mcp-questionnaire.qba0550.workers.dev`. **Auth is GitHub OAuth** (step 7):
+`@cloudflare/workers-oauth-provider` owns the Worker's fetch, MCP is served at
+plain `/mcp` behind a bearer token, and `GITHUB_ALLOWED_USERS` in
+`wrangler.jsonc` `vars` decides who may hold one (comma-separated logins,
+case-insensitive, fails closed when unset). The URL is no longer a capability,
+so the repo may be public; the `formId` still is one internally. Plugin +
+marketplace live in `packages/plugin` and `.claude-plugin/`. Dev harness:
+`pnpm --filter @mcpq/ui dev` → localhost:5173/dev/. Deploy traps to know: a
+wrangler `vars` entry replaces a same-named secret (so `GITHUB_CLIENT_ID` /
+`GITHUB_CLIENT_SECRET` are secrets and live nowhere in `vars`; fakes are in
+`.dev.vars`), and a trailing newline piped into `wrangler secret put` is a real
+bug that has bitten this deploy before.
 
 **DESIGN.html is the canonical spec.** Read it before implementing anything. Every
 `decided` chip is settled — do not re-litigate or "improve" a decided item; if you
