@@ -8,7 +8,7 @@
  * touch on that path, so it also clears the row's needs-review counter.
  */
 
-import { memo, useId, useState } from "react";
+import { memo, useEffect, useId, useRef, useState } from "react";
 import { useActions, useDisabled, useNote } from "../state";
 
 export const NoteAffordance = memo(function NoteAffordance({
@@ -23,8 +23,14 @@ export const NoteAffordance = memo(function NoteAffordance({
   const actions = useActions();
   const [open, setOpen] = useState(false);
   const inputId = useId();
+  const input = useRef<HTMLInputElement | null>(null);
   const filled = Boolean(note && note.trim().length > 0);
   const expanded = open || filled;
+
+  // Opening the icon puts the caret in the note, as the §5.1 mockup does.
+  useEffect(() => {
+    if (open) input.current?.focus();
+  }, [open]);
 
   return (
     <>
@@ -43,6 +49,7 @@ export const NoteAffordance = memo(function NoteAffordance({
       {expanded ? (
         <div className="subrow">
           <input
+            ref={input}
             id={inputId}
             className="field-input note-input"
             type="text"

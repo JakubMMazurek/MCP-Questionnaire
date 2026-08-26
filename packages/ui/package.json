@@ -6,7 +6,8 @@
   "description": "Renderer bundle (build step 3 — renderer v1, assumption ledger): rules engine, host bridge, React ledger renderer. Vite single-file output.",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "vite build && node scripts/verify-bundle.mjs",
+    "verify": "node scripts/verify-bundle.mjs",
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit"

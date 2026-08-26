@@ -47,7 +47,15 @@ export type EngineState = {
   effects: Effects;
   /** Condition of every rule instance at the last commit — the `clear` edge. */
   priorConditions: Readonly<Record<string, boolean>>;
+  /**
+   * The mode we are actually rendering in. The HOST owns this (§7.3): the
+   * form's own `display` is a preference, used only until the host says
+   * otherwise — the renderer must never draw a fullscreen surface into an
+   * inline card because the schema asked it to.
+   */
   displayMode: DisplayMode;
+  /** What the host told us, if it has. */
+  hostDisplayMode: DisplayMode | null;
   /** Bumps on every answer mutation. What the bridge's debouncers watch. */
   revision: number;
 };
@@ -79,6 +87,7 @@ const INITIAL: EngineState = {
   effects: EMPTY_EFFECTS,
   priorConditions: {},
   displayMode: "inline",
+  hostDisplayMode: null,
   revision: 0,
 };
 
@@ -249,7 +258,9 @@ export function createEngineStore(): EngineStore {
           leaves,
           effects: committed.effects,
           priorConditions: committed.priorConditions,
-          displayMode: form.display ?? "inline",
+          // The host's mode wins if it has told us one; the form's `display` is
+          // only the fallback (§7.3).
+          displayMode: get().hostDisplayMode ?? form.display ?? "inline",
           revision: 0,
         });
       },
@@ -391,7 +402,7 @@ export function createEngineStore(): EngineStore {
         });
       },
 
-      setDisplayMode: (mode) => set({ displayMode: mode }),
+      setDisplayMode: (mode) => set({ displayMode: mode, hostDisplayMode: mode }),
 
       cancel: () => set({ status: "cancelled" }),
     };

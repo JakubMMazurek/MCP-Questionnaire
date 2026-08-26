@@ -11,10 +11,13 @@ export type Seen = { method: string; params: unknown; id?: JsonRpcId };
 
 export type FakeHostOptions = {
   transport: Transport;
-  hostContext?: HostContext;
+  /** A function when the context changes over time (the harness's theme toggle). */
+  hostContext?: HostContext | (() => HostContext);
   /** Return an error to reject a `tools/call` — e.g. `save_draft` not deployed. */
   onToolsCall?: (params: unknown) => unknown | Error;
   onRequest?: (message: JsonRpcRequest) => unknown | Error | undefined;
+  /** Every inbound message, as it arrives — the harness's log panel. */
+  onSeen?: (entry: Seen) => void;
 };
 
 export type FakeHost = {
@@ -57,6 +60,7 @@ export function createFakeHost(options: FakeHostOptions): FakeHost {
     const entry: Seen = { method: message.method, params: message.params };
     if ("id" in message) entry.id = message.id;
     seen.push(entry);
+    options.onSeen?.(entry);
 
     if (!("id" in message)) return;
     const request = message as JsonRpcRequest;
@@ -67,11 +71,13 @@ export function createFakeHost(options: FakeHostOptions): FakeHost {
 
     switch (request.method) {
       case METHOD.initialize: {
+        const context =
+          typeof options.hostContext === "function" ? options.hostContext() : options.hostContext;
         const result: InitializeResult = {
           protocolVersion: PROTOCOL_VERSION,
           hostInfo: { name: "fake-host", version: "0.0.0" },
           hostCapabilities: {},
-          hostContext: options.hostContext ?? { theme: "light", displayMode: "inline" },
+          hostContext: context ?? { theme: "light", displayMode: "inline" },
         };
         return reply(request.id, result);
       }
