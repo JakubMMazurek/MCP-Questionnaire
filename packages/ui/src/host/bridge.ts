@@ -539,9 +539,11 @@ export function createBridge(options: BridgeOptions): Bridge {
       // The text is a human-readable receipt — `ui/message` lands VISIBLY in
       // the conversation, so raw JSON here reads as noise to the user (§7.2:
       // the context channel above carries the payload; this only triggers the
-      // turn). The serialized submission is appended ONLY when the context
-      // push failed, so the answers can never be lost outright.
-      const receipt = summaryLine(state.form, submission.summary);
+      // turn). And it is SHORT: the widget above it already shows every answer,
+      // so the receipt only needs to say that the submit happened. The counts
+      // live in the context-channel summary; the serialized submission is
+      // appended ONLY when the context push failed, as carrier of last resort.
+      const receipt = `Submitted “${state.form.title}”.`;
       await app.sendMessage({
         role: "user",
         content: [
