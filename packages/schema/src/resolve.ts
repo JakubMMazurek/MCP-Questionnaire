@@ -100,6 +100,22 @@ export type ResolveResult = ResolveSuccess | { ok: false; error: ResolveError };
 
 const MAX_LISTED = 12;
 
+/**
+ * Stands in for a row id when a `$self` path is resolved against the schema
+ * rather than against a rendered row: at validation time no row exists yet.
+ */
+const ANY_ROW = "$row";
+
+/** The section the outermost container of a scope chain lives in. */
+function sectionOfChain(form: Form, chain: readonly ContainerField[]): Section {
+  const outermost = chain[0];
+  const found = outermost
+    ? form.sections.find((section) => section.fields.includes(outermost))
+    : undefined;
+  // A validated form always has at least one section (§4.8, enforced by shape.ts).
+  return found ?? (form.sections[0] as Section);
+}
+
 function list(ids: readonly string[]): string {
   if (ids.length === 0) return "(none)";
   const shown = ids.slice(0, MAX_LISTED).map((id) => `"${id}"`);
@@ -454,26 +470,21 @@ function resolveWithScope(form: Form, parsed: ParsedPath, scope: Scope | undefin
         `Path "${source}" uses "$${parsed.head.kind}", which only has a meaning inside a repeatable or table row (§4.6). This form declares no repeatable or table field, so there is no row scope — address the field directly by its id.`,
       );
     }
+    const section = sectionOfChain(form, chain);
     if (parsed.head.kind === "self") {
-      const rowId = scope?.rowIds?.at(-1);
       cursor = {
         t: "row",
         container: innermost,
-        rowId: rowId ?? "$row",
-        section:
-          form.sections.find((s) => s.fields.includes(chain[0] as Field)) ??
-          (form.sections[0] as Section),
+        rowId: scope?.rowIds?.at(-1) ?? ANY_ROW,
+        section,
       };
     } else {
       const outer = chain.at(-2);
-      const section =
-        form.sections.find((s) => s.fields.includes(chain[0] as Field)) ??
-        (form.sections[0] as Section);
       if (outer) {
         cursor = {
           t: "row",
           container: outer,
-          rowId: scope?.rowIds?.at(-2) ?? "$row",
+          rowId: scope?.rowIds?.at(-2) ?? ANY_ROW,
           section,
         };
       } else {
