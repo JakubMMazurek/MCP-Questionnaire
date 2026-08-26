@@ -78,6 +78,8 @@ export type EngineActions = {
   hydrate: (answers: Answers) => void;
   setAnswer: (path: string, value: unknown) => void;
   setEmpty: (path: string) => void;
+  /** Deletes the entry, so the §4.7 prefill shows through again (§5.5 revert). */
+  reset: (path: string) => void;
   setNote: (path: string, note: string) => void;
   /** Writes `answered` entries copying the prefill value (§5.1 bulk affirm). */
   bulkAffirm: (paths: readonly string[]) => void;
@@ -318,6 +320,26 @@ export function createEngineStore(): EngineStore {
         write((answers) => {
           const note = answers[key]?.note;
           return { ...answers, [key]: { state: "empty", ...(note ? { note } : {}) } };
+        });
+      },
+
+      /**
+       * Back to UNTOUCHED — the entry is deleted, not set to `empty`.
+       *
+       * These are not the same thing and the difference is the whole §4.7
+       * baseline story: `empty` is a decision the user made and it submits as
+       * one, while no entry at all means the prefill shows through again. So
+       * this is what a matrix cell's revert affordance needs (§5.5 "per-cell
+       * revert"), and nothing else could express it — `setEmpty` would leave the
+       * cell dirty-against-baseline forever.
+       */
+      reset: (path) => {
+        const key = canon(path);
+        write((answers) => {
+          if (answers[key] === undefined) return answers;
+          const next: Answers = { ...answers };
+          delete next[key];
+          return next;
         });
       },
 

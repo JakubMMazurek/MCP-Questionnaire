@@ -932,6 +932,189 @@ body {
     font-size: var(--font-text-xs-size);
   }
 
+  /* ---------------- matrix (§5.5 mockup is normative) -------------------- */
+  .palette {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+    margin: 6px 0;
+  }
+
+  .palette-swatch {
+    display: inline-flex;
+    gap: 6px;
+    align-items: center;
+    padding: 4px 10px;
+    border: var(--border-width-regular) solid var(--color-border-primary);
+    border-radius: var(--border-radius-sm);
+    background: var(--color-background-primary);
+    color: var(--color-text-secondary);
+    font: inherit;
+    font-size: var(--font-text-sm-size);
+    font-weight: var(--font-weight-semibold);
+    cursor: pointer;
+    appearance: none;
+  }
+
+  .palette-swatch[aria-checked="true"] {
+    border-color: var(--color-background-inverse);
+    background: var(--color-background-tertiary);
+    color: var(--color-text-primary);
+  }
+
+  .palette-key {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 15px;
+    height: 15px;
+    border-radius: 3px;
+    background: var(--color-background-tertiary);
+    color: var(--color-text-tertiary);
+    font-family: var(--font-mono);
+    font-size: var(--font-text-xs-size);
+  }
+
+  .palette-swatch[aria-checked="true"] .palette-key {
+    background: var(--color-background-primary);
+  }
+
+  /*
+   * The grid gets its OWN horizontal scroll: thirty columns do not fit, and a
+   * matrix is fullscreen-only anyway (§7.3 keeps it out of inline cards, where
+   * a nested scroll would fight the conversation).
+   */
+  .mscroll {
+    overflow-x: auto;
+    margin-top: 4px;
+  }
+
+  .mgrid {
+    border-collapse: separate;
+    border-spacing: 2px;
+    font-size: var(--font-text-sm-size);
+    touch-action: none;
+  }
+
+  .mgrid th {
+    padding: 0;
+    font-weight: var(--font-weight-normal);
+    text-align: left;
+  }
+
+  .mhead {
+    vertical-align: bottom;
+  }
+
+  .mrow {
+    max-width: 20rem;
+  }
+
+  .mcorner {
+    width: 1%;
+  }
+
+  .mhead-btn {
+    padding: 3px 6px;
+    border: 0;
+    border-radius: var(--border-radius-sm);
+    background: transparent;
+    color: var(--color-text-secondary);
+    font: inherit;
+    font-size: var(--font-text-xs-size);
+    font-weight: var(--font-weight-semibold);
+    text-align: left;
+    cursor: pointer;
+    appearance: none;
+  }
+
+  .mhead-btn:hover:not(:disabled) {
+    background: var(--color-background-tertiary);
+    color: var(--color-text-primary);
+  }
+
+  .mrow .mhead-btn {
+    font-family: var(--font-mono);
+  }
+
+  .mcell-wrap {
+    position: relative;
+    padding: 0;
+  }
+
+  .mcell {
+    display: block;
+    width: 100%;
+    min-width: 3.4rem;
+    padding: 5px 8px;
+    border: var(--border-width-regular) solid var(--color-border-secondary);
+    border-radius: var(--border-radius-sm);
+    background: var(--color-background-secondary);
+    color: var(--color-text-primary);
+    font: inherit;
+    font-family: var(--font-mono);
+    font-size: var(--font-text-xs-size);
+    text-align: center;
+    cursor: pointer;
+    appearance: none;
+  }
+
+  .mcell:hover:not(:disabled):not([data-readonly="true"]) {
+    border-color: var(--color-border-primary);
+    background: var(--color-background-tertiary);
+  }
+
+  .mcell[data-empty="true"] {
+    color: var(--color-text-tertiary);
+  }
+
+  /* Dirty vs the `source: "existing"` baseline (§4.7) — including
+     changed-to-empty, which is why the mark is on the border and not the text. */
+  .mcell[data-dirty="true"] {
+    border-color: var(--color-border-warning);
+    background: var(--color-background-warning);
+    color: var(--color-text-warning);
+  }
+
+  .mcell[data-readonly="true"] {
+    background: var(--color-background-disabled);
+    color: var(--color-text-disabled);
+    cursor: not-allowed;
+  }
+
+  .mrevert {
+    position: absolute;
+    top: -5px;
+    right: -3px;
+    width: 15px;
+    height: 15px;
+    padding: 0;
+    border: var(--border-width-regular) solid var(--color-border-warning);
+    border-radius: var(--border-radius-full);
+    background: var(--color-background-primary);
+    color: var(--color-text-warning);
+    font-size: 9px;
+    line-height: 1;
+    cursor: pointer;
+    appearance: none;
+  }
+
+  .mcell-input {
+    width: 5rem;
+    padding: 5px 7px;
+    border: var(--border-width-regular) solid var(--color-border-secondary);
+    border-radius: var(--border-radius-sm);
+    background: var(--color-background-secondary);
+    color: var(--color-text-primary);
+    font: inherit;
+    font-size: var(--font-text-xs-size);
+  }
+
+  .mcell-input[data-dirty="true"] {
+    border-color: var(--color-border-warning);
+    background: var(--color-background-warning);
+  }
+
   /* ---------------- skeletons, never spinners (§7.4) --------------------- */
   .skeleton {
     border-radius: var(--border-radius-sm);

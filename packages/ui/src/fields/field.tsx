@@ -15,6 +15,7 @@ import { Pill, ProvenanceChip } from "../components/primitives";
 import { useComputed, usePrefill, useRequired, useVisible } from "../state";
 import { AllocationFieldView } from "./allocation";
 import { LeafControl } from "./controls";
+import { MatrixFieldView } from "./matrix";
 import { NoteAffordance } from "./note";
 import { RankFieldView } from "./rank";
 import { RepeatableFieldView } from "./repeatable";
@@ -182,5 +183,6 @@ export const FieldView = memo(function FieldView({ field }: { field: Field }) {
   if (!visible || isComputedField(field)) return null;
   if (field.type === "info") return <InfoBlock field={field} />;
   if (field.type === "table") return <TableFieldView field={field} path={field.id} />;
+  if (field.type === "matrix") return <MatrixFieldView field={field} path={field.id} />;
   return <FieldRow field={field} />;
 });

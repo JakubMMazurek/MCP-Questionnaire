@@ -21,6 +21,7 @@ import {
   isVisible,
   malformedReason,
   malformedValues,
+  sameValue,
 } from "./engine/index.js";
 import type { Bridge } from "./host/index.js";
 
@@ -161,6 +162,28 @@ export function useRows(containerPath: string): readonly string[] {
 }
 
 const EMPTY_ROWS: readonly string[] = [];
+
+/**
+ * True when this path differs from its `source: "existing"` baseline (§4.7) —
+ * the matrix's dirty mark. Written out longhand rather than borrowing
+ * `isChanged`, which needs the leaf: finding a leaf is a scan, and a scan per
+ * cell per store notification is exactly the cost §5.5 exists to avoid.
+ *
+ * A changed-to-EMPTY cell is dirty, not merely blank: the user's decision to
+ * clear an existing value is a change, and it must look like one.
+ */
+export function useDirty(path: string): boolean {
+  return useEngine((state) => {
+    if (state.answers[path] === undefined) return false;
+    const effective = effectiveValue(
+      { answers: state.answers, prefill: state.prefill, overlays: state.effects },
+      path,
+    );
+    const baseline = state.prefill[path];
+    if (baseline?.source !== "existing") return effective.present;
+    return !(effective.present && sameValue(effective.value, baseline.value));
+  });
+}
 
 /** Values a per-cell `matrix` constraint restricts a leaf to, or undefined (§5.5). */
 export function useAllowed(path: string): readonly Value[] | undefined {
