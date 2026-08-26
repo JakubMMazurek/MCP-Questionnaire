@@ -33,12 +33,16 @@ describe("declaration (§7.1)", () => {
       (tools.find((t) => t.name === name)?._meta as { ui?: Record<string, unknown> } | undefined)
         ?.ui;
 
-    for (const name of ["gather_decisions", "get_form_guide", "load_form"]) {
+    // Only the two tools that produce a VIEW carry the renderer. Attaching
+    // resourceUri to a text tool makes the host mount the app on that tool's
+    // input — get_form_guide once rendered "form could not be rendered".
+    for (const name of ["gather_decisions", "load_form"]) {
       expect(meta(name), name).toEqual({
         resourceUri: RENDERER_URI,
         visibility: ["model", "app"],
       });
     }
+    expect(meta("get_form_guide")).toEqual({ visibility: ["model"] });
     // §7.1 — anything the UI needs and the model must not see.
     for (const name of ["save_draft", "get_form_state"]) {
       expect(meta(name), name).toEqual({ visibility: ["app"] });

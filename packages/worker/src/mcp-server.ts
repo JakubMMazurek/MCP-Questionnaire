@@ -65,6 +65,15 @@ const uiMeta = (visibility: ("model" | "app")[]) => ({
  */
 const appOnlyMeta = { ui: { visibility: ["app"] } } as const;
 
+/**
+ * A text tool: model-visible, renders NOTHING. Attaching `resourceUri` to a
+ * tool makes the host mount the renderer and feed it that tool's input — which
+ * for `get_form_guide` meant the app receiving `{archetype}` where a form
+ * belongs, and the user seeing the "form could not be rendered" state. Only
+ * `gather_decisions` and `load_form` produce a view.
+ */
+const textOnlyMeta = { ui: { visibility: ["model"] } } as const;
+
 /* -------------------------------------------------------------------------- */
 /* results                                                                    */
 /* -------------------------------------------------------------------------- */
@@ -264,7 +273,7 @@ export function createServer(env: WorkerEnv): McpServer {
           .enum(ARCHETYPES)
           .describe("Which recipe to return. Pick by the moment, not the field types."),
       }),
-      _meta: uiMeta(["model", "app"]),
+      _meta: textOnlyMeta,
     },
     async ({ archetype }) => {
       const name = archetype as ArchetypeName;
