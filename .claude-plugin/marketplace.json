@@ -3,7 +3,7 @@
   "owner": { "name": "Jakub Mazurek" },
   "plugins": [
     {
-      "name": "gather-decisions",
+      "name": "mcp-questionnaire",
       "source": {
         "source": "git-subdir",
         "url": "https://github.com/JakubMMazurek/MCP-Questionnaire.git",

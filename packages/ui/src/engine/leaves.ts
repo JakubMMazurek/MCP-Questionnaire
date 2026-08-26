@@ -10,8 +10,8 @@
  * runtime (`rows`, keyed by canonical container path, §4.5).
  */
 
-import type { Field, Form, Option, Section, Value } from "@gather/schema";
-import { containerMembers, isContainer } from "@gather/schema";
+import type { Field, Form, Option, Section, Value } from "@mcpq/schema";
+import { containerMembers, isContainer } from "@mcpq/schema";
 import { joinPath } from "./paths.js";
 
 /** Runtime rows for every `repeatable` in the form, keyed by container path. */

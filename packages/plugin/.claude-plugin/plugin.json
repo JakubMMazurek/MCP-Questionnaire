@@ -1,5 +1,5 @@
 {
-  "name": "gather-decisions",
+  "name": "mcp-questionnaire",
   "description": "Structured input surfaces inside the Claude conversation — prefilled forms, assumption ledgers, review matrices — instead of clarifying questions as prose. Connector + skill in one install.",
   "version": "0.1.0",
   "author": { "name": "Jakub Mazurek" },

@@ -11,7 +11,7 @@
  * Submit is never gated by `require` (§4.6/§6.3). Only malformed values block.
  */
 
-import type { Form, Section } from "@gather/schema";
+import type { Form, Section } from "@mcpq/schema";
 import { memo, useState } from "react";
 import { Button, StatusLine } from "./components/primitives";
 import {

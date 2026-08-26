@@ -9,8 +9,8 @@
  * can open on them instead of re-reading a blob (§4.4).
  */
 
-import type { Answer, Answers, Form, Prefill } from "@gather/schema";
-import { resolvePath } from "@gather/schema";
+import type { Answer, Answers, Form, Prefill } from "@mcpq/schema";
+import { resolvePath } from "@mcpq/schema";
 import { type ComputeContext, isChanged, isVisible, needsReview } from "./computed.js";
 import { effectiveValue, type ValueContext } from "./effective.js";
 import type { Effects } from "./evaluate.js";

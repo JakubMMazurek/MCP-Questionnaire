@@ -8,7 +8,7 @@
  * only of the ledger's.
  */
 
-import type { Field, Option, Value } from "@gather/schema";
+import type { Field, Option, Value } from "@mcpq/schema";
 import { memo } from "react";
 import {
   CheckboxList,

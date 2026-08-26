@@ -16,7 +16,7 @@
  *    the agent can decide what to do with it.
  */
 
-import type { AllocationField } from "@gather/schema";
+import type { AllocationField } from "@mcpq/schema";
 import { memo } from "react";
 import { FieldError, Pill } from "../components/primitives";
 import { joinPath } from "../engine/index.js";

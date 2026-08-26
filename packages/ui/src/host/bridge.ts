@@ -9,8 +9,8 @@
  * existing yet.
  */
 
-import type { Answers } from "@gather/schema";
-import { validateForm } from "@gather/schema";
+import type { Answers } from "@mcpq/schema";
+import { validateForm } from "@mcpq/schema";
 import {
   buildSubmission,
   type EngineStore,

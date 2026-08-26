@@ -3,7 +3,7 @@
  * notes, §5.1 bulk affirm).
  */
 
-import { assumptionLedger, elicitation } from "@gather/schema";
+import { assumptionLedger, elicitation } from "@mcpq/schema";
 import { describe, expect, it } from "vitest";
 import { answersOf, counter, ctx, loaded, submit } from "./harness.js";
 import { mintRowId } from "./paths.js";

@@ -4,7 +4,7 @@
  * `clear` edge, the iteration cap, per-row `$self`.
  */
 
-import { assumptionLedger, convergence } from "@gather/schema";
+import { assumptionLedger, convergence } from "@mcpq/schema";
 import { describe, expect, it } from "vitest";
 import { chained, clearer, cyclic, filtered, gate } from "./__fixtures__/rules.js";
 import { evaluate, MAX_ITERATIONS } from "./evaluate.js";

@@ -15,8 +15,8 @@
  * the schema back would pay for it twice and undo the whole point.
  */
 
-import type { Answers, Form } from "@gather/schema";
-import { validateAnswers, validateForm } from "@gather/schema";
+import type { Answers, Form } from "@mcpq/schema";
+import { validateAnswers, validateForm } from "@mcpq/schema";
 import { McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
 import type { WorkerEnv } from "./env.js";
@@ -41,7 +41,7 @@ import {
 } from "./renderer-resource.js";
 import { diagnosticsWithExample, serialiseExample } from "./worked-example.js";
 
-export const SERVER_INFO = { name: "gather-decisions", version: "0.1.0" } as const;
+export const SERVER_INFO = { name: "mcp-questionnaire", version: "0.1.0" } as const;
 
 /* -------------------------------------------------------------------------- */
 /* _meta.ui (§7.1)                                                            */
@@ -175,7 +175,7 @@ export function createServer(env: WorkerEnv): McpServer {
   server.registerTool(
     "gather_decisions",
     {
-      title: "Gather decisions",
+      title: "MCP Questionnaire",
       description: GATHER_DECISIONS_DESCRIPTION,
       /**
        * LOOSE on purpose (§6.3): "design the inputSchema loose and validate

@@ -36,7 +36,7 @@ export const RENDERER_DESCRIPTION =
   "Renders a form schema delivered as tool input and returns the answers. One template for every archetype; the schema is data.";
 
 /**
- * The bundle is a single self-contained HTML file built by `@gather/ui`
+ * The bundle is a single self-contained HTML file built by `@mcpq/ui`
  * (`vite-plugin-singlefile`, verified to reference nothing external). It is
  * read through the ASSETS binding rather than embedded in the Worker source so
  * that a renderer change is an asset upload, not a code change.
@@ -50,7 +50,7 @@ export async function readRendererBundle(env: WorkerEnv): Promise<string> {
   const response = await env.ASSETS.fetch(new Request(ASSET_URL));
   if (!response.ok) {
     throw new Error(
-      `the renderer bundle is missing (ASSETS returned ${response.status}). Build it: pnpm --filter @gather/ui build.`,
+      `the renderer bundle is missing (ASSETS returned ${response.status}). Build it: pnpm --filter @mcpq/ui build.`,
     );
   }
   return await response.text();

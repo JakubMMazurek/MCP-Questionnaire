@@ -1,5 +1,5 @@
 /**
- * `@gather/schema` — the meta-schema of DESIGN.html §4.
+ * `@mcpq/schema` — the meta-schema of DESIGN.html §4.
  *
  * One codebase for the Worker and the UI (§8.1): types, the Zod validator with
  * its teaching errors (§6.3), and the path parser/resolver (§4.5).

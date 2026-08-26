@@ -9,7 +9,7 @@
  * validator and a teacher.
  */
 
-import { validateForm } from "@gather/schema";
+import { validateForm } from "@mcpq/schema";
 import { describe, expect, it } from "vitest";
 import { ALL_EXAMPLES, ARCHETYPES } from "../src/recipes.js";
 import { closestArchetype } from "../src/worked-example.js";

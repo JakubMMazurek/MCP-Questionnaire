@@ -20,12 +20,12 @@ const bundle = join(here, "..", "..", "ui", "dist", "index.html");
 
 if (existsSync(bundle)) process.exit(0);
 
-console.log("ensure-bundle: packages/ui/dist/index.html is missing — building @gather/ui first.");
+console.log("ensure-bundle: packages/ui/dist/index.html is missing — building @mcpq/ui first.");
 try {
-  execFileSync("pnpm", ["--filter", "@gather/ui", "build"], { stdio: "inherit" });
+  execFileSync("pnpm", ["--filter", "@mcpq/ui", "build"], { stdio: "inherit" });
 } catch {
   console.error(
-    "ensure-bundle: `pnpm --filter @gather/ui build` failed. The Worker cannot serve ui://forms/renderer without it.",
+    "ensure-bundle: `pnpm --filter @mcpq/ui build` failed. The Worker cannot serve ui://forms/renderer without it.",
   );
   process.exit(1);
 }

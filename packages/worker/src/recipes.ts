@@ -12,7 +12,7 @@
  * not a multi_select; never ship a blank form; partial submit is the norm; keep
  * the chat escape hatch.
  *
- * The worked examples are the audited archetype fixtures from `@gather/schema`
+ * The worked examples are the audited archetype fixtures from `@mcpq/schema`
  * — the same objects the validator's own test suite proves valid, so the
  * examples cannot rot away from the meta-schema.
  */
@@ -26,7 +26,7 @@ import {
   type Form,
   matrixFls,
   planConfirmation,
-} from "@gather/schema";
+} from "@mcpq/schema";
 
 /** The public vocabulary of `get_form_guide`. Named for the moment, not the type. */
 export const ARCHETYPES = [

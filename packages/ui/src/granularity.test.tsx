@@ -7,7 +7,7 @@
  * hooks the cells use and count renders.
  */
 
-import { assumptionLedger, matrixFls } from "@gather/schema";
+import { assumptionLedger, matrixFls } from "@mcpq/schema";
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 import { App } from "./App";

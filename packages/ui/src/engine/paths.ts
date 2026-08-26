@@ -7,7 +7,7 @@
  * The agent writes either syntax; the store only ever sees one.
  */
 
-import { canonicalPath, parsePath } from "@gather/schema";
+import { canonicalPath, parsePath } from "@mcpq/schema";
 
 /**
  * Canonical form of a path, or the input verbatim when it does not parse.

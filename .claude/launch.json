@@ -4,7 +4,7 @@
     {
       "name": "ui-harness",
       "runtimeExecutable": "pnpm",
-      "runtimeArgs": ["--filter", "@gather/ui", "dev"],
+      "runtimeArgs": ["--filter", "@mcpq/ui", "dev"],
       "port": 5173
     }
   ]

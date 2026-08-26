@@ -20,7 +20,7 @@
  */
 
 import { DurableObject } from "cloudflare:workers";
-import type { Answers, Form } from "@gather/schema";
+import type { Answers, Form } from "@mcpq/schema";
 import type { WorkerEnv } from "./env.js";
 import { logEvent } from "./log.js";
 

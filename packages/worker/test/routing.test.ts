@@ -36,7 +36,7 @@ describe("base path resolution", () => {
     const env = { BASE_PATH: DEV_PLACEHOLDER_BASE_PATH } as never;
     expect(resolveBasePath(env, url("http://localhost:8787/")).ok).toBe(true);
     expect(resolveBasePath(env, url("http://127.0.0.1/")).ok).toBe(true);
-    expect(resolveBasePath(env, url("https://gather-decisions.workers.dev/"))).toEqual({
+    expect(resolveBasePath(env, url("https://mcp-questionnaire.workers.dev/"))).toEqual({
       ok: false,
       reason: "placeholder-off-localhost",
     });

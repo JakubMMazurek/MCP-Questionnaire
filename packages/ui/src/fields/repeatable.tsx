@@ -8,7 +8,7 @@
  * that, and nothing here knows about ordinals.
  */
 
-import type { Field, RepeatableField } from "@gather/schema";
+import type { Field, RepeatableField } from "@mcpq/schema";
 import { memo } from "react";
 import { Button } from "../components/primitives";
 import { joinPath } from "../engine/index.js";

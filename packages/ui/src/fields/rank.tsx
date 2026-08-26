@@ -28,7 +28,7 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import type { Member, RankField } from "@gather/schema";
+import type { Member, RankField } from "@mcpq/schema";
 import { memo, useMemo } from "react";
 import { useActions, useDisabled, useEffective } from "../state";
 

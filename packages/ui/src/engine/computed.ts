@@ -10,7 +10,7 @@
  * subsequence match the validator uses (`withinTarget`).
  */
 
-import type { Answers, Computed, Form, Prefill, Value } from "@gather/schema";
+import type { Answers, Computed, Form, Prefill, Value } from "@mcpq/schema";
 import { baselineOf, effectiveValue, sameValue, type ValueContext } from "./effective.js";
 import type { Effects } from "./evaluate.js";
 import type { Leaf } from "./leaves.js";

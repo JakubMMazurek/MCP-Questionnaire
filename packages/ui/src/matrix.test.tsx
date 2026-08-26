@@ -11,8 +11,8 @@
  * thing is navigable from the keyboard.
  */
 
-import type { Form } from "@gather/schema";
-import { FORM_SCHEMA_VERSION, matrixFls } from "@gather/schema";
+import type { Form } from "@mcpq/schema";
+import { FORM_SCHEMA_VERSION, matrixFls } from "@mcpq/schema";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 import { App } from "./App";

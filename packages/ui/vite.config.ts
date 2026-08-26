@@ -10,9 +10,9 @@ import { viteSingleFile } from "vite-plugin-singlefile";
  * script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline';
  * connect-src 'none'` (§3) — so a bundle that loads anything at runtime does
  * not degrade, it breaks silently. Everything is inlined here, and the build is
- * checked for external references (`pnpm --filter @gather/ui verify`).
+ * checked for external references (`pnpm --filter @mcpq/ui verify`).
  *
- * `pnpm --filter @gather/ui dev` also serves the host harness at /dev/, which
+ * `pnpm --filter @mcpq/ui dev` also serves the host harness at /dev/, which
  * plays host over the same transport (dev/harness.tsx). The harness is not part
  * of the production input.
  */

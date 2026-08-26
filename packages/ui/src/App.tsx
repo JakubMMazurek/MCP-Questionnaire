@@ -21,7 +21,7 @@
  * `table`/`matrix` — a grid has no honest inline rendering at all.
  */
 
-import type { Form } from "@gather/schema";
+import type { Form } from "@mcpq/schema";
 import { useEffect, useRef } from "react";
 import { Button, Pill, Skeleton, StatusLine } from "./components/primitives";
 import { FormShell } from "./FormShell";

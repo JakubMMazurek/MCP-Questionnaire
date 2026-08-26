@@ -1,7 +1,7 @@
 /**
  * The dev harness: a host, played over the same transport the real one uses.
  *
- * `pnpm --filter @gather/ui dev` then open http://localhost:5173/dev/. The app
+ * `pnpm --filter @mcpq/ui dev` then open http://localhost:5173/dev/. The app
  * runs in a real iframe and talks real postMessage JSON-RPC, so what this page
  * exercises is the actual bridge — the handshake, the tool-input notifications,
  * the debounced pushes, cancellation and teardown. Everything is local: the
@@ -12,7 +12,7 @@
  * index.html).
  */
 
-import { archetypes } from "@gather/schema";
+import { archetypes } from "@mcpq/schema";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import {
@@ -463,7 +463,7 @@ function Harness() {
         <iframe
           key={generation}
           ref={frame}
-          title="Gather decisions renderer"
+          title="MCP Questionnaire renderer"
           src="/index.html"
           style={{
             width: mode === "inline" ? "min(560px, 100%)" : "100%",

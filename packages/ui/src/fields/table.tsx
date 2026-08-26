@@ -12,7 +12,7 @@
  * so a click re-renders one row at most (§5.5/§8).
  */
 
-import type { TableColumn, TableField, TableRow } from "@gather/schema";
+import type { TableColumn, TableField, TableRow } from "@mcpq/schema";
 import { memo } from "react";
 import { ProvenanceChip } from "../components/primitives";
 import { joinPath } from "../engine/index.js";

@@ -10,7 +10,7 @@
  * exempt: they submit `empty`.
  */
 
-import type { Field } from "@gather/schema";
+import type { Field } from "@mcpq/schema";
 import { isVisible } from "./computed.js";
 import { effectiveValue, type ValueContext } from "./effective.js";
 import type { Effects } from "./evaluate.js";

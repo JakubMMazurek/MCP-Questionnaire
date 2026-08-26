@@ -13,7 +13,7 @@
 // affordance, and clicking the selected segment again clears the answer, which
 // a native radio cannot express.
 
-import type { Option, Prefill, Value } from "@gather/schema";
+import type { Option, Prefill, Value } from "@mcpq/schema";
 import { memo, type ReactNode, useCallback, useEffect, useId, useRef, useState } from "react";
 
 export function cn(...parts: (string | false | null | undefined)[]): string {

@@ -12,8 +12,8 @@
  * form renders for real inline instead of being a card that says "open me".
  */
 
-import type { Form } from "@gather/schema";
-import { convergence, elicitation, FORM_SCHEMA_VERSION } from "@gather/schema";
+import type { Form } from "@mcpq/schema";
+import { convergence, elicitation, FORM_SCHEMA_VERSION } from "@mcpq/schema";
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 import { App, fitsInline } from "./App";

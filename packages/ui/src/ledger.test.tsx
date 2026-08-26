@@ -11,7 +11,7 @@
  * not invalidate the other rows' subscriptions.
  */
 
-import { assumptionLedger } from "@gather/schema";
+import { assumptionLedger } from "@mcpq/schema";
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 import { App } from "./App";

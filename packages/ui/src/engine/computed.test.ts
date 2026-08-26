@@ -4,8 +4,8 @@
  * and `count_changed` (a revert to the baseline counts as unchanged).
  */
 
-import type { Computed } from "@gather/schema";
-import { assumptionLedger, convergence, matrixFls } from "@gather/schema";
+import type { Computed } from "@mcpq/schema";
+import { assumptionLedger, convergence, matrixFls } from "@mcpq/schema";
 import { describe, expect, it } from "vitest";
 import { compute, counter, loaded } from "./harness.js";
 

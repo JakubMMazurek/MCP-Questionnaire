@@ -14,7 +14,7 @@
  * entry survives in the store.
  */
 
-import type { Answers, Prefill, Value } from "@gather/schema";
+import type { Answers, Prefill, Value } from "@mcpq/schema";
 
 /** Canonical-path-keyed prefill. */
 export type PrefillMapCanonical = Readonly<Record<string, Prefill>>;

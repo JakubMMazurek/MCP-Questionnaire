@@ -1,5 +1,5 @@
 {
-  "name": "@gather/worker",
+  "name": "@mcpq/worker",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -12,14 +12,14 @@
     "typecheck": "wrangler types && tsc --noEmit"
   },
   "dependencies": {
-    "@gather/schema": "workspace:*",
+    "@mcpq/schema": "workspace:*",
     "@modelcontextprotocol/server": "2.0.0",
     "agents": "^0.21.0",
     "zod": "^4.4.3"
   },
   "devDependencies": {
     "@cloudflare/vitest-plugin": "^1.1.0",
-    "@gather/ui": "workspace:*",
+    "@mcpq/ui": "workspace:*",
     "@modelcontextprotocol/client": "2.0.0",
     "typescript": "^7.0.2",
     "vitest": "^4.1.11",

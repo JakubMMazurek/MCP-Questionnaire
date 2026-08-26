@@ -1,6 +1,6 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "gather-decisions",
+  "name": "mcp-questionnaire",
   "main": "src/index.ts",
 
   // ≥ 2026-02-24 is load-bearing, not cosmetic (DESIGN.html §3): from that date
@@ -48,7 +48,7 @@
   "observability": {
     "enabled": true,
     "head_sampling_rate": 1
-  },
+  }
 
   // §3/§10 — the endpoint is public (custom connectors are reached from
   // Anthropic's cloud), so the hardening is an unguessable path segment: all

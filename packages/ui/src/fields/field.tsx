@@ -9,7 +9,7 @@
  * allocation, a repeatable, a slider with its end labels.
  */
 
-import type { ComputedField, Field } from "@gather/schema";
+import type { ComputedField, Field } from "@mcpq/schema";
 import { memo } from "react";
 import { Pill, ProvenanceChip } from "../components/primitives";
 import { useComputed, usePrefill, useRequired, useVisible } from "../state";

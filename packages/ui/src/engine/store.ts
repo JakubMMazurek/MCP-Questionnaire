@@ -15,8 +15,8 @@
  * `count_changed` need to know, and what lets a user's edit outrank a default.
  */
 
-import type { Answers, Diagnostic, DisplayMode, Form, Prefill, Value } from "@gather/schema";
-import { validateForm } from "@gather/schema";
+import type { Answers, Diagnostic, DisplayMode, Form, Prefill, Value } from "@mcpq/schema";
+import { validateForm } from "@mcpq/schema";
 import { createStore, type StoreApi } from "zustand/vanilla";
 import type { ComputeContext } from "./computed.js";
 import { sameValue } from "./effective.js";

@@ -3,7 +3,7 @@ name: gather
 description: Renders structured input surfaces (prefilled forms, assumption ledgers, review matrices) inside the conversation via the gather_decisions tool, instead of asking clarifying questions as prose. Use when about to write clarifying questions as bullets, list options for the user to pick from, or summarise a plan/assumptions for approval. Do NOT use for a single question, for "A or B?" analysis requests, or when the user is venting or thinking out loud.
 ---
 
-# Gather decisions — when to render a form instead of asking
+# Gather decisions (MCP Questionnaire) — when to render a form instead of asking
 
 ## The moment, not the topic
 

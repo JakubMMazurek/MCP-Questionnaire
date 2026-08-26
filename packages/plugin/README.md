@@ -1,4 +1,4 @@
-# gather-decisions plugin
+# mcp-questionnaire plugin
 
 One install gives a teammate the connector (the remote MCP server) and the
 skill that carries the *whether* — the negative rules about when a form is
@@ -9,7 +9,7 @@ wrong (DESIGN.html §6.4).
 `.mcp.json` ships with a placeholder. Replace `REPLACE_WITH_CONNECTOR_URL` with
 the deployed connector URL:
 
-    https://gather-decisions.<account>.workers.dev/<BASE_PATH>/mcp
+    https://mcp-questionnaire.<account>.workers.dev/<BASE_PATH>/mcp
 
 The `<BASE_PATH>` segment IS the capability (DESIGN.html §3): anyone with the
 URL can reach the server, so this repo must stay private, and rotating the
@@ -18,7 +18,7 @@ URL can reach the server, so this repo must stay private, and rotating the
 ## Install (teammates)
 
     /plugin marketplace add JakubMMazurek/MCP-Questionnaire
-    /plugin install gather-decisions@mcp-questionnaire
+    /plugin install mcp-questionnaire@mcp-questionnaire
 
 ## What's inside
 

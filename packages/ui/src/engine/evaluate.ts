@@ -19,8 +19,8 @@
  *    transition (see store.ts).
  */
 
-import type { Answers, Form, Prefill, Rule, RuleOp, Value } from "@gather/schema";
-import { type ParsedPath, parsePath, resolvePath } from "@gather/schema";
+import type { Answers, Form, Prefill, Rule, RuleOp, Value } from "@mcpq/schema";
+import { type ParsedPath, parsePath, resolvePath } from "@mcpq/schema";
 import {
   type Effective,
   effectiveValue,

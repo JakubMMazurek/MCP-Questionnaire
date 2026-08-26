@@ -17,7 +17,7 @@
 
 export const PROTOCOL_VERSION = "2026-01-26";
 
-export const APP_INFO = { name: "gather-decisions-renderer", version: "0.1.0" } as const;
+export const APP_INFO = { name: "mcp-questionnaire-renderer", version: "0.1.0" } as const;
 
 /** Every method this app sends or handles. */
 export const METHOD = {

@@ -3,7 +3,7 @@
  * store the way the renderer does — load, mutate, read the same derived state.
  */
 
-import type { Answers, Computed, Form } from "@gather/schema";
+import type { Answers, Computed, Form } from "@mcpq/schema";
 import { type ComputeContext, computeValue } from "./computed.js";
 import { computeContext, createEngineStore, type EngineStore } from "./store.js";
 import { buildSubmission, type Submission } from "./submission.js";

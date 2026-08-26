@@ -3,7 +3,7 @@
  * autosave round trip, and the two hardening limits.
  */
 
-import { assumptionLedger } from "@gather/schema";
+import { assumptionLedger } from "@mcpq/schema";
 import { describe, expect, it } from "vitest";
 import { MAX_DRAFT_BYTES } from "../src/form-do.js";
 import { FORM_ID_PATTERN } from "../src/form-id.js";

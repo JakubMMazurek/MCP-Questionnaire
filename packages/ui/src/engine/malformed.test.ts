@@ -3,8 +3,8 @@
  * that may hold submit back is a value the form's own schema rejects.
  */
 
-import type { Form } from "@gather/schema";
-import { FORM_SCHEMA_VERSION } from "@gather/schema";
+import type { Form } from "@mcpq/schema";
+import { FORM_SCHEMA_VERSION } from "@mcpq/schema";
 import { describe, expect, it } from "vitest";
 import { loaded } from "./harness.js";
 import { malformedValues } from "./malformed.js";

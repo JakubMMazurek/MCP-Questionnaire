@@ -7,8 +7,8 @@
  * final draft flush, and that a missing `save_draft` tool is a non-event.
  */
 
-import type { Answers } from "@gather/schema";
-import { assumptionLedger } from "@gather/schema";
+import type { Answers } from "@mcpq/schema";
+import { assumptionLedger } from "@mcpq/schema";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createEngineStore, type EngineStore } from "../engine/index.js";
 import { createBridge, MODEL_CONTEXT_DEBOUNCE_MS, SAVE_DRAFT_DEBOUNCE_MS } from "./bridge.js";
@@ -100,7 +100,7 @@ describe("the handshake (§7.2)", () => {
 });
 
 describe("tool input (§7.2)", () => {
-  it("validates the schema through @gather/schema and renders it", async () => {
+  it("validates the schema through @mcpq/schema and renders it", async () => {
     const { host, store } = await connect();
     host.sendToolInput(assumptionLedger);
     await settle();

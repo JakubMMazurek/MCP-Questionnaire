@@ -9,7 +9,7 @@
  * component that actually changed.
  */
 
-import type { Computed, Field, Prefill, Value } from "@gather/schema";
+import type { Computed, Field, Prefill, Value } from "@mcpq/schema";
 import { createContext, type ReactNode, useContext } from "react";
 import { useStore } from "zustand";
 import {

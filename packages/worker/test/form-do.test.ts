@@ -17,7 +17,7 @@ import {
   runDurableObjectAlarm,
   runInDurableObject,
 } from "cloudflare:test";
-import { assumptionLedger } from "@gather/schema";
+import { assumptionLedger } from "@mcpq/schema";
 import { describe, expect, it } from "vitest";
 import type { FormDO, FormStore } from "../src/form-do.js";
 import { IDLE_TTL_MS, MIN_DRAFT_INTERVAL_MS } from "../src/form-do.js";

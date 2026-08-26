@@ -48,7 +48,7 @@ export async function connect(): Promise<{
       );
     }) as never,
   });
-  const client = new Client({ name: "gather-decisions-tests", version: "0.0.0" });
+  const client = new Client({ name: "mcp-questionnaire-tests", version: "0.0.0" });
   await client.connect(transport);
 
   return {

@@ -1,12 +1,12 @@
 /**
  * Small purpose-built forms for the engine tests. The archetypes
- * (`@gather/schema`'s fixtures) cover the real shapes; these isolate one rule
+ * (`@mcpq/schema`'s fixtures) cover the real shapes; these isolate one rule
  * mechanic each, which is the only way to test the cap and the `clear` edge
  * without a form that also happens to be a good form.
  */
 
-import type { Form } from "@gather/schema";
-import { FORM_SCHEMA_VERSION } from "@gather/schema";
+import type { Form } from "@mcpq/schema";
+import { FORM_SCHEMA_VERSION } from "@mcpq/schema";
 
 const pick = (id: string, label: string) => ({
   type: "single_select" as const,

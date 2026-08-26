@@ -1,5 +1,5 @@
 {
-  "name": "@gather/schema",
+  "name": "@mcpq/schema",
   "version": "0.0.0",
   "private": true,
   "type": "module",

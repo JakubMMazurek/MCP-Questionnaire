@@ -1,5 +1,5 @@
 {
-  "gather-decisions": {
+  "mcp-questionnaire": {
     "type": "http",
     "url": "REPLACE_WITH_CONNECTOR_URL"
   }
