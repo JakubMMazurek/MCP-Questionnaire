@@ -703,6 +703,22 @@ $self.detail</code></pre>
     <li><strong>Matrix performance:</strong> the §5.5 "direct DOM mutation" requirement is satisfied with per-cell memoized components — a click re-renders one cell, not 800. If bundle size ever becomes a problem, Preact + <code>preact/compat</code> is a near-drop-in ~40KB saving; decide at build step 3, not now.</li>
     <li><strong>Styling:</strong> shadcn's Tailwind output plus plain CSS where clearer, all over host custom properties with <code>:root</code> fallbacks. No CSS-in-JS runtime.</li>
   </ul>
+
+  <h3>8.1 Toolchain <span class="chip decided">decided 2026-08-26</span></h3>
+  <ul class="tight">
+    <li><strong>Monorepo, pnpm workspaces:</strong> <code>packages/schema</code> (types + Zod validator + path parser — imported by both Worker and UI, which is what makes §6.3's validator one codebase), <code>packages/ui</code> (renderer bundle), <code>packages/worker</code> (MCP handler + form DO).</li>
+    <li><strong>Zustand for the answer store.</strong> A vanilla store with per-path selectors gives per-cell subscription granularity — the mechanism behind §5.5's "a click re-renders one cell, not 800" — and the rules engine runs against the same store outside React.</li>
+    <li><strong>Vitest</strong> throughout; <code>@cloudflare/vitest-pool-workers</code> for DO/handler tests. <strong>Biome</strong> for lint + format. <strong>TypeScript strict.</strong></li>
+  </ul>
+
+  <h3>8.2 Visual language <span class="chip decided">decided 2026-08-26</span></h3>
+  <p>Aesthetics are mostly <em>not ours to decide</em> — §7.4 means the form inherits Claude's theme and should read as part of the conversation, not an embedded website. What the app owns, normatively defined by the mockups in this document:</p>
+  <ul class="tight">
+    <li><strong>Provenance chips</strong> are the one semantic color system: amber = inferred, blue = user-said, neutral = existing. Nothing else gets semantic color.</li>
+    <li><strong>Segmented controls</strong> are the default answer affordance; <strong>counters are pills</strong>; the note icon has a distinct filled state.</li>
+    <li><strong>Density</strong> per the §5 mockups — a ledger is a dense audit surface, not a spacious marketing form.</li>
+    <li><strong>Accent once per surface</strong> (the primary action), skeletons never spinners (§7.4), motion minimal.</li>
+  </ul>
   </div>
 </section>
 
@@ -784,6 +800,8 @@ $self.detail</code></pre>
     <div>Prefill always, with provenance</div><div class="r">reviewing is cheap, authoring is expensive; makes inferences auditable</div>
     <div>Partial submit is first-class</div><div class="r">a form that gates progress is worse than chat</div>
     <div>React + headless libs, bundled, zero runtime fetches</div><div class="r">schema-driven tree is React's shape; CSP default-src 'none' breaks anything that phones home</div>
+    <div>pnpm monorepo (schema / ui / worker), Zustand store, Vitest + workers pool, Biome</div><div class="r">shared schema package makes the validator one codebase; per-path store selectors are what make memoized matrix cells work</div>
+    <div>Mockups are the normative visual reference</div><div class="r">host tokens own all structural color; the app owns chips, density and interaction states — defined by example, not by prose</div>
     <div>Matrix cells: cycle ≤4 options, paint palette above</div><div class="r">cycling stops being predictable past ~4; a select-once-apply-many brush scales to any option count and bulk-edits better</div>
     <div>Assumption ledger first</div><div class="r">highest value, smallest surface, proves the loop</div>
   </div>
