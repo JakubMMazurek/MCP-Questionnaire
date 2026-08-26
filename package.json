@@ -1,0 +1,22 @@
+{
+  "name": "gather-decisions",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Gather Decisions — structured input surfaces inside the Claude conversation (MCP App). See DESIGN.html.",
+  "packageManager": "pnpm@10.33.0",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "test": "pnpm -r test",
+    "typecheck": "pnpm -r typecheck",
+    "lint": "biome check .",
+    "lint:fix": "biome check --write .",
+    "format": "biome format --write ."
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.5.10",
+    "typescript": "^7.0.2"
+  }
+}

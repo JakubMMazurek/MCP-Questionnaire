@@ -1,0 +1,22 @@
+{
+  "name": "@gather/schema",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Meta-schema (§4): types, Zod validator, path parser + resolver. Imported by the Worker and the UI so the validator is one codebase (§6.3).",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.11"
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "name": "@gather/worker",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "STUB — MCP handler + form Durable Object (build step 4). Not implemented yet; see DESIGN.html §9.",
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "typescript": "^7.0.2"
+  }
+}
