@@ -73,7 +73,11 @@ export function useEffective(path: string): unknown {
   });
 }
 
-/** Where the rendered value came from — drives the "you changed this" affordances. */
+/**
+ * Where the rendered value came from. Not used by the ledger; it is what the
+ * matrix archetype's dirty-cell marks read (§5.5), and it belongs next to the
+ * value it describes.
+ */
 export function useOrigin(path: string): "answer" | "default" | "prefill" | null {
   return useEngine((state) => {
     const effective = effectiveValue(
