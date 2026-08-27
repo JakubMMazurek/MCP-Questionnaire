@@ -55,11 +55,21 @@ names. If you are about to:
    the `formId`; call `get_answers` with it before acting, and again after any
    turn where the user may have changed something. Never guess at the answers
    and never ask the user to retype what they just filled in.
-8. **Chain forms via `formId`** (returned in the tool result) and `load_form`,
-   not by re-serialising answers through your context. Ranking survivors of a
+8. **`load_form` renders; `get_answers` reads.** `load_form(formId)` puts the
+   same form back on screen *for the user* — call it when they should see or
+   edit it again. It returns the same stub as `gather_decisions` and no answers,
+   so calling it to find out what someone said gets them a second copy of the
+   form and gets you nothing. Chain forms by passing `formId` forward rather
+   than re-serialising answers through your context; ranking survivors of a
    prune is the NEXT form, reusing the prune's row ids.
 9. The user's process preferences (what their defers mean, how terse they like
    forms) live in CLAUDE.md/memory and override the recipes.
 10. If the tool returns validation errors, they include the fix and a worked
    example — correct the schema and call again; never fall back to prose bullets
    after a single failure.
+11. **If the user says they see nothing, believe them and switch to prose.** The
+   tool result is a stub whether or not anything rendered, so you cannot tell
+   from your side. Not every host mounts MCP UI resources — Claude Code installs
+   this skill and calls these tools but shows no surface. A form nobody can see
+   is not a form: ask that turn's questions in chat, and mention that forms
+   render on claude.ai and Claude Desktop. Do not re-render and hope.
