@@ -36,6 +36,24 @@ import {
 export const MODEL_CONTEXT_DEBOUNCE_MS = 2_000;
 /** §3 — debounced draft write to the form's Durable Object. */
 export const SAVE_DRAFT_DEBOUNCE_MS = 3_000;
+/**
+ * §6.3 — how long a form attempt that does not validate is given to become one
+ * before the app says so.
+ *
+ * The partial channel was always patient: a brace-healed prefix renders nothing
+ * and waits. But not every host streams a form on `tool-input-partial` — some
+ * deliver growing arguments on `tool-input` itself, and the last thing a person
+ * should watch while the agent is still writing their form is "this form could
+ * not be rendered", replaced a second later by the form. The invalid state is
+ * for a schema the agent got WRONG, not for one it has not finished.
+ *
+ * Waiting costs nothing real: `gather_decisions` validates server-side before
+ * it stores anything, so a genuinely malformed envelope is being rejected with
+ * teaching errors on that path anyway, and the agent is already on its way to a
+ * second attempt. What the delay buys is that the sentence only ever appears
+ * when it is true and final.
+ */
+export const INVALID_GRACE_MS = 800;
 
 /** After this many consecutive failures we stop trying (the tool may not exist). */
 const SAVE_DRAFT_GIVE_UP_AFTER = 3;
@@ -283,6 +301,7 @@ export function createBridge(options: BridgeOptions): Bridge {
    */
   let submittedFlush = false;
   let lastPartial: unknown = null;
+  let pendingInvalid: ReturnType<typeof setTimeout> | null = null;
   let unsubscribeStore: (() => void) | null = null;
   let observer: ResizeObserver | null = null;
 
@@ -424,6 +443,39 @@ export function createBridge(options: BridgeOptions): Bridge {
     if (answers && store.getState().status === "ready") store.getState().hydrate(answers);
   }
 
+  /** Any newer input, cancellation or teardown outranks a scheduled verdict. */
+  function clearPendingInvalid(): void {
+    if (pendingInvalid === null) return;
+    clearTimeout(pendingInvalid);
+    pendingInvalid = null;
+  }
+
+  /**
+   * The one door every form schema comes through, partial or final (§6.3).
+   *
+   * Validates first: anything that parses renders immediately, which is the
+   * common case and the fast one. Anything that does not is treated as "not yet"
+   * — silently while more may arrive, and after INVALID_GRACE_MS on the final
+   * channel, where nothing more is expected. The app stays on its skeletons in
+   * the meantime, so a form still being written looks like a form still being
+   * written.
+   */
+  function applyToolInput(args: unknown, final: boolean): void {
+    clearPendingInvalid();
+    const candidate = extractForm(args);
+    if (validateForm(candidate).ok) {
+      loadFromArguments(args);
+      return;
+    }
+    // A prefix is not a defect. Say nothing and let the next chunk decide.
+    if (!final) return;
+    pendingInvalid = setTimeout(() => {
+      pendingInvalid = null;
+      // `loadForm` is what sets `invalid` and carries the diagnostics with it.
+      store.getState().loadForm(candidate);
+    }, INVALID_GRACE_MS);
+  }
+
   /**
    * The `load_form` path (§7.2): the input named a form and nothing else, so we
    * pull the schema and the accumulated answers ourselves through the
@@ -468,15 +520,17 @@ export function createBridge(options: BridgeOptions): Bridge {
     const args = params.arguments;
     if (!isFormAttempt(args)) {
       // Not our tool's input. Draw nothing, say nothing (see `isFormAttempt`).
+      clearPendingInvalid();
       store.getState().noForm();
       return;
     }
     const reopened = loadFormId(args);
     if (reopened) {
+      clearPendingInvalid();
       knownFormId = reopened;
       void hydrateFromServer(reopened);
     } else {
-      loadFromArguments(args);
+      applyToolInput(args, true);
     }
   });
 
@@ -485,8 +539,7 @@ export function createBridge(options: BridgeOptions): Bridge {
     // arguments are brace-HEALED JSON, so a half-parsed schema is not merely
     // incomplete, it can be wrong — and must never flash a broken form (§6.3).
     lastPartial = params.arguments;
-    const candidate = extractForm(lastPartial);
-    if (validateForm(candidate).ok) loadFromArguments(lastPartial);
+    applyToolInput(lastPartial, false);
   });
 
   app.addEventListener("toolresult", (params) => {
@@ -499,6 +552,8 @@ export function createBridge(options: BridgeOptions): Bridge {
 
   app.addEventListener("toolcancelled", (params) => {
     frozen = true;
+    // The agent stopped mid-schema: that is a cancellation, not a bad form.
+    clearPendingInvalid();
     contextPush.cancel();
     draftPush.cancel();
     store.getState().cancel();
@@ -523,6 +578,7 @@ export function createBridge(options: BridgeOptions): Bridge {
     emit({ type: "teardown" });
     await flushComplete();
     frozen = true;
+    clearPendingInvalid();
     contextPush.cancel();
     return {};
   };

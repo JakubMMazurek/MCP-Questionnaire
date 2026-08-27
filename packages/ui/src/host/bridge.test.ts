@@ -21,7 +21,12 @@ import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import type { CallToolRequest } from "@modelcontextprotocol/sdk/types.js";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createEngineStore, type EngineStore } from "../engine/index.js";
-import { createBridge, MODEL_CONTEXT_DEBOUNCE_MS, SAVE_DRAFT_DEBOUNCE_MS } from "./bridge.js";
+import {
+  createBridge,
+  INVALID_GRACE_MS,
+  MODEL_CONTEXT_DEBOUNCE_MS,
+  SAVE_DRAFT_DEBOUNCE_MS,
+} from "./bridge.js";
 import { createFakeHost, type FakeHost } from "./fake-host.js";
 import { type HostContext, METHOD } from "./protocol.js";
 
@@ -161,6 +166,12 @@ describe("tool input (§7.2)", () => {
     const { host, store } = await connect();
     host.sendToolInput({ version: 1, title: "no sections" });
     await settle();
+    // Not yet: the verdict waits out INVALID_GRACE_MS in case this is a host
+    // that streams a form on the final channel.
+    expect(store.getState().status).toBe("loading");
+
+    await vi.advanceTimersByTimeAsync(INVALID_GRACE_MS);
+    await settle();
     expect(store.getState().status).toBe("invalid");
     expect(store.getState().form).toBeNull();
     expect(store.getState().diagnostics.length).toBeGreaterThan(0);
@@ -189,6 +200,7 @@ describe("tool input (§7.2)", () => {
     // `version` + `title` is an envelope with its sections missing — the agent
     // meant a form and got it wrong, which is exactly what `invalid` is for.
     host.sendToolInput({ version: 1, title: "no sections", archetype: "ledger" });
+    await vi.advanceTimersByTimeAsync(INVALID_GRACE_MS);
     await settle();
     expect(store.getState().status).toBe("invalid");
   });
@@ -202,6 +214,45 @@ describe("tool input (§7.2)", () => {
     host.sendPartial(assumptionLedger);
     await settle();
     expect(store.getState().status).toBe("ready");
+  });
+
+  /**
+   * A partial schema arriving on the FINAL channel — which is what a host that
+   * does not implement `tool-input-partial` looks like from in here. The old
+   * behaviour said "this form could not be rendered" over every chunk until the
+   * last one; the user watched an error message while their form was being
+   * written.
+   */
+  it("says nothing while a form streams in on the final channel", async () => {
+    const { host, store } = await connect();
+
+    host.sendToolInput({ version: 1, title: "Before I draft" });
+    await vi.advanceTimersByTimeAsync(INVALID_GRACE_MS - 1);
+    await settle();
+    expect(store.getState().status).toBe("loading");
+
+    host.sendToolInput({ version: 1, title: "Before I draft", sections: [] });
+    await vi.advanceTimersByTimeAsync(INVALID_GRACE_MS - 1);
+    await settle();
+    expect(store.getState().status).toBe("loading");
+
+    host.sendToolInput(assumptionLedger);
+    await settle();
+    expect(store.getState().status).toBe("ready");
+
+    // And the verdict scheduled by the earlier chunks never lands.
+    await vi.advanceTimersByTimeAsync(INVALID_GRACE_MS * 3);
+    await settle();
+    expect(store.getState().status).toBe("ready");
+  });
+
+  it("does not blame a form the user stopped mid-stream", async () => {
+    const { host, store } = await connect();
+    host.sendToolInput({ version: 1, title: "half a form" });
+    host.sendCancelled("the user pressed stop");
+    await vi.advanceTimersByTimeAsync(INVALID_GRACE_MS * 2);
+    await settle();
+    expect(store.getState().status).toBe("cancelled");
   });
 });
 

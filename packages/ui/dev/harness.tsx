@@ -286,6 +286,24 @@ function Harness() {
     }
   };
 
+  /**
+   * The same prefixes, but every one of them on `tool-input` — a host with no
+   * `tool-input-partial` implementation, seen from the app. This is the shape
+   * that used to show "this form could not be rendered" over each chunk, and
+   * the reason the invalid verdict now waits out INVALID_GRACE_MS.
+   */
+  const streamFinalChannel = async (key: FixtureKey) => {
+    for (const [index, step] of partials(archetypes[key]).entries()) {
+      host.current?.sendToolInput(step);
+      append({
+        direction: "out",
+        method: METHOD.toolInput,
+        detail: `${key} #${index + 1} (on the FINAL channel)`,
+      });
+      await new Promise((resolve) => setTimeout(resolve, 700));
+    }
+  };
+
   useEffect(() => {
     // Theme, palette and display mode are host state: push them as a patch.
     pushContext({
@@ -395,6 +413,14 @@ function Harness() {
           <div style={styles.group}>
             <button type="button" style={styles.button} onClick={() => void stream(fixture)}>
               stream partials
+            </button>
+            <button
+              type="button"
+              style={styles.button}
+              onClick={() => void streamFinalChannel(fixture)}
+              title="A host with no tool-input-partial: every chunk on tool-input"
+            >
+              stream on final
             </button>
             <button
               type="button"
