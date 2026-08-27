@@ -6,8 +6,8 @@
   "description": "MCP handler (createMcpHandler + MCP SDK v2) + the per-form Durable Object + ui://forms/renderer (build step 4). See DESIGN.html §3, §6, §7.",
   "scripts": {
     "dev": "node scripts/ensure-bundle.mjs && wrangler dev",
-    "check": "node scripts/ensure-bundle.mjs && wrangler deploy --dry-run --outdir .wrangler/dry-run",
-    "test": "node scripts/ensure-bundle.mjs && vitest run",
+    "check": "node scripts/verify-contract.mjs && node scripts/ensure-bundle.mjs && wrangler deploy --dry-run --outdir .wrangler/dry-run",
+    "test": "node scripts/verify-contract.mjs && node scripts/ensure-bundle.mjs && vitest run",
     "test:watch": "node scripts/ensure-bundle.mjs && vitest",
     "typecheck": "wrangler types && tsc --noEmit"
   },

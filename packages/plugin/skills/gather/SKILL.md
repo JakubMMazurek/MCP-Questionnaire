@@ -5,6 +5,13 @@ description: Renders structured input surfaces (prefilled forms, assumption ledg
 
 # Gather decisions (MCP Questionnaire) — when to render a form instead of asking
 
+**Skill contract 0.3.4.** The `gather_decisions` tool description states the
+contract the deployed server expects. If it names a number higher than this one,
+this file is stale — tell the user in one line to run
+`/plugin update mcp-questionnaire`, and follow the tool descriptions and
+`get_form_guide` rather than the rules below, which were written for an older
+server.
+
 ## The moment, not the topic
 
 The trigger is something you notice in YOUR OWN output, never a topic the user

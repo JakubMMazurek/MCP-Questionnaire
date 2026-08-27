@@ -15,7 +15,29 @@
  * someone says "questionnaire", which never happens.
  */
 
+/**
+ * The skill contract version, and the one string that lets a stale install
+ * announce itself (§6.1).
+ *
+ * The plugin's skill file ships by VERSION over git; this Worker's tool
+ * descriptions ship by DEPLOY. The two drift, and the failure is silent and
+ * expensive: an agent following 0.2.1's instructions against a 0.3.x server
+ * does not know get_answers exists, so it reaches for load_form, renders a
+ * second form, and reads nobody's answers. That is a real field session.
+ *
+ * Nothing in the protocol reports an installed plugin version. But the agent
+ * can read its OWN loaded skill text, and this description is always in its
+ * context beside it — so the server states the current contract and asks for a
+ * one-line comparison. Bump this in lockstep with
+ * packages/plugin/.claude-plugin/plugin.json; verify-contract.mjs fails the
+ * build if they drift.
+ */
+export const SKILL_CONTRACT = "0.3.4";
+
 export const GATHER_DECISIONS_DESCRIPTION = `Render a structured input surface (a form) in the conversation and collect the user's answers.
+
+BEFORE ANYTHING ELSE — IS YOUR SKILL CURRENT?
+The current skill contract is ${SKILL_CONTRACT}. If the mcp-questionnaire skill instructions in your context do not say "Skill contract ${SKILL_CONTRACT}" — an older number, or no such line at all — then the installed plugin is behind this server and its rules are wrong in ways that will cost the user real turns. Say so once, in one line, and give them the fix: \`/plugin update mcp-questionnaire\`. Then carry on using THIS description and get_form_guide as the source of truth, never the stale skill.
 
 WHEN TO CALL THIS
 If you are about to write clarifying questions as prose bullets, stop — those go in this tool instead. Same if you are about to list options for the user to pick from, or summarise a plan for approval.
