@@ -54,7 +54,18 @@ names. If you are about to:
    displayed. On submit, a one-line receipt appears in the conversation naming
    the `formId`; call `get_answers` with it before acting, and again after any
    turn where the user may have changed something. Never guess at the answers
-   and never ask the user to retype what they just filled in.
+   and never ask the user to retype what they just filled in. Two things about
+   what comes back:
+   - **A draft is readable.** Before submit it reports NOT YET SUBMITTED and
+     shows the state so far, which is fine to read and act on cautiously — it
+     is just not a decision yet. "No answers recorded" means nobody has opened
+     it, which is not the same as a form full of empties.
+   - **Your own prefill returns as `answered`.** A value that was on screen when
+     they submitted counts as submitted, whether they looked at it or not — so
+     the report cannot tell you which values they actually vetted. The receipt's
+     "N inferred values unreviewed" is your only signal. On anything expensive
+     to get wrong, confirm that item in chat instead of treating your own
+     inference as their answer.
 8. **`load_form` renders; `get_answers` reads.** `load_form(formId)` puts the
    same form back on screen *for the user* — call it when they should see or
    edit it again. It returns the same stub as `gather_decisions` and no answers,
@@ -73,3 +84,9 @@ names. If you are about to:
    this skill and calls these tools but shows no surface. A form nobody can see
    is not a form: ask that turn's questions in chat, and mention that forms
    render on claude.ai and Claude Desktop. Do not re-render and hope.
+12. **`get_form_state` and `save_draft` are the renderer's, not yours.** They
+   exist so a reopened form can hydrate itself and autosave. Some hosts hide
+   them from you; some (Claude Code) do not. `get_form_state` returns the entire
+   schema plus answers — precisely the second copy that the stub-shaped result
+   of `gather_decisions` exists to avoid paying for. If you want answers, that
+   is `get_answers`. Never call these two.
