@@ -6,9 +6,9 @@
   "description": "Renderer bundle: rules engine, host bridge, and a control for every §4.2 field type including the matrix. Vite single-file output.",
   "scripts": {
     "dev": "vite",
-    "build": "vite build && node scripts/verify-bundle.mjs",
+    "build": "node scripts/verify-styles.mjs && vite build && node scripts/verify-bundle.mjs",
     "verify": "node scripts/verify-bundle.mjs",
-    "test": "vitest run",
+    "test": "node scripts/verify-styles.mjs && vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit"
   },

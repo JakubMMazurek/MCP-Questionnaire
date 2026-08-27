@@ -9,9 +9,22 @@
  *
  * Semantic color is rationed (§8.2): provenance chips (amber = inferred,
  * blue = user-said, neutral = existing) and the counter pills. The selected
- * state of a segmented control is deliberately NEUTRAL — colouring it by option
+ * state of a segmented control is deliberately HUELESS — colouring it by option
  * position would mean the renderer assigning meaning to agent-authored values,
- * which §4.1 forbids.
+ * which §4.1 forbids. But hueless per OPTION is not the same as colourless:
+ * every selected control is painted with one tint of --color-ring-primary,
+ * identically, saying "current" and nothing more — the §5 mockups' own
+ * treatment, minus the per-option hue a human hand-assigned there. Ink stays
+ * --color-text-primary on a tint of the page's ground, never on the accent,
+ * because the host supplies an accent with no companion contrast colour.
+ *
+ * The one place the mockups cannot be followed is the primary button: theirs
+ * is accent-on-accent-contrast, a PAIR the host does not give us. It keeps the
+ * host's own ink and ground, inverted (§8.2).
+ *
+ * Selection also carries no provenance — an inferred value the user kept and
+ * one they picked themselves are the same current value, told apart by the
+ * chips and nothing else.
  */
 
 :root {
@@ -276,14 +289,45 @@ body {
     border-left: 0;
   }
 
-  .seg > button:hover:not(:disabled) {
+  .seg > button:hover:not(:disabled):not([aria-checked="true"]) {
     background: var(--color-background-secondary);
   }
 
+  /*
+   * Selected, painted the way the §5.1 mockup paints it: a low-percentage tint
+   * of the accent, a ring in the accent at full strength, and the page's own
+   * ink for the label.
+   *
+   * The mockup gets its hue from `.seg button.on-ok` — a class the mockup's
+   * author assigned because they knew "Confirm" was the affirmative option.
+   * The renderer cannot know that: `Confirm` / `Fix` / `TBD` are agent-authored
+   * strings, and choosing a hue per option would be the renderer reading
+   * meaning out of a value (§4.1). So the hue is the same for every option and
+   * says only "this one is current" — and the accent is
+   * `--color-ring-primary`, a host token whose own fallbacks are already the
+   * mockup's teal.
+   *
+   * The label stays `--color-text-primary` on a tint of the page's own ground,
+   * so the ink is legible whatever the host's accent turns out to be. Text ON
+   * the accent would be a bet: the host gives an accent with no companion
+   * contrast colour, which is the same shape as the bug that shipped white on
+   * white.
+   *
+   * What this replaced: two adjacent host greys (tertiary selected, secondary
+   * on hover — 10 values apart on claude.ai) plus a hairline ring in the
+   * container's own border colour. Worse, `:hover:not(:disabled)` outranked
+   * `[aria-checked="true"]`, so hovering your own answer repainted it as
+   * unselected — and the pointer is still on the button right after a click,
+   * which is exactly when a person looks for confirmation.
+   */
   .seg > button[aria-checked="true"] {
-    background: var(--color-background-tertiary);
+    background: color-mix(in srgb, var(--color-ring-primary) 16%, transparent);
     color: var(--color-text-primary);
-    box-shadow: inset 0 0 0 1px var(--color-border-primary);
+    box-shadow: inset 0 0 0 1px var(--color-ring-primary);
+  }
+
+  .seg > button[aria-checked="true"]:hover:not(:disabled) {
+    background: color-mix(in srgb, var(--color-ring-primary) 26%, transparent);
   }
 
   .seg > button:disabled {
@@ -341,6 +385,19 @@ body {
   .btn-primary:hover:not(:disabled) {
     background: var(--color-text-primary);
     filter: brightness(1.15);
+  }
+
+  /*
+   * `.btn:disabled` is a class plus a pseudo-class and so outranks the single
+   * class of `.btn-primary`: the inverted ink was replaced by
+   * --color-text-disabled while the dark ground stayed put. After submit the
+   * label flips to "Sent" (FormShell) and went near-invisible — the button
+   * read as blank, which is what a field report called "an empty white
+   * button". Disabled-ness is opacity here, so the pair survives it.
+   */
+  .btn-primary:disabled {
+    color: var(--color-background-primary);
+    opacity: 0.6;
   }
 
   .btn-icon {
@@ -480,13 +537,15 @@ body {
     padding: 5px 8px;
   }
 
-  .tile:hover:not(:disabled) {
+  .tile:hover:not(:disabled):not([aria-checked="true"]) {
     background: var(--color-background-secondary);
   }
 
+  /* Same recipe as the segmented control, and hover no longer outranks it.
+     The filled radio mark below is the second signal. */
   .tile[aria-checked="true"] {
-    background: var(--color-background-tertiary);
-    box-shadow: inset 0 0 0 1px var(--color-border-primary);
+    background: color-mix(in srgb, var(--color-ring-primary) 12%, transparent);
+    box-shadow: inset 0 0 0 2px var(--color-ring-primary);
   }
 
   .tile:disabled {
@@ -778,8 +837,8 @@ body {
   }
 
   .preset[aria-checked="true"] {
-    border-color: var(--color-text-primary);
-    background: var(--color-background-tertiary);
+    border-color: var(--color-ring-primary);
+    background: color-mix(in srgb, var(--color-ring-primary) 12%, transparent);
     color: var(--color-text-primary);
   }
 
@@ -832,10 +891,12 @@ body {
     min-width: 0;
   }
 
+  /* The mockup paints the fill and the thumb in the accent; `accent-color`
+     does both on a native range, and nothing sits on top of it to read. */
   .slider {
     flex: 1 1 auto;
     min-width: 6rem;
-    accent-color: var(--color-text-primary);
+    accent-color: var(--color-ring-primary);
   }
 
   .slider[data-empty="true"] {
@@ -973,8 +1034,8 @@ body {
   }
 
   .palette-swatch[aria-checked="true"] {
-    border-color: var(--color-text-primary);
-    background: var(--color-background-tertiary);
+    border-color: var(--color-ring-primary);
+    background: color-mix(in srgb, var(--color-ring-primary) 12%, transparent);
     color: var(--color-text-primary);
   }
 
@@ -1075,7 +1136,7 @@ body {
     appearance: none;
   }
 
-  .mcell:hover:not(:disabled):not([data-readonly="true"]) {
+  .mcell:hover:not(:disabled):not([data-readonly="true"]):not([data-dirty="true"]) {
     border-color: var(--color-border-primary);
     background: var(--color-background-tertiary);
   }

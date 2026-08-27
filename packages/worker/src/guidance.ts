@@ -52,7 +52,11 @@ This is how the answers reach you. The form is a surface the user interacts with
 
 The result is one line per question — the label the user saw, the path, and the value — including the ones left empty, which are answers too. It says whether the form was submitted or is still a draft; a draft is safe to read, it is just not a decision yet.`;
 
-export const LOAD_FORM_DESCRIPTION = `Re-open a form that was already rendered, with everything the user has answered so far. Forms are documents, not one-shot events — use this to bring one back after other turns, or to show the user their own state again. Takes the formId returned by gather_decisions.`;
+export const LOAD_FORM_DESCRIPTION = `Render an already-stored form again, for the USER to look at. Takes the formId returned by gather_decisions.
+
+This does NOT return the answers to you. It returns the same stub gather_decisions returns; what it produces is a second copy of the form in the conversation. To read what the user answered, call get_answers(formId) — that is the only tool that reports answers, and it renders nothing.
+
+Use load_form when the user should see and edit the form again: they asked for it back, or a later turn changed what you need from them. If you only want to know what they said, you want get_answers.`;
 
 /* -------------------------------------------------------------------------- */
 /* app-visible tools (§7.1 — visibility ["app"]); the model never sees these.  */

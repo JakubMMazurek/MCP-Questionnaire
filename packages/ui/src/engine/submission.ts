@@ -136,7 +136,10 @@ export function buildSubmission(
 export function countsLine(summary: SubmissionSummary): string {
   const total = summary.answered + summary.empty;
   const parts = [`${summary.answered} of ${total} answered`];
-  if (summary.unreviewed > 0) parts.push(`${summary.unreviewed} inferred values unreviewed`);
+  if (summary.unreviewed > 0)
+    parts.push(
+      `${summary.unreviewed} inferred value${summary.unreviewed === 1 ? "" : "s"} unreviewed`,
+    );
   if (summary.changed > 0) parts.push(`${summary.changed} changed from current`);
   return `${parts.join("; ")}.`;
 }
