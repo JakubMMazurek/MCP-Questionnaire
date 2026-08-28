@@ -43,6 +43,8 @@ export type DiagnosticCode =
   | "rule_in_on_a_set"
   | "rule_membership_needs_a_set"
   | "rule_membership_takes_one_value"
+  | "rule_set_op_takes_a_list"
+  | "rule_set_op_empty_list"
   | "rule_payload_required"
   | "rule_target_has_no_options"
   | "rule_option_not_declared"

@@ -83,11 +83,20 @@ export const TABLE_COLUMN_TYPES = [
  * which on an array-valued field is never true — a field session wrote exactly
  * that rule, the form validated, and the section silently never appeared.
  *
- * They take ONE option value, not an array, deliberately: "contains any of
- * these" is two rules whose `show` targets the same section, and OR is already
- * what a flat rule list means. An array here would have to choose silently
- * between subset and intersection, which is the ambiguity that made overloading
- * `in` the wrong fix.
+ * The pair takes ONE option value; the trio below takes a list. They are
+ * separate ops rather than one overloaded `contains` because an array under a
+ * single name would have to choose silently between "all of these" and "any of
+ * these" — the same ambiguity that made overloading `in` the wrong fix.
+ *
+ * WHICH ONES EXIST, AND WHY NOT MORE. A rule list is a flat OR: two rules whose
+ * `show` names the same target mean "either". Nothing in a flat list can mean
+ * "both". So the conjunctive predicates have to be ops —
+ * `contains_all` (S superset of L) and `contains_none` (empty intersection,
+ * which is AND over negations) — while `contains_any` is sugar for a pattern
+ * that already worked. The missing fourth, "does not contain all of these", is
+ * deliberate: it is the OR-shaped negation, so two `not_contains` rules already
+ * say it, and the name is read as "contains none of these" by almost everyone
+ * who meets it.
  */
 export const RULE_OPS = [
   "eq",
@@ -95,6 +104,9 @@ export const RULE_OPS = [
   "in",
   "contains",
   "not_contains",
+  "contains_all",
+  "contains_any",
+  "contains_none",
   "gt",
   "lt",
   "empty",

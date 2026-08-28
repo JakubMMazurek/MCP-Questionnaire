@@ -119,9 +119,20 @@ describe("formatDiagnostics", () => {
             when: { field: "region", op: "contains", value: "eu" },
             then: { action: "show", targets: ["dryRun"] },
           },
-          // `contains` handed a list, where OR is a second rule.
+          // `contains` handed a list: the error has to ask WHICH list op, since
+          // that is exactly the ambiguity the trio exists to remove.
           {
             when: { field: "addons", op: "contains", value: ["gdpr_pack", "audit_log"] },
+            then: { action: "show", targets: ["dryRun"] },
+          },
+          // A list op handed one value.
+          {
+            when: { field: "addons", op: "contains_any", value: "audit_log" },
+            then: { action: "show", targets: ["dryRun"] },
+          },
+          // A list op handed nothing to compare against.
+          {
+            when: { field: "addons", op: "contains_all", value: [] },
             then: { action: "show", targets: ["dryRun"] },
           },
         ];

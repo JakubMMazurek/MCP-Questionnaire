@@ -285,6 +285,72 @@ describe("membership on a multi_select (§4.6)", () => {
     expect(visible(s, ["meat_note", "veg_note"])).toEqual([]);
   });
 
+  /**
+   * The list forms, as a truth table — the point being that each op has exactly
+   * one reading, since the ambiguity of a single overloaded `contains` is the
+   * reason there are three of them.
+   */
+  describe("the list forms", () => {
+    const shownBy = (op: string, value: unknown, selection: string[]): boolean => {
+      const s = createEngineStore();
+      s.getState().loadForm({
+        ...form,
+        rules: [
+          {
+            when: { field: "toppings", op, value },
+            then: { action: "show" as const, targets: ["meat_note"] },
+          },
+        ],
+      });
+      s.getState().setAnswer("toppings", selection);
+      return visible(s, ["meat_note"]).length === 1;
+    };
+
+    const PAIR = ["pepperoni", "mushroom"];
+
+    it("contains_all holds only when every listed value is present", () => {
+      expect(shownBy("contains_all", PAIR, ["pepperoni", "mushroom"])).toBe(true);
+      // Order-insensitive, and extras do not spoil it: superset, not equality.
+      expect(shownBy("contains_all", PAIR, ["mushroom", "pineapple", "pepperoni"])).toBe(true);
+      expect(shownBy("contains_all", PAIR, ["pepperoni"])).toBe(false);
+      expect(shownBy("contains_all", PAIR, ["pineapple"])).toBe(false);
+    });
+
+    it("contains_any holds on one hit", () => {
+      expect(shownBy("contains_any", PAIR, ["pineapple", "mushroom"])).toBe(true);
+      expect(shownBy("contains_any", PAIR, ["pepperoni"])).toBe(true);
+      expect(shownBy("contains_any", PAIR, ["pineapple"])).toBe(false);
+    });
+
+    it("contains_none is the intersection being empty, not the negation of all", () => {
+      expect(shownBy("contains_none", PAIR, ["pineapple"])).toBe(true);
+      // One hit is enough to fail it — this is the distinction that a
+      // "not_contains_all" op would have blurred, which is why there isn't one.
+      expect(shownBy("contains_none", PAIR, ["pineapple", "mushroom"])).toBe(false);
+      expect(shownBy("contains_none", PAIR, ["pepperoni", "mushroom"])).toBe(false);
+    });
+
+    /**
+     * §4.6: a rule cannot fire on a field the user has not reached, and that
+     * governs even where the predicate would be vacuously true. `contains_none`
+     * of anything is trivially true of an empty selection — and still does not
+     * fire, because "they have not answered" is what `empty` is for.
+     */
+    it("stays false on an unanswered field, contains_none included", () => {
+      const s = createEngineStore();
+      s.getState().loadForm({
+        ...form,
+        rules: [
+          {
+            when: { field: "toppings", op: "contains_none" as const, value: PAIR },
+            then: { action: "show" as const, targets: ["meat_note"] },
+          },
+        ],
+      });
+      expect(visible(s, ["meat_note"])).toEqual([]);
+    });
+  });
+
   /** `eq` on a set is set equality, so tap order cannot decide it either. */
   it("treats eq on a multi_select as a set, not a sequence", () => {
     const s = createEngineStore();

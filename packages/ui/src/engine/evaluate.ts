@@ -245,6 +245,29 @@ function test(op: RuleOp, effective: Effective, against: unknown): boolean {
       return Array.isArray(value) && value.some((held) => sameValue(held, against));
     case "not_contains":
       return Array.isArray(value) && !value.some((held) => sameValue(held, against));
+    /**
+     * The list forms. `contains_all` and `contains_none` are conjunctions, which
+     * a flat rule list cannot express by composition — `contains_any` can be
+     * (one rule per value) and is here for the reading.
+     */
+    case "contains_all":
+      return (
+        Array.isArray(value) &&
+        Array.isArray(against) &&
+        against.every((want) => value.some((held) => sameValue(held, want)))
+      );
+    case "contains_any":
+      return (
+        Array.isArray(value) &&
+        Array.isArray(against) &&
+        against.some((want) => value.some((held) => sameValue(held, want)))
+      );
+    case "contains_none":
+      return (
+        Array.isArray(value) &&
+        Array.isArray(against) &&
+        !against.some((want) => value.some((held) => sameValue(held, want)))
+      );
     case "gt":
     case "lt":
       return compare(op, value, against);

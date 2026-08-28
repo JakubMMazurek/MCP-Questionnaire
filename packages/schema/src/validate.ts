@@ -492,9 +492,23 @@ function checkComputed(
 /* rules                                                                      */
 /* -------------------------------------------------------------------------- */
 
-const VALUE_REQUIRED_OPS = new Set(["eq", "neq", "contains", "not_contains", "gt", "lt"]);
-/** The membership pair — array-valued fields only, one option value each. */
+const VALUE_REQUIRED_OPS = new Set([
+  "eq",
+  "neq",
+  "contains",
+  "not_contains",
+  "contains_all",
+  "contains_any",
+  "contains_none",
+  "gt",
+  "lt",
+]);
+/** One option value each, against a set-valued field. */
 const MEMBERSHIP_OPS = new Set(["contains", "not_contains"]);
+/** A LIST of option values, against a set-valued field. */
+const SET_OPS = new Set(["contains_all", "contains_any", "contains_none"]);
+/** Everything that only makes sense against a multi_select. */
+const SET_FIELD_OPS = new Set([...MEMBERSHIP_OPS, ...SET_OPS]);
 const VALUE_FORBIDDEN_OPS = new Set(["empty", "filled"]);
 /** Actions that change what a field holds, and so can feed another `when`. */
 const VALUE_AFFECTING_ACTIONS = new Set(["show", "hide", "set_default", "clear"]);
@@ -539,11 +553,31 @@ function checkRule(
     );
   }
   if (MEMBERSHIP_OPS.has(rule.when.op) && Array.isArray(rule.when.value)) {
+    const suggestion =
+      rule.when.op === "contains" ? `"contains_all" or "contains_any"` : `"contains_none"`;
     out.push(
       error(
         "rule_membership_takes_one_value",
         `rules[${index}].when.value`,
-        `Rule ${index} uses op "${rule.when.op}", which tests ONE option value against what the field holds, so "value" must be that value and not a list — as in "value": "pepperoni". For "any of these", write one rule per value with the same "show" target: a rule list is a flat OR, and any rule that fires reveals the target.`,
+        `Rule ${index} uses op "${rule.when.op}", which tests ONE option value against what the field holds, so "value" must be that value and not a list — as in "value": "pepperoni". For a list, say which you mean: ${suggestion}.`,
+      ),
+    );
+  }
+  if (SET_OPS.has(rule.when.op) && hasValue && !Array.isArray(rule.when.value)) {
+    out.push(
+      error(
+        "rule_set_op_takes_a_list",
+        `rules[${index}].when.value`,
+        `Rule ${index} uses op "${rule.when.op}", which compares a LIST of option values against what the field holds, so "value" must be an array — as in "value": ["gdpr_pack", "audit_log"]. For a single value, use "contains" or "not_contains".`,
+      ),
+    );
+  }
+  if (SET_OPS.has(rule.when.op) && Array.isArray(rule.when.value) && rule.when.value.length === 0) {
+    out.push(
+      error(
+        "rule_set_op_empty_list",
+        `rules[${index}].when.value`,
+        `Rule ${index} uses op "${rule.when.op}" with an empty list, which asks nothing: "contains_all" and "contains_none" would hold for every answer and "contains_any" for none. List the option values the branch depends on, or use "empty"/"filled" if what you meant was whether the field was answered at all.`,
       ),
     );
   }
@@ -567,12 +601,12 @@ function checkRule(
       (whenTarget.kind === "field" && whenTarget.field.type === "multi_select") ||
       (whenTarget.kind === "matrix_cell" && whenTarget.field.cellType === "multi_select");
 
-    if (MEMBERSHIP_OPS.has(rule.when.op) && !holdsASet) {
+    if (SET_FIELD_OPS.has(rule.when.op) && !holdsASet) {
       out.push(
         error(
           "rule_membership_needs_a_set",
           `rules[${index}].when.op`,
-          `Rule ${index} asks whether ${describeTarget(whenTarget)} "${rule.when.op === "contains" ? "contains" : "does not contain"}" a value, but that field holds ONE value, not a set. Use "eq"/"neq" for one value, or "in" for several — "${rule.when.op}" is for multi_select.`,
+          `Rule ${index} uses "${rule.when.op}" against ${describeTarget(whenTarget)}, but that field holds ONE value, not a set. Use "eq"/"neq" for one value, or "in" for several — "${rule.when.op}" is for multi_select.`,
         ),
       );
     }
@@ -589,13 +623,16 @@ function checkRule(
       // Teach with a value the author declared on THIS field where possible: a
       // worked example in their own vocabulary is the difference between
       // reading the rule and applying it (§6.3).
-      const own = acceptedValues(whenTarget)?.[0];
-      const example = JSON.stringify(own ?? "audit_log");
+      const own = acceptedValues(whenTarget) ?? [];
+      const example = JSON.stringify(own[0] ?? "audit_log");
+      const listExample = JSON.stringify(
+        own.length > 1 ? own.slice(0, 2) : ["audit_log", "gdpr_pack"],
+      );
       out.push(
         error(
           "rule_in_on_a_set",
           `rules[${index}].when.op`,
-          `Rule ${index} uses "in" against ${describeTarget(whenTarget)}, which holds a SET of values. "in" compares the field's whole value to each candidate, so against a multi_select it can never be true and the rule would never fire. To branch on one chosen option use "contains" with a single value ("value": ${example}); for several, one "contains" rule each with the same target — a rule list is a flat OR. To match the whole selection exactly, use "eq" with the full array.`,
+          `Rule ${index} uses "in" against ${describeTarget(whenTarget)}, which holds a SET of values. "in" compares the field's whole value to each candidate, so against a multi_select it can never be true and the rule would never fire. For one chosen option use "contains" ("value": ${example}); for a list, "contains_any" / "contains_all" / "contains_none" ("value": ${listExample}); for the whole selection exactly, "eq" with the full array.`,
         ),
       );
     }

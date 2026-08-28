@@ -73,9 +73,15 @@ TARGET SECTIONS, NOT JUST FIELDS. "targets" takes section ids as happily as fiel
   { when: { field: "auth_method", op: "eq", value: "oauth" }, then: { action: "show", targets: ["oauth_details"] } }
 A "show" target STARTS HIDDEN — inferred from the rule list, so you need no matching "hide" rule and nothing flashes on first render. Same for "enable": an "enable" target starts disabled.
 
-THE OPS: eq, neq, in, contains, not_contains, gt, lt, empty, filled. "in" takes an array and is how two branches share a section ("value": ["api_key", "oauth"]). "empty"/"filled" take no value and are how you react to the user having answered at all.
+THE OPS: eq, neq, in, contains, not_contains, contains_all, contains_any, contains_none, gt, lt, empty, filled. "in" takes an array and is how two branches share a section ("value": ["api_key", "oauth"]). "empty"/"filled" take no value and are how you react to the user having answered at all.
 
-BRANCHING ON A multi_select TAKES "contains", NOT "in". A multi_select holds a SET, and "in" asks whether the field's whole value is one of your candidates — against a set that is never true, so the rule silently never fires and the branch never appears. Use one option value: { when: { field: "toppings", op: "contains", value: "pepperoni" }, then: { action: "show", targets: ["pepperoni_note"] } }. For "any of these", write one rule per value with the same target — a rule list is a flat OR, so whichever fires reveals it. "not_contains" is the negation, and "eq" with the full array still means "exactly this selection".
+BRANCHING ON A multi_select TAKES THE SET OPS, NOT "in". A multi_select holds a SET, and "in" asks whether the field's whole value is one of your candidates — against a set that is never true, so the rule silently never fires and the branch never appears. Which one:
+- "contains" / "not_contains" — ONE option value. { when: { field: "toppings", op: "contains", value: "pepperoni" }, then: { action: "show", targets: ["meat_note"] } }
+- "contains_all" — a list, every one of them present. The only way to say AND, because a rule list cannot: two rules with the same target mean OR.
+- "contains_any" — a list, at least one present. Same meaning as one "contains" rule per value; use it when that would be three lines of noise.
+- "contains_none" — a list, none of them present. Also a conjunction, so also not writable any other way.
+- "eq" with the full array — exactly this selection, order-insensitive.
+There is no "does not contain all of these" on purpose: it is the OR-shaped negation, so two "not_contains" rules with the same target already say it, and the name reads to almost everyone as "contains none". Every one of these is FALSE on a field the user has not answered, "contains_none" included — presence is what "empty"/"filled" are for.
 
 THE ACTIONS, and what each is actually for:
 - show / hide — the branch itself. Prefer show, so the default state is "not asked".

@@ -82,26 +82,36 @@ ERROR   unknown_answer_state · answers["notes"].state
 `;
 
 exports[`formatDiagnostics > renders the multi_select membership errors, each with the op to use instead 1`] = `
-"Form rejected — 3 errors. Nothing was rendered; fix the errors and call again.
+"Form rejected — 5 errors. Nothing was rendered; fix the errors and call again.
 
 ERROR   rule_in_on_a_set · rules[0].when.op
   Rule 0 uses "in" against field "addons" of type "multi_select", which holds a SET of
   values. "in" compares the field's whole value to each candidate, so against a multi_select
-  it can never be true and the rule would never fire. To branch on one chosen option use
-  "contains" with a single value ("value": "gdpr_pack"); for several, one "contains" rule
-  each with the same target — a rule list is a flat OR. To match the whole selection
-  exactly, use "eq" with the full array.
+  it can never be true and the rule would never fire. For one chosen option use "contains"
+  ("value": "gdpr_pack"); for a list, "contains_any" / "contains_all" / "contains_none"
+  ("value": ["gdpr_pack","audit_log"]); for the whole selection exactly, "eq" with the full
+  array.
 
 ERROR   rule_membership_needs_a_set · rules[1].when.op
-  Rule 1 asks whether field "region" of type "single_select" "contains" a value, but that
-  field holds ONE value, not a set. Use "eq"/"neq" for one value, or "in" for several —
-  "contains" is for multi_select.
+  Rule 1 uses "contains" against field "region" of type "single_select", but that field
+  holds ONE value, not a set. Use "eq"/"neq" for one value, or "in" for several — "contains"
+  is for multi_select.
 
 ERROR   rule_membership_takes_one_value · rules[2].when.value
   Rule 2 uses op "contains", which tests ONE option value against what the field holds, so
-  "value" must be that value and not a list — as in "value": "pepperoni". For "any of
-  these", write one rule per value with the same "show" target: a rule list is a flat OR,
-  and any rule that fires reveals the target."
+  "value" must be that value and not a list — as in "value": "pepperoni". For a list, say
+  which you mean: "contains_all" or "contains_any".
+
+ERROR   rule_set_op_takes_a_list · rules[3].when.value
+  Rule 3 uses op "contains_any", which compares a LIST of option values against what the
+  field holds, so "value" must be an array — as in "value": ["gdpr_pack", "audit_log"]. For
+  a single value, use "contains" or "not_contains".
+
+ERROR   rule_set_op_empty_list · rules[4].when.value
+  Rule 4 uses op "contains_all" with an empty list, which asks nothing: "contains_all" and
+  "contains_none" would hold for every answer and "contains_any" for none. List the option
+  values the branch depends on, or use "empty"/"filled" if what you meant was whether the
+  field was answered at all."
 `;
 
 exports[`formatDiagnostics > renders the ordinal teaching error — the §4.5 rule that prevents corruption 1`] = `
