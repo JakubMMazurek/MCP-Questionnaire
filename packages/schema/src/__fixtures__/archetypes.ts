@@ -877,13 +877,14 @@ export const conditionalBranching = {
       ],
     },
     /**
-     * A SIBLING section, not a field inside "oauth_details", and the reason is a
-     * limitation worth knowing: a `show` aimed at a section expands to its
-     * leaves, so it un-hides everything in it — including a field with a
-     * narrower `show` rule of its own. Nesting a branch inside a branched
-     * section does not work; a second section beside it does, and reads better
-     * anyway. It disappears on its own when scopes stops being rendered, since
-     * what is not rendered is empty (§4.6).
+     * A SIBLING section rather than two more fields inside "oauth_details" — a
+     * choice now, not a workaround: a branch may nest (a field inside a shown
+     * section keeps its own `show` rule), but a scope justification earns its
+     * own heading and its own place in the rail.
+     *
+     * It closes on its own when `scopes` stops being rendered, because what is
+     * not rendered is empty and `contains` is then false (§4.6). No cleanup
+     * rule, and no rule about the section either.
      */
     {
       id: "admin_scope",

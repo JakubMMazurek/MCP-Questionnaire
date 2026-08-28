@@ -288,6 +288,14 @@ type Mutable = {
   clears: Map<string, readonly string[]>;
 };
 
+/**
+ * A `show` target starts hidden and an `enable` target starts disabled (§4.6),
+ * so no matching `hide` rule is needed and nothing flashes on first render.
+ *
+ * Only the TARGETED path is seeded. What lives inside it follows from
+ * `closeContainment` at the end of every pass, which is what lets a field keep a
+ * narrower rule than the section it sits in.
+ */
 function defaultsFor(instances: readonly Instance[]): {
   hidden: Set<string>;
   disabled: Set<string>;
@@ -296,16 +304,36 @@ function defaultsFor(instances: readonly Instance[]): {
   const disabled = new Set<string>();
   for (const instance of instances) {
     const action = instance.rule.then.action;
-    if (action === "show") {
-      for (const target of instance.targets) hidden.add(target);
-      for (const leaf of instance.targetLeaves) hidden.add(leaf);
-    }
-    if (action === "enable") {
-      for (const target of instance.targets) disabled.add(target);
-      for (const leaf of instance.targetLeaves) disabled.add(leaf);
-    }
+    if (action === "show") for (const target of instance.targets) hidden.add(target);
+    if (action === "enable") for (const target of instance.targets) disabled.add(target);
   }
   return { hidden, disabled };
+}
+
+/**
+ * Containment, applied once a pass has settled rather than per rule (§4.6).
+ *
+ * A hidden section hides everything inside it, and a disabled one disables
+ * everything inside it — unconditionally, whatever narrower rule some field in
+ * there carries. Two things follow, and both were wrong before:
+ *
+ *  1. ORDER STOPS MATTERING. The expansion used to happen as each rule applied,
+ *     so `hide` on a section and `show` on a field inside it fought, and the
+ *     later rule won. A section's visibility is not a peer of its content's; it
+ *     is a precondition, and a closure says so where a rule ordering cannot.
+ *  2. BRANCHES NEST. Showing a section no longer un-hides a field that has its
+ *     own `show` rule, because the section's rule never spoke about that field
+ *     in the first place — visibility is now a conjunction, so the field waits
+ *     for its own condition.
+ *
+ * `containment` maps each rule target to the leaves under it, so this walks only
+ * paths a rule could actually have hidden.
+ */
+function closeContainment(state: Mutable, containment: ReadonlyMap<string, readonly string[]>) {
+  for (const [path, leaves] of containment) {
+    if (state.hidden.has(path)) for (const leaf of leaves) state.hidden.add(leaf);
+    if (state.disabled.has(path)) for (const leaf of leaves) state.disabled.add(leaf);
+  }
 }
 
 function onePass(
@@ -314,6 +342,7 @@ function onePass(
   prefill: Readonly<Record<string, Prefill>>,
   overlays: Overlays,
   seed: { hidden: Set<string>; disabled: Set<string> },
+  containment: ReadonlyMap<string, readonly string[]>,
 ): Mutable {
   const state: Mutable = {
     hidden: new Set(seed.hidden),
@@ -343,17 +372,24 @@ function onePass(
 
     const all = [...instance.targets, ...instance.targetLeaves];
     switch (action) {
+      /*
+       * These four name the target and nothing else: `closeContainment` carries
+       * the verdict down to whatever is inside it, after every rule has spoken.
+       * `require`, `filter_options` and `set_default` below still expand
+       * eagerly, because they are per-leaf marks rather than a state a section
+       * can be in.
+       */
       case "show":
-        for (const path of all) state.hidden.delete(path);
+        for (const path of instance.targets) state.hidden.delete(path);
         break;
       case "hide":
-        for (const path of all) state.hidden.add(path);
+        for (const path of instance.targets) state.hidden.add(path);
         break;
       case "enable":
-        for (const path of all) state.disabled.delete(path);
+        for (const path of instance.targets) state.disabled.delete(path);
         break;
       case "disable":
-        for (const path of all) state.disabled.add(path);
+        for (const path of instance.targets) state.disabled.add(path);
         break;
       case "require":
         for (const path of all) state.required.set(path, true);
@@ -378,6 +414,7 @@ function onePass(
         break;
     }
   }
+  closeContainment(state, containment);
   return state;
 }
 
@@ -441,18 +478,29 @@ export function evaluate(form: Form, answers: Answers, options: EvaluateOptions 
   }
 
   const seed = defaultsFor(instances);
+  /**
+   * Every path a rule could hide, mapped to the leaves inside it. Built once:
+   * anything that ends up in `hidden` got there from some instance's targets, so
+   * these are the only paths containment has to be closed over.
+   */
+  const containment = new Map<string, readonly string[]>();
+  for (const instance of instances) {
+    for (const target of instance.targets) {
+      if (!containment.has(target)) containment.set(target, expandTarget(form, leaves, target));
+    }
+  }
   let overlays: Overlays = {
     hidden: seed.hidden,
     defaults: NO_OVERLAYS.defaults,
     filtered: NO_OVERLAYS.filtered,
   };
-  let pass = onePass(instances, answers, prefill, overlays, seed);
+  let pass = onePass(instances, answers, prefill, overlays, seed, containment);
   let iterations = 1;
   let capped = true;
 
   while (iterations < MAX_ITERATIONS) {
     overlays = { hidden: pass.hidden, defaults: pass.defaults, filtered: pass.filtered };
-    const next = onePass(instances, answers, prefill, overlays, seed);
+    const next = onePass(instances, answers, prefill, overlays, seed, containment);
     iterations += 1;
     if (stable(pass, next)) {
       pass = next;

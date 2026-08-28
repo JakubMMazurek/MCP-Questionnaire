@@ -5,7 +5,7 @@ description: Renders structured input surfaces (prefilled forms, assumption ledg
 
 # Gather decisions (MCP Questionnaire) — when to render a form instead of asking
 
-**Skill contract 0.3.6.** The `gather_decisions` tool description states the
+**Skill contract 0.3.7.** The `gather_decisions` tool description states the
 contract the deployed server expects. If it names a number higher than this one,
 this file is stale — tell the user in one line to run
 `/plugin update mcp-questionnaire`, and follow the tool descriptions and
@@ -58,6 +58,9 @@ names. If you are about to:
    `contains_all` / `contains_none` when you mean AND — a rule list is a flat
    OR, so two rules with one target can only ever mean "either". `eq` with the
    full array means "exactly this selection", order-insensitively.
+   Branches nest: a section governs everything inside it, so hiding one hides
+   all of its content, while a field inside a shown section still waits for its
+   own `show` rule. Rule order never changes what is visible.
 4. **Never ask for a secret.** No password, API key, token or card number
    fields — the answers enter your context and rest in the form's store. Ask
    where the value *lives* ("env var / secret manager / prompt at runtime").

@@ -73,6 +73,8 @@ TARGET SECTIONS, NOT JUST FIELDS. "targets" takes section ids as happily as fiel
   { when: { field: "auth_method", op: "eq", value: "oauth" }, then: { action: "show", targets: ["oauth_details"] } }
 A "show" target STARTS HIDDEN — inferred from the rule list, so you need no matching "hide" rule and nothing flashes on first render. Same for "enable": an "enable" target starts disabled.
 
+A SECTION GOVERNS WHAT IS INSIDE IT. Hiding or disabling a section hides or disables everything in it, whatever narrower rule a field in there carries — visibility is a precondition, not a competition, so rule order cannot change the answer. The useful half of that: branches NEST. Show a section on one answer and a single field inside it on another, and the field waits for its own condition instead of arriving with the section. What a closed section holds still submits empty (§4.6).
+
 THE OPS: eq, neq, in, contains, not_contains, contains_all, contains_any, contains_none, gt, lt, empty, filled. "in" takes an array and is how two branches share a section ("value": ["api_key", "oauth"]). "empty"/"filled" take no value and are how you react to the user having answered at all.
 
 BRANCHING ON A multi_select TAKES THE SET OPS, NOT "in". A multi_select holds a SET, and "in" asks whether the field's whole value is one of your candidates — against a set that is never true, so the rule silently never fires and the branch never appears. Which one:

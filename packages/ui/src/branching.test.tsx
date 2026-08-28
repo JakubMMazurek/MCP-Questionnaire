@@ -413,3 +413,128 @@ describe("the worked example's multi_select branch (§4.6)", () => {
     expect(visible(store, ADMIN)).toEqual([]);
   });
 });
+
+/**
+ * Containment: a section's visibility is a precondition for its content, not a
+ * peer of it (§4.6).
+ *
+ * Before this, `show`/`hide` expanded to a section's leaves as each rule
+ * applied, which had two consequences worth a test each: a `hide` on the section
+ * and a `show` on a field inside it fought, and whichever came later won; and
+ * showing a section un-hid a field that had its own narrower rule, so a branch
+ * could not live inside a branch.
+ */
+describe("a section governs what is inside it (§4.6)", () => {
+  /** `gate` opens the section; `detail` is a field inside it with its own rule. */
+  const nested = (rules: unknown[]) => ({
+    version: 1 as const,
+    title: "Nesting",
+    sections: [
+      {
+        id: "always",
+        title: "Always",
+        fields: [
+          {
+            type: "boolean" as const,
+            id: "gate",
+            label: "Open the section?",
+            render: "toggle" as const,
+          },
+          {
+            type: "boolean" as const,
+            id: "deeper",
+            label: "And the detail inside it?",
+            render: "toggle" as const,
+          },
+        ],
+      },
+      {
+        id: "branch",
+        title: "The branch",
+        fields: [
+          { type: "short_text" as const, id: "plain", label: "Always in the branch" },
+          { type: "short_text" as const, id: "detail", label: "Only sometimes" },
+        ],
+      },
+    ],
+    rules,
+  });
+
+  const SHOW_SECTION = {
+    when: { field: "gate", op: "eq" as const, value: true },
+    then: { action: "show" as const, targets: ["branch"] },
+  };
+  const SHOW_DETAIL = {
+    when: { field: "deeper", op: "eq" as const, value: true },
+    then: { action: "show" as const, targets: ["detail"] },
+  };
+
+  const load = (rules: unknown[]) => {
+    const s = createEngineStore();
+    s.getState().loadForm(nested(rules));
+    return s;
+  };
+  const PATHS = ["branch", "plain", "detail"] as const;
+
+  it("keeps a field waiting for its own rule inside a section that is already open", () => {
+    const s = load([SHOW_SECTION, SHOW_DETAIL]);
+    expect(visible(s, PATHS)).toEqual([]);
+
+    // The section opens; the field with its own rule does not come with it.
+    s.getState().setAnswer("gate", true);
+    expect(visible(s, PATHS)).toEqual(["branch", "plain"]);
+
+    s.getState().setAnswer("deeper", true);
+    expect(visible(s, PATHS)).toEqual(["branch", "plain", "detail"]);
+  });
+
+  it("hides everything inside a closed section, including a field whose own rule fired", () => {
+    const s = load([SHOW_SECTION, SHOW_DETAIL]);
+    s.getState().setAnswer("gate", true);
+    s.getState().setAnswer("deeper", true);
+    expect(visible(s, PATHS)).toEqual(["branch", "plain", "detail"]);
+
+    // Closing the section takes the whole branch with it — the detail's own
+    // `show` rule is still firing, and it does not matter.
+    s.getState().setAnswer("gate", false);
+    expect(visible(s, PATHS)).toEqual([]);
+  });
+
+  /** The order-dependence this replaced: `hide` late, `show` early, and back. */
+  it("gives the same answer whichever order the rules are written in", () => {
+    const HIDE_SECTION = {
+      when: { field: "gate", op: "eq" as const, value: false },
+      then: { action: "hide" as const, targets: ["branch"] },
+    };
+    for (const rules of [
+      [HIDE_SECTION, SHOW_DETAIL],
+      [SHOW_DETAIL, HIDE_SECTION],
+    ]) {
+      const s = load(rules);
+      s.getState().setAnswer("deeper", true);
+      s.getState().setAnswer("gate", false);
+      expect(visible(s, PATHS)).toEqual([]);
+    }
+  });
+
+  /** And what is not rendered is empty, however deep it sits (§4.6). */
+  it("submits a field inside a closed section as empty, whatever it holds", () => {
+    const rules = [SHOW_SECTION, SHOW_DETAIL];
+    const s = load(rules);
+    const submit = () => {
+      const state = s.getState();
+      return buildSubmission(nested(rules) as never, state.answers, state.effects, state.prefill, {
+        rows: state.rows,
+        leaves: state.leaves,
+      }).answers.detail;
+    };
+
+    s.getState().setAnswer("gate", true);
+    s.getState().setAnswer("deeper", true);
+    s.getState().setAnswer("detail", "typed while it was open");
+    expect(submit()).toEqual({ state: "answered", value: "typed while it was open" });
+
+    s.getState().setAnswer("gate", false);
+    expect(submit()).toEqual({ state: "empty" });
+  });
+});
