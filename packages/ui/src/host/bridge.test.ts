@@ -275,7 +275,7 @@ describe("outbound pushes (§7.2 context discipline)", () => {
       content: { text: string }[];
       structuredContent?: unknown;
     };
-    expect(params.content[0]?.text).toContain("inferred values unreviewed");
+    expect(params.content[0]?.text).toContain("of 10 answered");
     expect(params.structuredContent).toBeUndefined();
     expect(JSON.stringify(params)).not.toContain("assumptions[r_eu]");
   });

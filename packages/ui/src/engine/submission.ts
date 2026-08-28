@@ -19,13 +19,30 @@ import { canon } from "./paths.js";
 
 export type NoteTriple = { path: string; label: string; note: string };
 
+/**
+ * There is deliberately no "unreviewed" count here.
+ *
+ * A prefilled value is a convenience — a guess put on screen so the user has
+ * something to correct instead of something to author. If they submitted with it
+ * showing, it is their answer; §4.6 already says the payload is a function of
+ * the rendered view, and nothing in `Answer` distinguishes a value they typed
+ * from one they let stand, because nothing should.
+ *
+ * The tally used to travel to the agent, which invited the one behaviour this
+ * whole tool exists to prevent: re-asking in prose about a value the user has
+ * already accepted. `needsReview` keeps its job on the surface the user sees —
+ * the provenance chip, the count_needs_review counter, bulk affirm — where it
+ * directs attention rather than reopening a settled question.
+ *
+ * `changed` stays, because it is not about attention: it says the user moved a
+ * value away from a `source: "existing"` baseline, which is a fact about the
+ * world the agent is about to act on.
+ */
 export type SubmissionSummary = {
   /** Visible leaves that will submit a value. */
   answered: number;
   /** Leaves that will submit `empty` — including every hidden one. */
   empty: number;
-  /** `count_needs_review` across the whole form (§4.7). */
-  unreviewed: number;
   /** Leaves that differ from their `source: "existing"` baseline. */
   changed: number;
 };
@@ -95,7 +112,7 @@ export function buildSubmission(
   const notes: NoteTriple[] = [];
   let answered = 0;
   let empty = 0;
-  let unreviewed = 0;
+
   let changed = 0;
 
   for (const leaf of leaves) {
@@ -108,7 +125,6 @@ export function buildSubmission(
 
     if (effective.present) answered += 1;
     else empty += 1;
-    if (needsReview(ctx, leaf)) unreviewed += 1;
     if (isVisible(effects, leaf.path) && isChanged(ctx, leaf)) changed += 1;
   }
 
@@ -125,7 +141,7 @@ export function buildSubmission(
     ...(form.formId ? { formId: form.formId } : {}),
     answers: out,
     notes,
-    summary: { answered, empty, unreviewed, changed },
+    summary: { answered, empty, changed },
   };
 }
 
@@ -136,10 +152,6 @@ export function buildSubmission(
 export function countsLine(summary: SubmissionSummary): string {
   const total = summary.answered + summary.empty;
   const parts = [`${summary.answered} of ${total} answered`];
-  if (summary.unreviewed > 0)
-    parts.push(
-      `${summary.unreviewed} inferred value${summary.unreviewed === 1 ? "" : "s"} unreviewed`,
-    );
   if (summary.changed > 0) parts.push(`${summary.changed} changed from current`);
   return `${parts.join("; ")}.`;
 }

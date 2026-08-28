@@ -22,7 +22,9 @@ describe("visible untouched fields submit as answered (§4.6)", () => {
     expect(payload.summary.answered).toBe(5);
     // The five hidden correction cells.
     expect(payload.summary.empty).toBe(5);
-    expect(payload.summary.unreviewed).toBe(5);
+    // No unreviewed tally: five prefilled verdicts the user left standing are
+    // five answers, and the payload says nothing about who put them there.
+    expect(Object.keys(payload.summary).sort()).toEqual(["answered", "changed", "empty"]);
   });
 
   it("submits a defaulted value the same way", () => {
@@ -125,9 +127,7 @@ describe("the model-context summary (§7.2)", () => {
   it("is a summary, not the payload", () => {
     const store = loaded(assumptionLedger);
     const line = summaryLine(assumptionLedger, submit(store).summary);
-    expect(line).toBe(
-      '"Before I draft the rollout plan…": 5 of 10 answered; 5 inferred values unreviewed.',
-    );
+    expect(line).toBe('"Before I draft the rollout plan…": 5 of 10 answered.');
     expect(line).not.toContain("confirm");
   });
 });

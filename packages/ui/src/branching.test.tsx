@@ -538,3 +538,40 @@ describe("a section governs what is inside it (§4.6)", () => {
     expect(submit()).toEqual({ state: "empty" });
   });
 });
+
+/**
+ * The list op and the nesting, both as the shipped example demonstrates them —
+ * `write_confirm` sits inside "endpoint", which is itself a branch.
+ */
+describe("the worked example's nested list-op branch (§4.6)", () => {
+  it("waits for a write scope, inside a section that is already open", () => {
+    const store = loaded();
+    store.getState().setAnswer("auth_method", "oauth");
+    // The section is open (OAuth is one of the two that talk to a host)…
+    expect(visible(store, ["endpoint"])).toEqual(["endpoint"]);
+    // …and the field inside it is not, because its own rule has not fired.
+    expect(visible(store, ["write_confirm"])).toEqual([]);
+
+    store.getState().setAnswer("scopes", ["read"]);
+    expect(visible(store, ["write_confirm"])).toEqual([]);
+
+    // Either scope is enough: contains_any.
+    store.getState().setAnswer("scopes", ["read", "write"]);
+    expect(visible(store, ["write_confirm"])).toEqual(["write_confirm"]);
+    store.getState().setAnswer("scopes", ["admin"]);
+    expect(visible(store, ["write_confirm"])).toEqual(["write_confirm"]);
+  });
+
+  it("goes with the section when the section closes", () => {
+    const store = loaded();
+    store.getState().setAnswer("auth_method", "oauth");
+    store.getState().setAnswer("scopes", ["write"]);
+    expect(visible(store, ["endpoint", "write_confirm"])).toEqual(["endpoint", "write_confirm"]);
+
+    // Basic auth is a database connection here: no host, so no endpoint section
+    // — and the confirmation goes with it even though `scopes` still holds
+    // "write" in the store.
+    store.getState().setAnswer("auth_method", "basic");
+    expect(visible(store, ["endpoint", "write_confirm"])).toEqual([]);
+  });
+});

@@ -5,7 +5,7 @@ description: Renders structured input surfaces (prefilled forms, assumption ledg
 
 # Gather decisions (MCP Questionnaire) — when to render a form instead of asking
 
-**Skill contract 0.3.7.** The `gather_decisions` tool description states the
+**Skill contract 0.3.8.** The `gather_decisions` tool description states the
 contract the deployed server expects. If it names a number higher than this one,
 this file is stale — tell the user in one line to run
 `/plugin update mcp-questionnaire`, and follow the tool descriptions and
@@ -80,12 +80,13 @@ names. If you are about to:
      shows the state so far, which is fine to read and act on cautiously — it
      is just not a decision yet. "No answers recorded" means nobody has opened
      it, which is not the same as a form full of empties.
-   - **Your own prefill returns as `answered`.** A value that was on screen when
-     they submitted counts as submitted, whether they looked at it or not — so
-     the report cannot tell you which values they actually vetted. The receipt's
-     "N inferred values unreviewed" is your only signal. On anything expensive
-     to get wrong, confirm that item in chat instead of treating your own
-     inference as their answer.
+   - **A prefill they left standing IS their answer.** It was on screen when
+     they submitted, so it comes back `answered` like anything else, and nothing
+     marks it as yours — deliberately. Do not re-ask about a value because you
+     guessed it; that turns a form they finished into another round of prose
+     questions, which is the thing this tool exists to replace. `needsReview` is
+     for the user's attention on the surface, not a queue for you to work
+     through afterwards.
 8. **`load_form` renders; `get_answers` reads.** `load_form(formId)` puts the
    same form back on screen *for the user* — call it when they should see or
    edit it again. It returns the same stub as `gather_decisions` and no answers,

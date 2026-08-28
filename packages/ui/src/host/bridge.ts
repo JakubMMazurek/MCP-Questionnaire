@@ -670,10 +670,10 @@ export function createBridge(options: BridgeOptions): Bridge {
        * conversation that made it), and not unambiguously when two forms are
        * open.
        *
-       * What left with the counts is the unreviewed tally — the one place the
-       * agent could learn a prefill was never vetted, since `Answer` carries no
-       * review state. It still travels on the advisory context channel, and it
-       * belongs in get_answers; per-path review state is the fix.
+       * The counts went with it and are not missed: get_answers reports them,
+       * and the one that used to look load-bearing — how many inferences went
+       * unreviewed — is gone from the model's side entirely. A guess the user
+       * left standing is their answer (see SubmissionSummary).
        */
       const receipt = formId
         ? `Submitted “${state.form.title}” (${formId})`

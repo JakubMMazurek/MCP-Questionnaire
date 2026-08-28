@@ -941,6 +941,18 @@ export const conditionalBranching = {
             { value: "apac_se", label: "ap-southeast-2" },
           ],
         },
+        /**
+         * A field with a NARROWER rule than the section it sits in: "endpoint"
+         * opens for two of the three auth methods, and this one waits for a
+         * scope that can change data. Branches nest, and a closed section takes
+         * it with it whatever its own rule says (§4.6).
+         */
+        {
+          type: "boolean",
+          id: "write_confirm",
+          label: "This connection can change data — confirmed?",
+          render: "toggle",
+        },
       ],
     },
     {
@@ -999,6 +1011,14 @@ export const conditionalBranching = {
     {
       when: { field: "scopes", op: "contains", value: "admin" },
       then: { action: "require", targets: ["admin_justification"] },
+    },
+    // `contains_any` — a LIST, at least one of them present. Same meaning as one
+    // `contains` rule per value (a rule list is a flat OR), and one line instead
+    // of two. `contains_all` would want both scopes; `contains_none` would want
+    // neither, and those two are the ones a rule list cannot say for itself.
+    {
+      when: { field: "scopes", op: "contains_any", value: ["write", "admin"] },
+      then: { action: "show", targets: ["write_confirm"] },
     },
     // A second, independent branch on a different field. Rules are a flat list
     // re-run until the view is stable, so branches compose without nesting.
