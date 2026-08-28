@@ -32,7 +32,7 @@
  * packages/plugin/.claude-plugin/plugin.json; verify-contract.mjs fails the
  * build if they drift.
  */
-export const SKILL_CONTRACT = "0.3.4";
+export const SKILL_CONTRACT = "0.3.5";
 
 export const GATHER_DECISIONS_DESCRIPTION = `Render a structured input surface (a form) in the conversation and collect the user's answers.
 

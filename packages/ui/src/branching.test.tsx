@@ -194,3 +194,156 @@ describe("require, set_default and clear", () => {
     expect(value(store, "base_url")).toMatchObject({ value: "https://kept.example" });
   });
 });
+
+/**
+ * The multi_select pair (§4.6), written from the field report that produced it.
+ *
+ * An agent branched a section on "pepperoni is among the toppings" with
+ * `{ op: "in", value: ["pepperoni"] }`, the only shape the vocabulary then
+ * offered. `in` compares the field's WHOLE value to each candidate, so it put an
+ * array against a string, was false forever, and the section never appeared —
+ * with no error anywhere, which is the part that made it expensive.
+ */
+describe("membership on a multi_select (§4.6)", () => {
+  const form = {
+    version: 1 as const,
+    title: "Pizza",
+    sections: [
+      {
+        id: "order",
+        title: "Order",
+        fields: [
+          {
+            type: "multi_select" as const,
+            id: "toppings",
+            label: "Toppings",
+            options: [
+              { value: "pepperoni", label: "Pepperoni" },
+              { value: "mushroom", label: "Mushroom" },
+              { value: "pineapple", label: "Pineapple" },
+            ],
+          },
+          {
+            type: "info" as const,
+            id: "meat_note",
+            label: "About the pepperoni",
+            markdown: "Cured meat on a shared pizza — worth checking with the table.",
+          },
+          {
+            type: "info" as const,
+            id: "veg_note",
+            label: "Vegetarian, then",
+            markdown: "No meat selected, so this one can go to the veggie stack.",
+          },
+        ],
+      },
+    ],
+    rules: [
+      {
+        when: { field: "toppings", op: "contains" as const, value: "pepperoni" },
+        then: { action: "show" as const, targets: ["meat_note"] },
+      },
+      {
+        when: { field: "toppings", op: "not_contains" as const, value: "pepperoni" },
+        then: { action: "show" as const, targets: ["veg_note"] },
+      },
+    ],
+  };
+
+  const store = () => {
+    const s = createEngineStore();
+    s.getState().loadForm(form);
+    return s;
+  };
+
+  it("fires on one chosen value among several", () => {
+    const s = store();
+    expect(visible(s, ["meat_note", "veg_note"])).toEqual([]);
+
+    s.getState().setAnswer("toppings", ["mushroom", "pepperoni", "pineapple"]);
+    expect(visible(s, ["meat_note", "veg_note"])).toEqual(["meat_note"]);
+  });
+
+  it("negates, and order never matters", () => {
+    const s = store();
+    s.getState().setAnswer("toppings", ["pineapple", "mushroom"]);
+    expect(visible(s, ["meat_note", "veg_note"])).toEqual(["veg_note"]);
+
+    s.getState().setAnswer("toppings", ["pepperoni", "mushroom"]);
+    expect(visible(s, ["meat_note", "veg_note"])).toEqual(["meat_note"]);
+    s.getState().setAnswer("toppings", ["mushroom", "pepperoni"]);
+    expect(visible(s, ["meat_note", "veg_note"])).toEqual(["meat_note"]);
+  });
+
+  /**
+   * Neither fires on an untouched field — the §4.6 invariant that a rule cannot
+   * react to a field the user has not reached. `not_contains` is a comparison,
+   * not a presence test: `empty` is the presence test.
+   */
+  it("stays quiet on an empty selection, negation included", () => {
+    const s = store();
+    expect(visible(s, ["meat_note", "veg_note"])).toEqual([]);
+  });
+
+  /** `eq` on a set is set equality, so tap order cannot decide it either. */
+  it("treats eq on a multi_select as a set, not a sequence", () => {
+    const s = createEngineStore();
+    s.getState().loadForm({
+      ...form,
+      rules: [
+        {
+          when: { field: "toppings", op: "eq" as const, value: ["pepperoni", "mushroom"] },
+          then: { action: "show" as const, targets: ["meat_note"] },
+        },
+      ],
+    });
+    s.getState().setAnswer("toppings", ["mushroom", "pepperoni"]);
+    expect(visible(s, ["meat_note"])).toEqual(["meat_note"]);
+
+    s.getState().setAnswer("toppings", ["mushroom", "pepperoni", "pineapple"]);
+    expect(visible(s, ["meat_note"])).toEqual([]);
+  });
+});
+
+/**
+ * The `contains` branch inside the shipped worked example, executed.
+ *
+ * `conditionalBranching` is what `get_form_guide` hands an agent to copy, so its
+ * demonstration of the op has to actually work — the whole reason the op exists
+ * is that the previous vocabulary looked like it worked and did not.
+ */
+describe("the worked example's multi_select branch (§4.6)", () => {
+  const ADMIN = ["admin_scope", "admin_justification", "admin_approver"] as const;
+
+  it("asks why admin only once admin is among the scopes", () => {
+    const store = loaded();
+    store.getState().setAnswer("auth_method", "oauth");
+    expect(visible(store, ADMIN)).toEqual([]);
+
+    store.getState().setAnswer("scopes", ["read", "write"]);
+    expect(visible(store, ADMIN)).toEqual([]);
+
+    store.getState().setAnswer("scopes", ["read", "admin"]);
+    expect(visible(store, ADMIN)).toEqual(["admin_scope", "admin_justification", "admin_approver"]);
+    expect(store.getState().effects.required.get("admin_justification")).toBe(true);
+
+    // And it un-asks, because `show` is the only thing holding it open.
+    store.getState().setAnswer("scopes", ["read"]);
+    expect(visible(store, ADMIN)).toEqual([]);
+  });
+
+  /**
+   * The section closes when the field it depends on stops being rendered: drop
+   * back to an API key and `scopes` is not on screen, so it is empty, so
+   * `contains` is false (§4.6). No cleanup rule required.
+   */
+  it("closes when the field it depends on is no longer rendered", () => {
+    const store = loaded();
+    store.getState().setAnswer("auth_method", "oauth");
+    store.getState().setAnswer("scopes", ["admin"]);
+    expect(visible(store, ADMIN)).toEqual(["admin_scope", "admin_justification", "admin_approver"]);
+
+    store.getState().setAnswer("auth_method", "api_key");
+    expect(visible(store, ADMIN)).toEqual([]);
+  });
+});

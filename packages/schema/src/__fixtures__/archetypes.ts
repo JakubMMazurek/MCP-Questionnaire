@@ -244,8 +244,9 @@ export const elicitation = {
 /**
  * §5.3 Brainstorm convergence — prune, capture WHY the dead options died, add
  * your own. Written as a table (keep + one-tap rejection reason per row), NOT a
- * multi_select: rules can't test membership of a multi-valued answer, and the
- * per-candidate reason needs `$self` row scope anyway. Ranking the survivors is
+ * multi_select: the per-candidate reason needs `$self` row scope. (Membership is
+ * no longer the reason — `contains` tests it since 0.3.5 — but a table is still
+ * the right shape for "why did this one die".) Ranking the survivors is
  * the NEXT form in the chain (§5.6) — rank items are declared at authoring
  * time, and the survivors aren't known until this form comes back.
  */
@@ -875,6 +876,34 @@ export const conditionalBranching = {
         { type: "boolean", id: "pkce", label: "Use PKCE?", render: "toggle" },
       ],
     },
+    /**
+     * A SIBLING section, not a field inside "oauth_details", and the reason is a
+     * limitation worth knowing: a `show` aimed at a section expands to its
+     * leaves, so it un-hides everything in it — including a field with a
+     * narrower `show` rule of its own. Nesting a branch inside a branched
+     * section does not work; a second section beside it does, and reads better
+     * anyway. It disappears on its own when scopes stops being rendered, since
+     * what is not rendered is empty (§4.6).
+     */
+    {
+      id: "admin_scope",
+      title: "Admin scope",
+      description: 'Shown because "admin" is among the scopes you picked.',
+      fields: [
+        {
+          type: "short_text",
+          id: "admin_justification",
+          label: "Why does it need admin?",
+          placeholder: "which operation needs it",
+        },
+        {
+          type: "short_text",
+          id: "admin_approver",
+          label: "Who signed off on it?",
+          description: "A name is enough — this ends up in the connection's notes.",
+        },
+      ],
+    },
     {
       id: "endpoint",
       title: "Where to reach it",
@@ -955,6 +984,20 @@ export const conditionalBranching = {
     {
       when: { field: "auth_method", op: "in", value: ["api_key", "oauth"] },
       then: { action: "show", targets: ["endpoint"] },
+    },
+    // `contains` — membership in a multi_select, which is NOT what `in` does.
+    // `in` asks whether the field's whole value is one of several candidates, so
+    // against a set it is never true and the branch would silently never open.
+    // One option value per rule: for "any of these", write one rule each with
+    // the same target, since a rule list is already a flat OR. `not_contains`
+    // negates, and `eq` with the full array still means "exactly these scopes".
+    {
+      when: { field: "scopes", op: "contains", value: "admin" },
+      then: { action: "show", targets: ["admin_scope"] },
+    },
+    {
+      when: { field: "scopes", op: "contains", value: "admin" },
+      then: { action: "require", targets: ["admin_justification"] },
     },
     // A second, independent branch on a different field. Rules are a flat list
     // re-run until the view is stable, so branches compose without nesting.

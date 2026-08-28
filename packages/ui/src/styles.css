@@ -612,14 +612,25 @@ body {
     appearance: none;
   }
 
-  .chip-toggle:hover:not(:disabled) {
+  .chip-toggle:hover:not(:disabled):not([aria-pressed="true"]) {
     background: var(--color-background-secondary);
   }
 
+  /*
+   * A multi_select chip is selected state like any other, and it was the one
+   * surface the accent pass walked past — because it keys on `aria-pressed`
+   * where every other control uses `aria-checked`, so neither the edit nor the
+   * verifier written to prevent exactly this caught it. The hover rule
+   * outranked it here too.
+   */
   .chip-toggle[aria-pressed="true"] {
-    border-color: var(--color-text-primary);
-    background: var(--color-background-tertiary);
+    border-color: var(--color-ring-primary);
+    background: color-mix(in srgb, var(--color-ring-primary) 16%, transparent);
     color: var(--color-text-primary);
+  }
+
+  .chip-toggle[aria-pressed="true"]:hover:not(:disabled) {
+    background: color-mix(in srgb, var(--color-ring-primary) 26%, transparent);
   }
 
   .chip-toggle-skip {

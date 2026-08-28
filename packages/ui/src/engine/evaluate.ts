@@ -200,9 +200,29 @@ function compare(op: "gt" | "lt", value: unknown, against: unknown): boolean {
 }
 
 /**
+ * `eq` on a multi_select compares SETS, not sequences.
+ *
+ * `sameValue` walks arrays index by index, which is right for change detection
+ * (it is the same answer only if it is the same list). But a multi_select's
+ * order is whatever the user tapped, so an index-wise `eq` fires or does not
+ * fire on tap order — indistinguishable from a broken rule. Membership is what
+ * the author meant, both ways.
+ *
+ * Only for rule evaluation: `sameValue` keeps its exact semantics everywhere
+ * else, including the `changed` counters.
+ */
+function sameAnswer(value: unknown, against: unknown): boolean {
+  if (!Array.isArray(value) || !Array.isArray(against)) return sameValue(value, against);
+  return (
+    value.length === against.length &&
+    value.every((held) => against.some((candidate) => sameValue(held, candidate)))
+  );
+}
+
+/**
  * One op against one effective value. Every comparison op is false on an empty
- * value — including `neq`, so a rule cannot fire on a field the user has not
- * reached yet. Only `empty`/`filled` test presence.
+ * value — including `neq` and `not_contains`, so a rule cannot fire on a field
+ * the user has not reached yet. Only `empty`/`filled` test presence.
  */
 function test(op: RuleOp, effective: Effective, against: unknown): boolean {
   if (op === "empty") return !effective.present;
@@ -211,11 +231,20 @@ function test(op: RuleOp, effective: Effective, against: unknown): boolean {
   const value = effective.value;
   switch (op) {
     case "eq":
-      return sameValue(value, against);
+      return sameAnswer(value, against);
     case "neq":
-      return !sameValue(value, against);
+      return !sameAnswer(value, against);
     case "in":
-      return Array.isArray(against) && against.some((candidate) => sameValue(value, candidate));
+      return Array.isArray(against) && against.some((candidate) => sameAnswer(value, candidate));
+    /**
+     * Membership, for multi_select (§4.6). False on a non-array value rather
+     * than throwing: the validator rejects `contains` against a single-valued
+     * field with a teaching error, and a rule is never worth a crash.
+     */
+    case "contains":
+      return Array.isArray(value) && value.some((held) => sameValue(held, against));
+    case "not_contains":
+      return Array.isArray(value) && !value.some((held) => sameValue(held, against));
     case "gt":
     case "lt":
       return compare(op, value, against);

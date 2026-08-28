@@ -5,7 +5,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { minimal } from "./__fixtures__/forms.js";
+import { kitchenSink, minimal } from "./__fixtures__/forms.js";
 import { formatDiagnostics } from "./diagnostics.js";
 import { validateAnswers, validateForm } from "./validate.js";
 
@@ -16,6 +16,13 @@ type Mutable = Record<string, any>;
 
 function tweak(mutate: (form: Mutable) => void): Mutable {
   const form = minimal();
+  mutate(form as Mutable);
+  return form;
+}
+
+/** For rules that need a multi_select to point at — `minimal` has none. */
+function tweakSink(mutate: (form: Mutable) => void): Mutable {
+  const form = kitchenSink();
   mutate(form as Mutable);
   return form;
 }
@@ -85,6 +92,37 @@ describe("formatDiagnostics", () => {
           {
             when: { field: "env", op: "empty" },
             then: { action: "hide", targets: ["scopeChoice"] },
+          },
+        ];
+      }),
+    ).text;
+    expect(text).toMatchSnapshot();
+  });
+
+  /**
+   * The membership errors (§4.6), which exist because their absence cost a real
+   * session a branch: `in` against a multi_select validated clean, rendered, and
+   * never fired. Snapshotted because "what to do instead" is the whole value of
+   * the message.
+   */
+  it("renders the multi_select membership errors, each with the op to use instead", () => {
+    const text = validateForm(
+      tweakSink((form) => {
+        form.rules = [
+          // The dead rule itself: `in` against a set.
+          {
+            when: { field: "addons", op: "in", value: ["audit_log"] },
+            then: { action: "show", targets: ["dryRun"] },
+          },
+          // `contains` aimed at a field that holds one value, not a set.
+          {
+            when: { field: "region", op: "contains", value: "eu" },
+            then: { action: "show", targets: ["dryRun"] },
+          },
+          // `contains` handed a list, where OR is a second rule.
+          {
+            when: { field: "addons", op: "contains", value: ["gdpr_pack", "audit_log"] },
+            then: { action: "show", targets: ["dryRun"] },
           },
         ];
       }),

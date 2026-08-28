@@ -73,7 +73,9 @@ TARGET SECTIONS, NOT JUST FIELDS. "targets" takes section ids as happily as fiel
   { when: { field: "auth_method", op: "eq", value: "oauth" }, then: { action: "show", targets: ["oauth_details"] } }
 A "show" target STARTS HIDDEN — inferred from the rule list, so you need no matching "hide" rule and nothing flashes on first render. Same for "enable": an "enable" target starts disabled.
 
-THE OPS: eq, neq, in, gt, lt, empty, filled. "in" takes an array and is how two branches share a section ("value": ["api_key", "oauth"]). "empty"/"filled" take no value and are how you react to the user having answered at all.
+THE OPS: eq, neq, in, contains, not_contains, gt, lt, empty, filled. "in" takes an array and is how two branches share a section ("value": ["api_key", "oauth"]). "empty"/"filled" take no value and are how you react to the user having answered at all.
+
+BRANCHING ON A multi_select TAKES "contains", NOT "in". A multi_select holds a SET, and "in" asks whether the field's whole value is one of your candidates — against a set that is never true, so the rule silently never fires and the branch never appears. Use one option value: { when: { field: "toppings", op: "contains", value: "pepperoni" }, then: { action: "show", targets: ["pepperoni_note"] } }. For "any of these", write one rule per value with the same target — a rule list is a flat OR, so whichever fires reveals it. "not_contains" is the negation, and "eq" with the full array still means "exactly this selection".
 
 THE ACTIONS, and what each is actually for:
 - show / hide — the branch itself. Prefer show, so the default state is "not asked".

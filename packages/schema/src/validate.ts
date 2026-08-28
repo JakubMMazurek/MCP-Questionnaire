@@ -492,7 +492,9 @@ function checkComputed(
 /* rules                                                                      */
 /* -------------------------------------------------------------------------- */
 
-const VALUE_REQUIRED_OPS = new Set(["eq", "neq", "gt", "lt"]);
+const VALUE_REQUIRED_OPS = new Set(["eq", "neq", "contains", "not_contains", "gt", "lt"]);
+/** The membership pair — array-valued fields only, one option value each. */
+const MEMBERSHIP_OPS = new Set(["contains", "not_contains"]);
 const VALUE_FORBIDDEN_OPS = new Set(["empty", "filled"]);
 /** Actions that change what a field holds, and so can feed another `when`. */
 const VALUE_AFFECTING_ACTIONS = new Set(["show", "hide", "set_default", "clear"]);
@@ -536,6 +538,15 @@ function checkRule(
       ),
     );
   }
+  if (MEMBERSHIP_OPS.has(rule.when.op) && Array.isArray(rule.when.value)) {
+    out.push(
+      error(
+        "rule_membership_takes_one_value",
+        `rules[${index}].when.value`,
+        `Rule ${index} uses op "${rule.when.op}", which tests ONE option value against what the field holds, so "value" must be that value and not a list — as in "value": "pepperoni". For "any of these", write one rule per value with the same "show" target: a rule list is a flat OR, and any rule that fires reveals the target.`,
+      ),
+    );
+  }
   if (
     (rule.when.op === "gt" || rule.when.op === "lt") &&
     hasValue &&
@@ -550,15 +561,66 @@ function checkRule(
     );
   }
 
+  if (resolvedWhen) {
+    const whenTarget = resolvedWhen.target;
+    const holdsASet =
+      (whenTarget.kind === "field" && whenTarget.field.type === "multi_select") ||
+      (whenTarget.kind === "matrix_cell" && whenTarget.field.cellType === "multi_select");
+
+    if (MEMBERSHIP_OPS.has(rule.when.op) && !holdsASet) {
+      out.push(
+        error(
+          "rule_membership_needs_a_set",
+          `rules[${index}].when.op`,
+          `Rule ${index} asks whether ${describeTarget(whenTarget)} "${rule.when.op === "contains" ? "contains" : "does not contain"}" a value, but that field holds ONE value, not a set. Use "eq"/"neq" for one value, or "in" for several — "${rule.when.op}" is for multi_select.`,
+        ),
+      );
+    }
+
+    /**
+     * The dead rule that cost a field session its branch (§6.3).
+     *
+     * `in` asks whether the field's whole value is one of the candidates. On a
+     * multi_select the value is an array and every candidate is an option, so
+     * the comparison is array-against-string: false, always, and silently — the
+     * form validates, renders, and the branch never appears.
+     */
+    if (rule.when.op === "in" && holdsASet) {
+      // Teach with a value the author declared on THIS field where possible: a
+      // worked example in their own vocabulary is the difference between
+      // reading the rule and applying it (§6.3).
+      const own = acceptedValues(whenTarget)?.[0];
+      const example = JSON.stringify(own ?? "audit_log");
+      out.push(
+        error(
+          "rule_in_on_a_set",
+          `rules[${index}].when.op`,
+          `Rule ${index} uses "in" against ${describeTarget(whenTarget)}, which holds a SET of values. "in" compares the field's whole value to each candidate, so against a multi_select it can never be true and the rule would never fire. To branch on one chosen option use "contains" with a single value ("value": ${example}); for several, one "contains" rule each with the same target — a rule list is a flat OR. To match the whole selection exactly, use "eq" with the full array.`,
+        ),
+      );
+    }
+  }
+
   if (resolvedWhen && VALUE_REQUIRED_OPS.has(rule.when.op) && hasValue) {
     const accepted = acceptedValues(resolvedWhen.target);
     const value = rule.when.value as Value;
-    if (accepted && accepted.length > 0 && !accepted.some((candidate) => candidate === value)) {
+    /**
+     * `eq` against a multi_select compares the WHOLE selection, so its value is
+     * an array of option values and each one has to be declared — checking the
+     * array itself against the option list would reject every such rule, which
+     * is exactly what it did to the worked example below.
+     */
+    const candidates = Array.isArray(value) ? (value as Value[]) : [value];
+    const undeclared =
+      accepted && accepted.length > 0
+        ? candidates.filter((candidate) => !accepted.some((option) => option === candidate))
+        : [];
+    if (accepted && accepted.length > 0 && undeclared.length > 0) {
       out.push(
         error(
           "rule_option_not_declared",
           `rules[${index}].when.value`,
-          `Rule ${index} tests "${rule.when.field}" against ${JSON.stringify(value)}, which is not one of the values that field can hold. The condition can never be true. Declared values: ${quoteList(accepted)}.`,
+          `Rule ${index} tests "${rule.when.field}" against ${JSON.stringify(undeclared.length === 1 ? undeclared[0] : undeclared)}, which is not one of the values that field can hold. The condition can never be true. Declared values: ${quoteList(accepted)}.`,
         ),
       );
     }

@@ -17,7 +17,6 @@ import { App } from "@modelcontextprotocol/ext-apps";
 import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
 import {
   buildSubmission,
-  countsLine,
   type EngineStore,
   type Submission,
   summaryLine,
@@ -656,8 +655,28 @@ export function createBridge(options: BridgeOptions): Bridge {
       // JSON rides along only when there is no formId to point at: a view with
       // no server-side store (§3), where the pull does not exist.
       const formId = state.form.formId ?? knownFormId;
+      /**
+       * One sentence, because a person is asked to vouch for it.
+       *
+       * This is a USER-role message the app composes, which is why the host
+       * shows it for confirmation (§3). It used to carry the answer counts and
+       * an instruction — "Read them with get_answers(formId: …)" — which read
+       * as a work order addressed past the user rather than a receipt they
+       * were signing. The agent does not need telling: get_answers is
+       * described as the only way answers reach it, and the id is right here.
+       *
+       * The id stays. The agent has it from the gather_decisions stub, but not
+       * after a compaction, not in a later session (a form outlives the
+       * conversation that made it), and not unambiguously when two forms are
+       * open.
+       *
+       * What left with the counts is the unreviewed tally — the one place the
+       * agent could learn a prefill was never vetted, since `Answer` carries no
+       * review state. It still travels on the advisory context channel, and it
+       * belongs in get_answers; per-path review state is the fix.
+       */
       const receipt = formId
-        ? `Submitted “${state.form.title}” — ${countsLine(submission.summary)} Read them with get_answers(formId: "${formId}").`
+        ? `Submitted “${state.form.title}” (${formId})`
         : `Submitted “${state.form.title}”.\n\n${JSON.stringify(submission)}`;
       await app.sendMessage({
         role: "user",

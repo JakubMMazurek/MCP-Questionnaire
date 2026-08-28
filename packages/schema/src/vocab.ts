@@ -74,8 +74,32 @@ export const TABLE_COLUMN_TYPES = [
   "info",
 ] as const;
 
-/** §4.6 rule conditions. */
-export const RULE_OPS = ["eq", "neq", "in", "gt", "lt", "empty", "filled"] as const;
+/**
+ * §4.6 rule conditions.
+ *
+ * `contains` / `not_contains` are the multi_select pair, and they exist because
+ * the set without them could not express "pepperoni is among the toppings" at
+ * all. `in` asks whether the field's WHOLE value is one of several candidates,
+ * which on an array-valued field is never true — a field session wrote exactly
+ * that rule, the form validated, and the section silently never appeared.
+ *
+ * They take ONE option value, not an array, deliberately: "contains any of
+ * these" is two rules whose `show` targets the same section, and OR is already
+ * what a flat rule list means. An array here would have to choose silently
+ * between subset and intersection, which is the ambiguity that made overloading
+ * `in` the wrong fix.
+ */
+export const RULE_OPS = [
+  "eq",
+  "neq",
+  "in",
+  "contains",
+  "not_contains",
+  "gt",
+  "lt",
+  "empty",
+  "filled",
+] as const;
 
 /** §4.6 rule actions. */
 export const RULE_ACTIONS = [

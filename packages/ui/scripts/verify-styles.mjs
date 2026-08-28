@@ -35,11 +35,26 @@ const lines = css.split("\n");
 const HOVER_RULES = [
   [".seg > button:hover:not(:disabled)", '[aria-checked="true"]'],
   [".tile:hover:not(:disabled)", '[aria-checked="true"]'],
+  [".chip-toggle:hover:not(:disabled)", '[aria-pressed="true"]'],
   [".mcell:hover:not(:disabled)", '[data-dirty="true"]'],
 ];
 
-/** A selected state must carry the accent, not a second host grey. */
-const SELECTED_SURFACES = [".seg > button", ".tile", ".preset", ".palette-swatch"];
+/**
+ * A selected state must carry the accent, not a second host grey.
+ *
+ * Keyed by the ATTRIBUTE each surface actually uses, because the first version
+ * of this file assumed `aria-checked` everywhere and so gave `.chip-toggle` —
+ * the multi_select chip, which uses `aria-pressed` — a clean bill of health
+ * while it kept both bugs. A new selectable control belongs in this list on the
+ * day it is written.
+ */
+const SELECTED_SURFACES = [
+  [".seg > button", "aria-checked"],
+  [".tile", "aria-checked"],
+  [".preset", "aria-checked"],
+  [".palette-swatch", "aria-checked"],
+  [".chip-toggle", "aria-pressed"],
+];
 
 const offences = [];
 
@@ -55,22 +70,22 @@ for (const [selector, excluded] of HOVER_RULES) {
   }
 }
 
-for (const surface of SELECTED_SURFACES) {
-  const at = css.indexOf(`${surface}[aria-checked="true"] {`);
+for (const [surface, attribute] of SELECTED_SURFACES) {
+  const at = css.indexOf(`${surface}[${attribute}="true"] {`);
   if (at === -1) {
-    offences.push(`no selected rule for \`${surface}\``);
+    offences.push(`no selected rule for \`${surface}\` (${attribute})`);
     continue;
   }
   const block = css.slice(at, css.indexOf("}", at));
   if (!block.includes("--color-ring-primary")) {
     offences.push(
-      `\`${surface}[aria-checked="true"]\` does not use --color-ring-primary: ` +
+      `\`${surface}[${attribute}="true"]\` does not use --color-ring-primary: ` +
         `two adjacent host greys are not a selected state anyone can see.`,
     );
   }
   if (block.includes("color: var(--color-background-primary)")) {
     offences.push(
-      `\`${surface}[aria-checked="true"]\` puts ink ON the accent — the host ` +
+      `\`${surface}[${attribute}="true"]\` puts ink ON the accent — the host ` +
         `supplies no companion contrast colour for it (§8.2).`,
     );
   }

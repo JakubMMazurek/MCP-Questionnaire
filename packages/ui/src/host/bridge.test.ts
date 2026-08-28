@@ -381,9 +381,11 @@ describe("submit (§5.6)", () => {
     // above is advisory, and an agent holding only "form displayed" is the
     // defect this replaced.
     const text = message.content[0]?.text ?? "";
-    expect(text).toContain("Submitted “Before I draft the rollout plan…”");
-    expect(text).toContain("5 of 10 answered");
-    expect(text).toContain(`get_answers(formId: "${FORM_ID}")`);
+    // One sentence and the id — a person is asked to confirm this message, so
+    // it reads as a receipt they are signing and not as an instruction aimed
+    // past them. The id is what keeps it self-sufficient across a compaction,
+    // a later session, or two open forms.
+    expect(text).toBe(`Submitted “Before I draft the rollout plan…” (${FORM_ID})`);
     expect(text).not.toContain('"state":"answered"');
   });
 
@@ -409,7 +411,10 @@ describe("submit (§5.6)", () => {
     const message = host.last(METHOD.message)?.params as {
       content: { text: string }[];
     };
-    expect(message.content[0]?.text).toContain(`get_answers(formId: "${FORM_ID}")`);
+    // Still the receipt and the id, never the payload: a host that accepts the
+    // context push and silently drops it looks identical from here, and the id
+    // is what the agent pulls with.
+    expect(message.content[0]?.text).toContain(FORM_ID);
     expect(message.content[0]?.text).not.toContain('"state":"answered"');
   });
 

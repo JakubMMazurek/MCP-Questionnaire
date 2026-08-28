@@ -106,7 +106,7 @@ describe("closed vocabularies (§4.1)", () => {
         (form) =>
           (form.rules = [
             {
-              when: { field: "env", op: "contains", value: "x" },
+              when: { field: "env", op: "matches", value: "x" },
               then: { action: "show", targets: ["notes"] },
             },
           ]),
