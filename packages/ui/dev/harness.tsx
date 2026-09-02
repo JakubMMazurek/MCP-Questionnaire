@@ -36,6 +36,36 @@ const FIXTURES: { key: FixtureKey; label: string }[] = [
 ];
 
 /**
+ * What the harness is currently playing host to. A fixture is the common case,
+ * but the renderer's whole point is that the schema is DATA — so the harness
+ * must be able to send a schema it has never seen, which is the only way to
+ * look at a form the agent actually built (`?form=`, the paste box, or
+ * `window.__mcpqLoadForm` from a console or an automation driver).
+ */
+type Active = { form: unknown; label: string; formId: string };
+
+const fixtureActive = (key: FixtureKey): Active => ({
+  form: archetypes[key],
+  label: key,
+  // The stub result the Worker returns (§3) is the ONLY channel by which the
+  // app learns the server-minted formId, so the harness has to mint one too.
+  formId: `f_${key.toLowerCase()}_demo`,
+});
+
+/**
+ * Accepts either a bare envelope or the `{ form: … }` wrapper that
+ * `gather_decisions` takes as tool input, so a schema can be pasted in exactly
+ * the shape it was sent to the server. A `formId` alongside it is honoured.
+ */
+function activeFromJson(raw: string, label: string): Active {
+  const parsed: unknown = JSON.parse(raw);
+  const wrapper = parsed as { form?: unknown; formId?: unknown };
+  const form = parsed && typeof parsed === "object" && "form" in wrapper ? wrapper.form : parsed;
+  const formId = typeof wrapper.formId === "string" ? wrapper.formId : "f_pasted_demo";
+  return { form, label, formId };
+}
+
+/**
  * A palette deliberately unlike the bundle's own `:root` fallbacks, so it is
  * obvious at a glance whether host variables are actually driving the surface
  * (§7.4). Toggle "send palette" off to see the fallbacks.
@@ -161,7 +191,9 @@ const styles = {
 } as const;
 
 function Harness() {
-  const [fixture, setFixture] = useState<FixtureKey>("assumptionLedger");
+  const [fixture, setFixture] = useState<FixtureKey | null>("assumptionLedger");
+  const [active, setActive] = useState<Active>(() => fixtureActive("assumptionLedger"));
+  const [pasted, setPasted] = useState("");
   const [theme, setTheme] = useState<Theme>("light");
   const [mode, setMode] = useState<Mode>("fullscreen");
   const [platform, setPlatform] = useState<Platform>("web");
@@ -173,8 +205,8 @@ function Harness() {
 
   const frame = useRef<HTMLIFrameElement | null>(null);
   const host = useRef<FakeHost | null>(null);
-  const settings = useRef({ theme, mode, platform, sendPalette, draftFails, fixture });
-  settings.current = { theme, mode, platform, sendPalette, draftFails, fixture };
+  const settings = useRef({ theme, mode, platform, sendPalette, draftFails, active });
+  settings.current = { theme, mode, platform, sendPalette, draftFails, active };
 
   const append = useCallback(
     (entry: Omit<LogEntry, "at">) =>
@@ -203,20 +235,56 @@ function Harness() {
   }, []);
 
   const sendSchema = useCallback(
-    (key: FixtureKey) => {
-      host.current?.sendToolInput(archetypes[key]);
-      append({ direction: "out", method: METHOD.toolInput, detail: key });
-      // The stub result, exactly as the Worker returns it (§3). This is the ONLY
-      // channel by which the app learns the server-minted formId, so without it
-      // every save_draft in the harness would carry `formId: null`.
-      const formId = `f_${key.toLowerCase()}_demo`;
+    (next: Active) => {
+      host.current?.sendToolInput(next.form);
+      append({ direction: "out", method: METHOD.toolInput, detail: next.label });
+      // The stub result, exactly as the Worker returns it (§3), because it is
+      // the only channel by which the app learns the formId — without it every
+      // save_draft in the harness would carry `formId: null`.
       host.current?.sendToolResult({
-        content: [{ type: "text", text: `Form displayed; awaiting input. formId: ${formId}` }],
-        structuredContent: { formId },
+        content: [{ type: "text", text: `Form displayed; awaiting input. formId: ${next.formId}` }],
+        structuredContent: { formId: next.formId },
       });
-      append({ direction: "out", method: METHOD.toolResult, detail: formId });
+      append({ direction: "out", method: METHOD.toolResult, detail: next.formId });
     },
     [append],
+  );
+
+  /** Show a fixture. */
+  const showFixture = useCallback(
+    (key: FixtureKey) => {
+      const next = fixtureActive(key);
+      setFixture(key);
+      setActive(next);
+      settings.current.active = next;
+      sendSchema(next);
+    },
+    [sendSchema],
+  );
+
+  /**
+   * Show a schema the harness has never seen. Errors land in the log rather
+   * than throwing, because a half-typed paste is the normal case here.
+   */
+  const showJson = useCallback(
+    (raw: string, label: string) => {
+      let next: Active;
+      try {
+        next = activeFromJson(raw, label);
+      } catch (error) {
+        append({
+          direction: "out",
+          method: "parse failed",
+          detail: error instanceof Error ? error.message : String(error),
+        });
+        return;
+      }
+      setFixture(null);
+      setActive(next);
+      settings.current.active = next;
+      sendSchema(next);
+    },
+    [append, sendSchema],
   );
 
   const pushContext = useCallback(
@@ -259,7 +327,7 @@ function Harness() {
         }
         if (entry.method === METHOD.initialized) {
           // The host MUST NOT send tool notifications before this (§7.2).
-          queueMicrotask(() => sendSchema(settings.current.fixture));
+          queueMicrotask(() => sendSchema(settings.current.active));
         }
         append({ direction: "in", method: entry.method, detail: summarise(entry.params) });
       },
@@ -268,8 +336,9 @@ function Harness() {
     return () => fake.stop();
   }, [generation, append, context, sendSchema]);
 
-  const stream = async (key: FixtureKey) => {
-    const steps = partials(archetypes[key]);
+  const stream = async () => {
+    const { form, label: key } = settings.current.active;
+    const steps = partials(form);
     for (const [index, step] of steps.entries()) {
       if (index === steps.length - 1) {
         host.current?.sendToolInput(step);
@@ -292,8 +361,9 @@ function Harness() {
    * that used to show "this form could not be rendered" over each chunk, and
    * the reason the invalid verdict now waits out INVALID_GRACE_MS.
    */
-  const streamFinalChannel = async (key: FixtureKey) => {
-    for (const [index, step] of partials(archetypes[key]).entries()) {
+  const streamFinalChannel = async () => {
+    const { form, label: key } = settings.current.active;
+    for (const [index, step] of partials(form).entries()) {
       host.current?.sendToolInput(step);
       append({
         direction: "out",
@@ -303,6 +373,45 @@ function Harness() {
       await new Promise((resolve) => setTimeout(resolve, 700));
     }
   };
+
+  /**
+   * `?form=/dev/my-form.json` loads a schema Vite is serving, and
+   * `window.__mcpqLoadForm(json)` does the same from a console or an
+   * automation driver. The HARNESS fetches — never the app: the bundle runs
+   * under `connect-src 'none'` (§8) and must stay unable to phone home, so the
+   * schema arrives where every schema arrives, as a tool-input notification.
+   */
+  useEffect(() => {
+    const target = new URLSearchParams(window.location.search).get("form");
+    if (!target) return;
+    let cancelled = false;
+    void fetch(target)
+      .then((response) => {
+        if (!response.ok) throw new Error(`${target} → ${response.status}`);
+        return response.text();
+      })
+      .then((body) => {
+        if (!cancelled) showJson(body, target);
+      })
+      .catch((error: unknown) =>
+        append({
+          direction: "out",
+          method: "fetch failed",
+          detail: error instanceof Error ? error.message : String(error),
+        }),
+      );
+    return () => {
+      cancelled = true;
+    };
+  }, [showJson, append]);
+
+  useEffect(() => {
+    (window as unknown as Record<string, unknown>).__mcpqLoadForm = (raw: unknown) =>
+      showJson(typeof raw === "string" ? raw : JSON.stringify(raw), "window.__mcpqLoadForm");
+    return () => {
+      delete (window as unknown as Record<string, unknown>).__mcpqLoadForm;
+    };
+  }, [showJson]);
 
   useEffect(() => {
     // Theme, palette and display mode are host state: push them as a patch.
@@ -332,14 +441,45 @@ function Harness() {
                 key={entry.key}
                 type="button"
                 style={toggle(entry.key === fixture)}
-                onClick={() => {
-                  setFixture(entry.key);
-                  sendSchema(entry.key);
-                }}
+                onClick={() => showFixture(entry.key)}
               >
                 {entry.label}
               </button>
             ))}
+          </div>
+        </div>
+
+        <div>
+          <div style={styles.label}>a schema of your own</div>
+          <div style={{ color: "#6a746e", marginBottom: "4px" }}>
+            {fixture ? "showing a fixture" : `showing: ${active.label}`}
+          </div>
+          <textarea
+            value={pasted}
+            onChange={(event) => setPasted(event.target.value)}
+            placeholder='Paste a form envelope, or the {"form": …} wrapper sent to gather_decisions'
+            spellCheck={false}
+            style={{
+              width: "100%",
+              minHeight: "72px",
+              padding: "6px",
+              border: "1px solid #cfd5cd",
+              borderRadius: "6px",
+              font: "inherit",
+              fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
+              fontSize: "11px",
+              resize: "vertical",
+            }}
+          />
+          <div style={{ ...styles.group, marginTop: "4px" }}>
+            <button
+              type="button"
+              style={styles.button}
+              disabled={pasted.trim() === ""}
+              onClick={() => showJson(pasted, "pasted schema")}
+            >
+              send pasted schema
+            </button>
           </div>
         </div>
 
@@ -411,13 +551,13 @@ function Harness() {
         <div>
           <div style={styles.label}>lifecycle</div>
           <div style={styles.group}>
-            <button type="button" style={styles.button} onClick={() => void stream(fixture)}>
+            <button type="button" style={styles.button} onClick={() => void stream()}>
               stream partials
             </button>
             <button
               type="button"
               style={styles.button}
-              onClick={() => void streamFinalChannel(fixture)}
+              onClick={() => void streamFinalChannel()}
               title="A host with no tool-input-partial: every chunk on tool-input"
             >
               stream on final
