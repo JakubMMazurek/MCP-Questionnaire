@@ -86,6 +86,6 @@
   //     wrangler secret put GITHUB_CLIENT_SECRET
   // (obvious fakes live in `.dev.vars` for local runs and tests).
   "vars": {
-    "GITHUB_ALLOWED_USERS": "JakubMMazurek"
+    "GITHUB_ALLOWED_USERS": "JakubMMazurek,jobrightpeter,KyleHarrison,marcinllukasiak,pbiszczak,Emanuele-20,ngstanley,jononunes,piotrslowinski365,Suwanja,Span999999999999999,Ryanksten,jakubkrawczyk-365,KeaganSedd,jag365,dawid-365,nazzia97,SebastianMarzec,MarekKlepka365,Lukasz365finance"
   }
 }
