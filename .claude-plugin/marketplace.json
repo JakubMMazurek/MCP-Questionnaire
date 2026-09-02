@@ -4,11 +4,7 @@
   "plugins": [
     {
       "name": "mcp-questionnaire",
-      "source": {
-        "source": "git-subdir",
-        "url": "https://github.com/JakubMMazurek/MCP-Questionnaire.git",
-        "path": "packages/plugin"
-      },
+      "source": "./packages/plugin",
       "description": "Structured input surfaces inside the Claude conversation — connector + skill in one install."
     }
   ]
