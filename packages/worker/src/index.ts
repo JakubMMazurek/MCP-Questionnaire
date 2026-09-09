@@ -59,7 +59,11 @@ function handlerFor(env: WorkerEnv) {
    */
   mcpHandler ??= createMcpHandler(
     (context) =>
-      createServer(env, context.requestInfo ? new URL(context.requestInfo.url).origin : null),
+      createServer(
+        env,
+        context.requestInfo ? new URL(context.requestInfo.url).origin : null,
+        context.requestInfo?.headers.get("user-agent") ?? null,
+      ),
     {
       route: MCP_ROUTE,
       /**

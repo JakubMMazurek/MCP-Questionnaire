@@ -269,7 +269,12 @@ export async function connect(options: ConnectOptions = {}): Promise<{
 export async function rawCall(
   name: string,
   args: Record<string, unknown>,
-  declaration: { clientName?: string; capabilities?: Record<string, unknown> } = {},
+  declaration: {
+    clientName?: string;
+    capabilities?: Record<string, unknown>;
+    /** What dialled the Worker. This is what decides the carrier — see needsLink. */
+    userAgent?: string;
+  } = {},
 ): Promise<ToolResult> {
   const accessToken = await tokenForTests();
   const envelope: Record<string, unknown> = {
@@ -297,6 +302,7 @@ export async function rawCall(
         // -32020 rather than a tool error.
         "Mcp-Method": "tools/call",
         "Mcp-Name": name,
+        ...(declaration.userAgent ? { "User-Agent": declaration.userAgent } : {}),
       },
       body: JSON.stringify({
         jsonrpc: "2.0",

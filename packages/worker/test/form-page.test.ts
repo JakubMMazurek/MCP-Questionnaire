@@ -241,12 +241,17 @@ describe("choosing the carrier", () => {
    * The whole point of the branch: chat and Cowork keep the form, Claude Code
    * gets a link, and neither needs the model to work out which it is in.
    */
-  it("hands a link to a client that declared capabilities without MCP Apps", async () => {
-    // What Claude Code sends, measured on the wire 2026-09-09.
+  it("hands a link to a locally-run Claude Code", async () => {
+    // Everything Claude Code sends, measured on the wire 2026-09-09 — the
+    // User-Agent included, because that is the half that decides.
     const result = await rawCall(
       "gather_decisions",
       { form: ledger() },
-      { clientName: "claude-code", capabilities: { roots: {}, elicitation: {} } },
+      {
+        clientName: "claude-code",
+        capabilities: { roots: {}, elicitation: {} },
+        userAgent: "claude-code/2.1.260 (claude-desktop; external, cli)",
+      },
     );
 
     const structured = result.structuredContent as { formId?: string; url?: string };
@@ -272,6 +277,28 @@ describe("choosing the carrier", () => {
     expect((result.structuredContent as { url?: string }).url).toBeUndefined();
   });
 
+  /**
+   * The one that shipped broken. Cowork declares exactly what Claude Code
+   * declares — same client name, same capabilities, no extensions map — and
+   * renders the form regardless. It reaches the Worker through Anthropic's
+   * fetcher rather than from the user's machine, and that is the whole of the
+   * difference.
+   */
+  it("leaves Cowork alone, though it declares exactly what Claude Code declares", async () => {
+    const result = await rawCall(
+      "gather_decisions",
+      { form: ledger() },
+      {
+        clientName: "claude-code",
+        capabilities: { roots: {}, elicitation: {} },
+        userAgent: "Claude-User",
+      },
+    );
+
+    expect(firstText(result)).toContain("Form displayed; awaiting input");
+    expect((result.structuredContent as { url?: string }).url).toBeUndefined();
+  });
+
   it("leaves a client that declares nothing exactly as it was", async () => {
     const { call, close } = await connect();
     const result = await call("gather_decisions", { form: ledger() });
@@ -288,7 +315,11 @@ describe("choosing the carrier", () => {
     const result = await rawCall(
       "load_form",
       { formId },
-      { clientName: "claude-code", capabilities: { roots: {}, elicitation: {} } },
+      {
+        clientName: "claude-code",
+        capabilities: { roots: {}, elicitation: {} },
+        userAgent: "claude-code/2.1.260 (claude-desktop; external, cli)",
+      },
     );
 
     // "Put this form back on screen" means nothing on a client with no screen.

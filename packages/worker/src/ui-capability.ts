@@ -24,6 +24,29 @@
  *            this server behaved before it could tell the difference.
  */
 
+/**
+ * A locally-run Claude Code, by its User-Agent.
+ *
+ * MEASURED 2026-09-09, and the measurement overturned the previous rule. Claude
+ * Code and Cowork are indistinguishable in everything they DECLARE — both send
+ * `clientInfo.name: "claude-code"`, both declare `{ roots, elicitation }` and
+ * no `extensions` map, both send the same envelope keys. One of them renders
+ * the form inline and one cannot. The only thing that differs is who is dialling
+ * the Worker:
+ *
+ *   Claude Code (desktop)  ua: `claude-code/2.1.260 (claude-desktop; …)`
+ *   Cowork (web)           ua: `Claude-User`
+ *
+ * `Claude-User` is Anthropic's server-side fetcher — chat, Cowork and mobile all
+ * reach an MCP server through it, and all of them mount the renderer. Claude
+ * Code connects directly from the user's machine and mounts nothing.
+ *
+ * This is a heuristic on a header, and it is written down as one. What keeps it
+ * honest is the direction it fails in: it is the POSITIVE evidence required
+ * before a link is sent, so anything unrecognised keeps rendering inline.
+ */
+const LOCAL_CLAUDE_CODE_UA = /^claude-code\//i;
+
 /** ext-apps `EXTENSION_ID`. Asserted against the package in the tests. */
 export const UI_EXTENSION_ID = "io.modelcontextprotocol/ui";
 
@@ -88,10 +111,36 @@ export function rendersInline(sources: {
  * only question worth asking of the logs — which clients are getting links, and
  * whether that matches what they can actually do.
  */
+/**
+ * Should this client be handed a link instead of a form?
+ *
+ * TWO conditions, and both are required:
+ *
+ *  1. It did not declare MCP Apps. If a future Claude Code gains the extension
+ *     and says so, this flips back to inline on its own.
+ *  2. It is a locally-run Claude Code by User-Agent — the positive evidence.
+ *
+ * The default is inline for everything else, including every client that says
+ * nothing at all, because the two failures are not symmetric: a link where a
+ * form would have rendered tells the model to hand over a URL while the form
+ * sits on screen above it (observed in Cowork, 2026-09-09), whereas an inline
+ * stub where nothing renders is only the status quo, with get_form_link one
+ * call away and skill rule 11 pointing at it.
+ */
+export function needsLink(sources: {
+  envelope?: unknown;
+  handshake?: unknown;
+  userAgent?: string | null;
+}): boolean {
+  if (rendersInline(sources) === true) return false;
+  return LOCAL_CLAUDE_CODE_UA.test(sources.userAgent ?? "");
+}
+
 export function clientFingerprint(sources: {
   envelope?: unknown;
   handshake?: unknown;
   clientInfo?: unknown;
+  userAgent?: string | null;
 }): string {
   const name =
     record(record(sources.envelope)?.[ENVELOPE_CLIENT_INFO])?.name ??
@@ -103,13 +152,21 @@ export function clientFingerprint(sources: {
           .replace(/[^a-z0-9]+/g, "-")
           .slice(0, 24)
       : "unknown";
-  const verdict = rendersInline(sources);
+  const verdict = needsLink(sources) ? "link" : "inline";
+  const declared = rendersInline(sources);
   const keys = (value: unknown) => Object.keys(record(value) ?? {}).join("+") || "none";
+  const envelopeInfo = record(record(sources.envelope)?.[ENVELOPE_CLIENT_INFO]);
+  const version = envelopeInfo?.version ?? record(sources.clientInfo)?.version;
+  const caps =
+    record(record(sources.envelope)?.[ENVELOPE_CAPABILITIES]) ?? record(sources.handshake);
   return [
     safe,
-    verdict === null ? "undeclared" : verdict ? "inline" : "no-ui",
-    `env=${keys(sources.envelope)}`,
-    `caps=${keys(sources.handshake)}`,
+    verdict,
+    `ext=${declared === null ? "undeclared" : declared ? "yes" : "no"}`,
+    `v=${typeof version === "string" ? version : "?"}`,
+    `caps=${keys(caps)}`,
+    `info=${keys(envelopeInfo)}`,
+    `ua=${(sources.userAgent ?? "none").slice(0, 40)}`,
   ]
     .join(":")
     .replace(/[^a-zA-Z0-9:+=._-]/g, "")

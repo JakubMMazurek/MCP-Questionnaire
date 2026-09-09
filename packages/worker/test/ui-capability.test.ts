@@ -2,30 +2,59 @@
  * Which carrier a client gets, and why.
  *
  * The two failures are not symmetric, and these tests are written around that.
- * A link where a form would have rendered puts a capability URL into a
- * conversation that never needed one and makes chat worse for everyone; an
+ * A link where a form would have rendered tells the model to hand over a URL
+ * while the form sits on screen above it — observed in Cowork on 2026-09-09,
+ * from a rule that read a missing `extensions` map as "cannot render". An
  * inline stub where nothing renders is only the status quo, with get_form_link
- * one call away. So silence means inline, and only an explicit declaration that
- * does not include MCP Apps buys a link.
+ * one call away. So a link needs POSITIVE evidence and everything else renders.
  *
- * The declarations here are the ones measured on the wire, not invented:
- * Claude Code 2.1.178 sends `{ roots, elicitation }` with no `extensions` map,
- * under `io.modelcontextprotocol/`-prefixed envelope keys.
+ * Every declaration here was measured on the wire, not invented.
  */
 
 import { describe, expect, it } from "vitest";
-import { clientFingerprint, rendersInline, UI_EXTENSION_ID } from "../src/ui-capability.js";
+import {
+  clientFingerprint,
+  needsLink,
+  rendersInline,
+  UI_EXTENSION_ID,
+} from "../src/ui-capability.js";
 
 const CAPS = "io.modelcontextprotocol/clientCapabilities";
 const INFO = "io.modelcontextprotocol/clientInfo";
 
-/** What Claude Code actually sends (measured 2026-09-09, CLI 2.1.178). */
+/**
+ * The two clients that matter, measured on the wire 2026-09-09.
+ *
+ * They are identical in everything they DECLARE. One renders the form inline
+ * and one cannot, and the only thing that separates them is who dialled the
+ * Worker — which is why the rule is a User-Agent heuristic and says so.
+ */
 const claudeCode = {
   envelope: {
     "io.modelcontextprotocol/protocolVersion": "2026-07-28",
-    [INFO]: { name: "claude-code", version: "2.1.178" },
+    [INFO]: { name: "claude-code", version: "2.1.260" },
     [CAPS]: { roots: {}, elicitation: {} },
   },
+  userAgent: "claude-code/2.1.260 (claude-desktop; external, cli)",
+};
+
+/**
+ * Cowork in the DESKTOP app — where the `Claude-User` sample was taken.
+ *
+ * Cowork on the web was observed rendering inline too, on an earlier build that
+ * did not yet log the User-Agent, so its header is inferred rather than
+ * measured: both dial the Worker from Anthropic's infrastructure rather than
+ * from the user's machine. The rule does not rest on that inference — anything
+ * whose UA is not a local `claude-code/…` renders inline, web Cowork and
+ * claude.ai chat included, measured or not.
+ */
+const cowork = {
+  envelope: {
+    "io.modelcontextprotocol/protocolVersion": "2026-07-28",
+    [INFO]: { name: "claude-code", version: "2.1.266" },
+    [CAPS]: { roots: {}, elicitation: {} },
+  },
+  userAgent: "Claude-User",
 };
 
 /** A host that supports MCP Apps declares the extension. */
@@ -42,9 +71,43 @@ describe("the extension identifier", () => {
   });
 });
 
+describe("who gets a link", () => {
+  it("hands one to a locally-run Claude Code", () => {
+    expect(needsLink(claudeCode)).toBe(true);
+  });
+
+  /**
+   * The regression this rule was rewritten for. Cowork declares exactly what
+   * Claude Code declares, and renders the form anyway; the previous rule read
+   * the missing extensions map as "cannot render" and told the model to hand
+   * over a URL while the form sat on screen above it.
+   */
+  it("does not hand one to Cowork, which declares the same and renders", () => {
+    expect(needsLink(cowork)).toBe(false);
+  });
+
+  it("does not hand one to a client that says nothing at all", () => {
+    expect(needsLink({})).toBe(false);
+    expect(needsLink({ userAgent: "some-other-client/1.0" })).toBe(false);
+  });
+
+  it("stops handing one over the moment Claude Code declares MCP Apps", () => {
+    const futureCode = {
+      ...claudeCode,
+      envelope: { ...claudeCode.envelope, [CAPS]: { extensions: { [UI_EXTENSION_ID]: {} } } },
+    };
+    // Two conditions, and the declaration outranks the header: the day this
+    // client can render, it renders, without anyone editing a regex.
+    expect(needsLink(futureCode)).toBe(false);
+  });
+});
+
 describe("reading the verdict", () => {
   it("says no for a client that declared capabilities without it", () => {
     expect(rendersInline(claudeCode)).toBe(false);
+    // Note what this does NOT decide on its own — Cowork reads the same way
+    // and renders regardless. See `needsLink`.
+    expect(rendersInline(cowork)).toBe(false);
   });
 
   it("says yes for a client that declared it", () => {
@@ -81,9 +144,14 @@ describe("reading the verdict", () => {
 describe("the log line", () => {
   it("names the client and the verdict", () => {
     expect(clientFingerprint(claudeCode)).toContain("claude-code");
-    expect(clientFingerprint(claudeCode)).toContain("no-ui");
-    expect(clientFingerprint(appsHost)).toContain("inline");
-    expect(clientFingerprint({})).toContain("undeclared");
+    // The line records the DECISION and the declaration separately, because
+    // reading one as the other is the mistake that shipped.
+    expect(clientFingerprint(claudeCode)).toContain("link");
+    expect(clientFingerprint(claudeCode)).toContain("ext=no");
+    expect(clientFingerprint(cowork)).toContain("inline");
+    expect(clientFingerprint(cowork)).toContain("ext=no");
+    expect(clientFingerprint(appsHost)).toContain("ext=yes");
+    expect(clientFingerprint({})).toContain("ext=undeclared");
   });
 
   it("cannot carry anything but a sanitised identity", () => {

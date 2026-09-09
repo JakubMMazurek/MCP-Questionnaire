@@ -45,7 +45,7 @@ import {
   RENDERER_URI,
   readRendererBundle,
 } from "./renderer-resource.js";
-import { clientFingerprint, rendersInline } from "./ui-capability.js";
+import { clientFingerprint, needsLink } from "./ui-capability.js";
 import { diagnosticsWithExample, serialiseExample } from "./worked-example.js";
 
 export const SERVER_INFO = { name: "mcp-questionnaire", version: "0.3.0" } as const;
@@ -154,11 +154,21 @@ async function stubFor(
   formId: string,
   origin: string | null,
   login: string | null,
-  sources: { envelope?: unknown; handshake?: unknown },
+  sources: {
+    envelope?: unknown;
+    handshake?: unknown;
+    clientInfo?: unknown;
+    userAgent?: string | null;
+  },
 ): Promise<ToolResult> {
-  const inline = rendersInline(sources);
-  if (inline !== false || !origin || !env.FORM_URL_SECRET) {
-    logEvent({ event: "stub_served", code: inline === false ? "link_unavailable" : "inline" });
+  // One line per carrier decision, wherever the decision is made. It lived in
+  // gather_decisions only, which meant a `load_form` — a reopen, the exact
+  // thing a person does when a form did not survive a refresh — decided the
+  // carrier and logged nothing about the client that got it.
+  logEvent({ event: "client", code: clientFingerprint(sources) });
+  const link = needsLink(sources);
+  if (!link || !origin || !env.FORM_URL_SECRET) {
+    logEvent({ event: "stub_served", code: link ? "link_unavailable" : "inline" });
     return stub(formId);
   }
   const token = await mintFormToken(env.FORM_URL_SECRET, { formId, login: login ?? "unknown" });
@@ -198,7 +208,11 @@ function currentLogin(): string | null {
  *   pinning one absolute URL would break two of those three. Null under
  *   `serveStdio`, where there is no HTTP request to read it from.
  */
-export function createServer(env: WorkerEnv, origin: string | null = null): McpServer {
+export function createServer(
+  env: WorkerEnv,
+  origin: string | null = null,
+  userAgent: string | null = null,
+): McpServer {
   const server = new McpServer(SERVER_INFO);
 
   /* ------------------------------ the resource --------------------------- */
@@ -273,17 +287,6 @@ export function createServer(env: WorkerEnv, origin: string | null = null): McpS
       _meta: uiMeta(["model", "app"]),
     },
     async ({ form }, ctx) => {
-      // Which carrier this client gets, and who it was. One line per rendered
-      // form, closed vocabulary — the question it answers is whether a client
-      // that got a link could in fact have rendered one.
-      logEvent({
-        event: "client",
-        code: clientFingerprint({
-          envelope: (ctx as { mcpReq?: { envelope?: unknown } })?.mcpReq?.envelope,
-          handshake: server.server.getClientCapabilities(),
-          clientInfo: server.server.getClientVersion(),
-        }),
-      });
       const validation = validateForm(form);
       if (!validation.ok || !validation.form) {
         logEvent({
@@ -318,6 +321,8 @@ export function createServer(env: WorkerEnv, origin: string | null = null): McpS
       const result = await stubFor(env, formId, origin, currentLogin(), {
         envelope: (ctx as { mcpReq?: { envelope?: unknown } })?.mcpReq?.envelope,
         handshake: server.server.getClientCapabilities(),
+        clientInfo: server.server.getClientVersion(),
+        userAgent,
       });
       return {
         ...result,
@@ -379,6 +384,8 @@ export function createServer(env: WorkerEnv, origin: string | null = null): McpS
       return stubFor(env, formId, origin, currentLogin(), {
         envelope: (ctx as { mcpReq?: { envelope?: unknown } })?.mcpReq?.envelope,
         handshake: server.server.getClientCapabilities(),
+        clientInfo: server.server.getClientVersion(),
+        userAgent,
       });
     },
   );
