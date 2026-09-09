@@ -217,14 +217,28 @@ function mcpFetch(accessToken: string) {
   }) as never;
 }
 
-export async function connect(): Promise<{
+/**
+ * What the client DECLARES, which is what decides its carrier.
+ *
+ * Default: nothing, matching the SDK client's own default and the "says
+ * nothing" case the server treats as inline.
+ */
+export type ConnectOptions = {
+  name?: string;
+  capabilities?: Record<string, unknown>;
+};
+
+export async function connect(options: ConnectOptions = {}): Promise<{
   client: Client;
   call: (name: string, args: Record<string, unknown>) => Promise<ToolResult>;
   close: () => Promise<void>;
 }> {
   const accessToken = await tokenForTests();
   const transport = new StreamableHTTPClientTransport(MCP_URL, { fetch: mcpFetch(accessToken) });
-  const client = new Client({ name: "mcp-questionnaire-tests", version: "0.0.0" });
+  const client = new Client(
+    { name: options.name ?? "mcp-questionnaire-tests", version: "0.0.0" },
+    options.capabilities ? { capabilities: options.capabilities } : undefined,
+  );
   await client.connect(transport);
 
   return {
@@ -240,6 +254,66 @@ export async function connect(): Promise<{
       await client.close();
     },
   };
+}
+
+/**
+ * A `tools/call` on the wire, carrying the per-request `_meta` envelope
+ * (protocol revision 2026-07-28).
+ *
+ * The SDK client cannot stand in for this: it sends no envelope at all, so a
+ * test built on it can only ever exercise the "client said nothing" path. What
+ * decides a form's carrier is what the client DECLARED, and the only honest way
+ * to test that is to declare it the way a real client does — the key names
+ * below are the ones measured off Claude Code 2.1.178 on 2026-09-09.
+ */
+export async function rawCall(
+  name: string,
+  args: Record<string, unknown>,
+  declaration: { clientName?: string; capabilities?: Record<string, unknown> } = {},
+): Promise<ToolResult> {
+  const accessToken = await tokenForTests();
+  const envelope: Record<string, unknown> = {
+    "io.modelcontextprotocol/protocolVersion": "2026-07-28",
+    "io.modelcontextprotocol/clientInfo": {
+      name: declaration.clientName ?? "test-client",
+      version: "0.0.0",
+    },
+  };
+  if (declaration.capabilities) {
+    envelope["io.modelcontextprotocol/clientCapabilities"] = declaration.capabilities;
+  }
+
+  const response = await SELF.fetch(
+    new Request(MCP_URL.href, {
+      method: "POST",
+      headers: {
+        Host: MCP_URL.host,
+        Authorization: `Bearer ${accessToken}`,
+        "content-type": "application/json",
+        accept: "application/json, text/event-stream",
+        // Required by the 2026-07-28 transport: the headers and the body must
+        // agree on both the method and the tool before the server will look at
+        // either. The transport checks this before dispatch, so a mismatch is a
+        // -32020 rather than a tool error.
+        "Mcp-Method": "tools/call",
+        "Mcp-Name": name,
+      },
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        id: 1,
+        method: "tools/call",
+        params: { name, arguments: args, _meta: envelope },
+      }),
+    }) as never,
+  );
+
+  const body = await response.text();
+  // Streamable HTTP may answer as JSON or as a one-event SSE stream.
+  const json =
+    body.startsWith("event:") || body.startsWith("data:")
+      ? JSON.parse(body.split("data: ")[1] ?? "{}")
+      : JSON.parse(body);
+  return (json.result ?? json) as ToolResult;
 }
 
 /** The text of the first content item — what actually lands in model context. */

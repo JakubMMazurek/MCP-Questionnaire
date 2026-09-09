@@ -22,6 +22,7 @@
     "@cloudflare/vitest-plugin": "^1.1.0",
     "@mcpq/ui": "workspace:*",
     "@modelcontextprotocol/client": "2.0.0",
+    "@modelcontextprotocol/ext-apps": "1.7.5",
     "typescript": "^7.0.2",
     "vitest": "^4.1.11",
     "wrangler": "^4.126.0"

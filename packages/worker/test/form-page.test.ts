@@ -17,7 +17,8 @@ import { SELF } from "cloudflare:test";
 import { assumptionLedger } from "@mcpq/schema";
 import { describe, expect, it } from "vitest";
 import { FORM_URL_TTL_MS, mintFormToken } from "../src/form-url.js";
-import { ALLOWED_LOGIN, connect, firstText } from "./harness.js";
+import { UI_EXTENSION_ID } from "../src/ui-capability.js";
+import { ALLOWED_LOGIN, connect, firstText, rawCall } from "./harness.js";
 
 /** Matches `.dev.vars` — the tests sign with the same fake the Worker reads. */
 const SECRET = "dev-only-not-a-real-signing-key";
@@ -232,5 +233,65 @@ describe("the surface stays closed", () => {
     const { path } = await linkFor(formId);
     const response = await fetchPath(path, { method: "DELETE" });
     expect(response.status).toBe(405);
+  });
+});
+
+describe("choosing the carrier", () => {
+  /**
+   * The whole point of the branch: chat and Cowork keep the form, Claude Code
+   * gets a link, and neither needs the model to work out which it is in.
+   */
+  it("hands a link to a client that declared capabilities without MCP Apps", async () => {
+    // What Claude Code sends, measured on the wire 2026-09-09.
+    const result = await rawCall(
+      "gather_decisions",
+      { form: ledger() },
+      { clientName: "claude-code", capabilities: { roots: {}, elicitation: {} } },
+    );
+
+    const structured = result.structuredContent as { formId?: string; url?: string };
+    expect(structured.url).toMatch(/\/f\/1\./);
+    // Both channels, because this client drops content[0].text and delivers
+    // structuredContent — a link in the prose alone would reach nobody here.
+    expect(firstText(result)).toContain(structured.url ?? "no url");
+    expect(firstText(result)).toContain("does not render forms inline");
+
+    // And it opens.
+    const page = await fetchPath(new URL(structured.url ?? "").pathname);
+    expect(page.status).toBe(200);
+  });
+
+  it("leaves a host that declares MCP Apps exactly as it was", async () => {
+    const result = await rawCall(
+      "gather_decisions",
+      { form: ledger() },
+      { clientName: "claude-ai", capabilities: { extensions: { [UI_EXTENSION_ID]: {} } } },
+    );
+
+    expect(firstText(result)).toContain("Form displayed; awaiting input");
+    expect((result.structuredContent as { url?: string }).url).toBeUndefined();
+  });
+
+  it("leaves a client that declares nothing exactly as it was", async () => {
+    const { call, close } = await connect();
+    const result = await call("gather_decisions", { form: ledger() });
+    await close();
+
+    // Silence is not evidence. An unknown client behaves as it did before this
+    // server could tell the difference, and get_form_link stays one call away.
+    expect(firstText(result)).toContain("Form displayed; awaiting input");
+    expect((result.structuredContent as { url?: string }).url).toBeUndefined();
+  });
+
+  it("reopens with a link too, for the client that cannot show one", async () => {
+    const formId = await storedForm();
+    const result = await rawCall(
+      "load_form",
+      { formId },
+      { clientName: "claude-code", capabilities: { roots: {}, elicitation: {} } },
+    );
+
+    // "Put this form back on screen" means nothing on a client with no screen.
+    expect((result.structuredContent as { url?: string }).url).toMatch(/\/f\/1\./);
   });
 });

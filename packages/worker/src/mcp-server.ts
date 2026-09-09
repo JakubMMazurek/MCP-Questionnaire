@@ -45,6 +45,7 @@ import {
   RENDERER_URI,
   readRendererBundle,
 } from "./renderer-resource.js";
+import { clientFingerprint, rendersInline } from "./ui-capability.js";
 import { diagnosticsWithExample, serialiseExample } from "./worked-example.js";
 
 export const SERVER_INFO = { name: "mcp-questionnaire", version: "0.3.0" } as const;
@@ -112,9 +113,58 @@ const stub = (formId: string): ToolResult => ({
   structuredContent: { formId },
 });
 
+/**
+ * The same stub, for a client that told us it cannot mount the renderer.
+ *
+ * The link goes in BOTH channels deliberately. Claude Code delivers
+ * `structuredContent` to the model and DROPS `content[0].text` — measured, not
+ * supposed: a `gather_decisions` call from a Code session returns a bare
+ * `{"formId":…}` and the stub sentence never arrives. A link that travels only
+ * in the prose would therefore reach exactly nobody in the one client this
+ * exists for.
+ */
+const linkStub = (formId: string, url: string): ToolResult => ({
+  content: [
+    {
+      type: "text",
+      text: `This client does not render forms inline, so the form is a page instead. Give the user this link — it works for 12 hours:\n\n${url}\n\nWhen they submit, read their answers with get_answers("${formId}"). Hand over the URL by itself; do not repeat the formId beside it.`,
+    },
+  ],
+  structuredContent: { formId, url },
+});
+
 /* -------------------------------------------------------------------------- */
 /* the Durable Object handle                                                  */
 /* -------------------------------------------------------------------------- */
+
+/**
+ * The stub for this client: inline where the renderer will mount, a link where
+ * it will not (PROPOSAL-standalone-route.md §5).
+ *
+ * The DEFAULT when a client says nothing is the inline stub — exactly what this
+ * server did before it could tell the difference. A client that declares
+ * nothing is far more likely to be an unknown host than a broken one, and the
+ * failure modes are not symmetric: a link where a form would have rendered puts
+ * a capability URL into a conversation that did not need one, while an inline
+ * stub where nothing renders is the status quo, with get_form_link one call
+ * away.
+ */
+async function stubFor(
+  env: WorkerEnv,
+  formId: string,
+  origin: string | null,
+  login: string | null,
+  sources: { envelope?: unknown; handshake?: unknown },
+): Promise<ToolResult> {
+  const inline = rendersInline(sources);
+  if (inline !== false || !origin || !env.FORM_URL_SECRET) {
+    logEvent({ event: "stub_served", code: inline === false ? "link_unavailable" : "inline" });
+    return stub(formId);
+  }
+  const token = await mintFormToken(env.FORM_URL_SECRET, { formId, login: login ?? "unknown" });
+  logEvent({ event: "stub_served", code: "link" });
+  return linkStub(formId, formUrl(origin, token));
+}
 
 const NOT_FOUND = (formId: string) =>
   `form ${formId} not found — it may have expired (30-day idle TTL, reset on every read or write). Forms are not recoverable once expired: render a fresh one with gather_decisions, prefilled from what you already know.`;
@@ -222,7 +272,18 @@ export function createServer(env: WorkerEnv, origin: string | null = null): McpS
       }),
       _meta: uiMeta(["model", "app"]),
     },
-    async ({ form }) => {
+    async ({ form }, ctx) => {
+      // Which carrier this client gets, and who it was. One line per rendered
+      // form, closed vocabulary — the question it answers is whether a client
+      // that got a link could in fact have rendered one.
+      logEvent({
+        event: "client",
+        code: clientFingerprint({
+          envelope: (ctx as { mcpReq?: { envelope?: unknown } })?.mcpReq?.envelope,
+          handshake: server.server.getClientCapabilities(),
+          clientInfo: server.server.getClientVersion(),
+        }),
+      });
       const validation = validateForm(form);
       if (!validation.ok || !validation.form) {
         logEvent({
@@ -254,7 +315,10 @@ export function createServer(env: WorkerEnv, origin: string | null = null): McpS
         codes.length > 0
           ? ` ${validation.warnings.length} warning(s): ${codes.join(", ")} — the form renders as-is; see get_form_guide for the recipe.`
           : "";
-      const result = stub(formId);
+      const result = await stubFor(env, formId, origin, currentLogin(), {
+        envelope: (ctx as { mcpReq?: { envelope?: unknown } })?.mcpReq?.envelope,
+        handshake: server.server.getClientCapabilities(),
+      });
       return {
         ...result,
         content: [{ type: "text", text: `${result.content[0]?.text ?? ""}${warnings}` }],
@@ -302,15 +366,20 @@ export function createServer(env: WorkerEnv, origin: string | null = null): McpS
       }),
       _meta: uiMeta(["model", "app"]),
     },
-    async ({ formId }) => {
+    async ({ formId }, ctx) => {
       if (!isFormId(formId)) return failure(NOT_FOUND(formId));
       const exists = await formStore(env, formId).exists();
       if (!exists) return failure(NOT_FOUND(formId));
       logEvent({ event: "form_loaded" });
-      // The same stub shape as gather_decisions. The schema is NOT sent here
-      // either — the renderer fetches it itself with get_form_state, because
-      // the host delivers only tool input to the app.
-      return stub(formId);
+      // The same stub shape as gather_decisions, and the same carrier decision:
+      // "put this form back on screen" means nothing on a client with no
+      // screen to put it on. The schema is NOT sent here either — the renderer
+      // fetches it itself with get_form_state, because the host delivers only
+      // tool input to the app.
+      return stubFor(env, formId, origin, currentLogin(), {
+        envelope: (ctx as { mcpReq?: { envelope?: unknown } })?.mcpReq?.envelope,
+        handshake: server.server.getClientCapabilities(),
+      });
     },
   );
 
