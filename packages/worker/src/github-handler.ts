@@ -40,6 +40,7 @@
 import { AuthorizationError, type AuthRequest } from "@cloudflare/workers-oauth-provider";
 import { ALLOWLIST_UNSET, isAllowedLogin, parseAllowlist } from "./allowlist.js";
 import type { AuthProps, WorkerEnv } from "./env.js";
+import { handleFormPage } from "./form-page.js";
 import { logConfigError, logEvent } from "./log.js";
 
 /* -------------------------------------------------------------------------- */
@@ -373,6 +374,12 @@ export const githubHandler = {
     if (url.pathname === "/callback" && request.method === "GET") {
       return handleCallback(request, env);
     }
+
+    // `/f/:token` — the standalone carrier. It answers for its own prefix and
+    // returns null for anything else, so "everything else 404s" stays true and
+    // stays decided here.
+    const formPage = await handleFormPage(request, env);
+    if (formPage) return formPage;
 
     // Everything else, `/` included. Nothing about this deployment beyond the
     // OAuth metadata OAuthProvider publishes is discoverable by fetching it.

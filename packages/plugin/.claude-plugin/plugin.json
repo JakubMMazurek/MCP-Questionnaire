@@ -1,6 +1,8 @@
 {
   "name": "mcp-questionnaire",
-  "description": "Structured input surfaces inside the Claude conversation — prefilled forms, assumption ledgers, review matrices — instead of clarifying questions as prose. Connector + skill in one install.",
-  "version": "0.3.8",
-  "author": { "name": "Jakub Mazurek" }
+  "description": "Structured input surfaces inside the Claude conversation \u2014 prefilled forms, assumption ledgers, review matrices \u2014 instead of clarifying questions as prose. Connector + skill in one install.",
+  "version": "0.4.0",
+  "author": {
+    "name": "Jakub Mazurek"
+  }
 }

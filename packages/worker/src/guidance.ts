@@ -32,7 +32,7 @@
  * packages/plugin/.claude-plugin/plugin.json; verify-contract.mjs fails the
  * build if they drift.
  */
-export const SKILL_CONTRACT = "0.3.8";
+export const SKILL_CONTRACT = "0.4.0";
 
 export const GATHER_DECISIONS_DESCRIPTION = `Render a structured input surface (a form) in the conversation and collect the user's answers.
 
@@ -75,6 +75,12 @@ This is how the answers reach you. The form is a surface the user interacts with
 The result is one line per question — the label the user saw, the path, and the value — including the ones left empty, which are answers too. It says whether the form was submitted or is still a draft; a draft is safe to read, it is just not a decision yet.
 
 A value you prefilled and the user left alone comes back like any other answer, and that is what it is: it was on screen when they submitted. Act on it. Re-asking because it was originally your guess spends the turn the form just saved.`;
+
+export const GET_FORM_LINK_DESCRIPTION = `Mint a link that opens an already-stored form as a web page, for a user whose client cannot render the form inline. Takes the formId from gather_decisions.
+
+Use it when the form did not appear. Some clients — Claude Code among them — run the tools but mount no UI, so the user sees your text and no form. If they say they cannot see it, or you are in a client where forms have not been appearing, call this and give them the link.
+
+The page is the same renderer, so answers land in the same place: when they submit, read the answers with get_answers exactly as you would have. The link is good for 12 hours; call this again for a fresh one. Hand over the URL and nothing else — it is a capability, so do not repeat the formId beside it in the conversation.`;
 
 export const LOAD_FORM_DESCRIPTION = `Render an already-stored form again, for the USER to look at. Takes the formId returned by gather_decisions.
 

@@ -14,13 +14,21 @@
 
 import type { OAuthHelpers } from "@cloudflare/workers-oauth-provider";
 
-export type WorkerEnv = Omit<Env, "GITHUB_ALLOWED_USERS"> & {
+export type WorkerEnv = Omit<Env, "GITHUB_ALLOWED_USERS" | "FORM_URL_SECRET"> & {
   /**
    * Comma-separated GitHub logins, case-insensitive (see allowlist.ts).
    * Optional in the type because absent must be a live possibility the code
    * handles — it fails closed — not a compile error nobody sees.
    */
   GITHUB_ALLOWED_USERS?: string;
+  /**
+   * HMAC key for `/f/:token` form URLs. A `wrangler secret`, NEVER a `vars`
+   * entry — a `vars` entry of the same name REPLACES a secret, which is the
+   * trap that has already bitten this deploy once. Optional in the type for
+   * the same reason as the allowlist: absent must be a case the code handles
+   * (it fails closed), not a compile error nobody sees.
+   */
+  FORM_URL_SECRET?: string;
   /** Injected per request by OAuthProvider before the handler runs. */
   OAUTH_PROVIDER: OAuthHelpers;
 };

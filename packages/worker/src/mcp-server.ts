@@ -22,17 +22,20 @@ import { McpServer } from "@modelcontextprotocol/server";
 import { getMcpAuthContext } from "agents/mcp/server";
 import { z } from "zod";
 import { loginFromProps, type WorkerEnv } from "./env.js";
-import type { FormState, FormStore, SaveDraftResult } from "./form-do.js";
+import type { FormState, SaveDraftResult } from "./form-do.js";
 import { isFormId, mintFormId } from "./form-id.js";
+import { formStore } from "./form-store.js";
+import { formUrl, mintFormToken } from "./form-url.js";
 import {
   GATHER_DECISIONS_DESCRIPTION,
   GET_ANSWERS_DESCRIPTION,
   GET_FORM_GUIDE_DESCRIPTION,
+  GET_FORM_LINK_DESCRIPTION,
   GET_FORM_STATE_DESCRIPTION,
   LOAD_FORM_DESCRIPTION,
   SAVE_DRAFT_DESCRIPTION,
 } from "./guidance.js";
-import { logEvent } from "./log.js";
+import { logConfigError, logEvent } from "./log.js";
 import { ARCHETYPES, type ArchetypeName, examplesFor, recipeFor } from "./recipes.js";
 import {
   RENDERER_DESCRIPTION,
@@ -113,18 +116,6 @@ const stub = (formId: string): ToolResult => ({
 /* the Durable Object handle                                                  */
 /* -------------------------------------------------------------------------- */
 
-/**
- * `getByName(formId)` is the current sugar for `get(idFromName(formId))` — the
- * §3 addressing, unchanged: every request for one id reaches one instance, so
- * writes serialise and reads are strongly consistent.
- */
-function formStore(env: WorkerEnv, formId: string): FormStore {
-  // The cast is explained on `FormStore`: DO RPC's `Serializable` constraint
-  // rejects the `unknown` an answer value legitimately is (§4.3), collapsing
-  // the inferred return to `never`. Everything crossing the wire is plain JSON.
-  return env.FORM_DO.getByName(formId) as unknown as FormStore;
-}
-
 const NOT_FOUND = (formId: string) =>
   `form ${formId} not found — it may have expired (30-day idle TTL, reset on every read or write). Forms are not recoverable once expired: render a fresh one with gather_decisions, prefilled from what you already know.`;
 
@@ -149,7 +140,15 @@ function currentLogin(): string | null {
 /* the server                                                                 */
 /* -------------------------------------------------------------------------- */
 
-export function createServer(env: WorkerEnv): McpServer {
+/**
+ * @param origin The absolute origin this request arrived on, when it is known.
+ *   Only `get_form_link` needs it, and it must come from the request rather
+ *   than from configuration: this Worker legitimately answers on `workers.dev`,
+ *   on localhost under `wrangler dev`, and inside workerd under test, and
+ *   pinning one absolute URL would break two of those three. Null under
+ *   `serveStdio`, where there is no HTTP request to read it from.
+ */
+export function createServer(env: WorkerEnv, origin: string | null = null): McpServer {
   const server = new McpServer(SERVER_INFO);
 
   /* ------------------------------ the resource --------------------------- */
@@ -416,6 +415,67 @@ export function createServer(env: WorkerEnv): McpServer {
           // "who last wrote this" is the question the column exists to answer.
           updatedBy: state.updatedBy,
         },
+      };
+    },
+  );
+
+  /* ----------------------------- get_form_link --------------------------- */
+
+  /**
+   * The escape hatch for a client that mounts no UI.
+   *
+   * `gather_decisions` renders inline wherever the host supports MCP Apps. Where
+   * it does not — Claude Code mounts no `ui://` resource at all — the tools
+   * still run and the person sees nothing, which is exactly the failure the
+   * second field session hit from the other direction. This mints a signed URL
+   * for the same renderer, served as a page (PROPOSAL-standalone-route.md).
+   *
+   * Model-visible, because the model is who notices the form did not appear.
+   * It mints rather than stores: a link is a capability with a clock on it, and
+   * re-minting after 12 hours costs one round trip and no state.
+   */
+  server.registerTool(
+    "get_form_link",
+    {
+      title: "Get form link",
+      description: GET_FORM_LINK_DESCRIPTION,
+      inputSchema: z.object({
+        formId: z.string().describe("The id returned by gather_decisions."),
+      }),
+      _meta: textOnlyMeta,
+    },
+    async ({ formId }) => {
+      if (!isFormId(formId)) return failure(NOT_FOUND(formId));
+      if (!env.FORM_URL_SECRET) {
+        // Fails closed and says which lever is loose — to the operator through
+        // the log, and to the agent in words it can act on.
+        logConfigError("form_url_secret_unset");
+        return failure(
+          "form links are not configured on this server (no signing key). Nothing is wrong with the form itself: its answers are still readable with get_answers once the user fills it in another client.",
+        );
+      }
+      const state: FormState | null = await formStore(env, formId).getState();
+      if (!state) return failure(NOT_FOUND(formId));
+
+      const token = await mintFormToken(env.FORM_URL_SECRET, {
+        formId,
+        login: currentLogin() ?? "unknown",
+      });
+      if (!origin) {
+        return failure(
+          "this server cannot tell what its own address is on this transport, so it cannot mint a link. The form is unaffected: its answers are still readable with get_answers.",
+        );
+      }
+      const url = formUrl(origin, token);
+      logEvent({ event: "form_link_minted" });
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Open the form here — the link works for 12 hours:\n\n${url}\n\nWhen the user submits, read the answers with get_answers.`,
+          },
+        ],
+        structuredContent: { url },
       };
     },
   );

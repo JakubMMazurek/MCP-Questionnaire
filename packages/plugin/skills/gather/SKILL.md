@@ -5,7 +5,7 @@ description: Renders structured input surfaces (prefilled forms, assumption ledg
 
 # Gather decisions (MCP Questionnaire) — when to render a form instead of asking
 
-**Skill contract 0.3.8.** The `gather_decisions` tool description states the
+**Skill contract 0.4.0.** The `gather_decisions` tool description states the
 contract the deployed server expects. If it names a number higher than this one,
 this file is stale — tell the user in one line to run
 `/plugin update mcp-questionnaire`, and follow the tool descriptions and
@@ -99,12 +99,16 @@ names. If you are about to:
 10. If the tool returns validation errors, they include the fix and a worked
    example — correct the schema and call again; never fall back to prose bullets
    after a single failure.
-11. **If the user says they see nothing, believe them and switch to prose.** The
+11. **If the user says they see nothing, believe them and send a link.** The
    tool result is a stub whether or not anything rendered, so you cannot tell
    from your side. Not every host mounts MCP UI resources — Claude Code installs
-   this skill and calls these tools but shows no surface. A form nobody can see
-   is not a form: ask that turn's questions in chat, and mention that forms
-   render on claude.ai and Claude Desktop. Do not re-render and hope.
+   this skill and calls these tools but shows no surface. Call
+   `get_form_link(formId)` and give them the URL: it opens the same form as a
+   page, in a browser tab or in Claude Code's own browser pane, and their
+   answers land in the same place, so you still read them with `get_answers`.
+   Hand over the URL and nothing else — it is a capability, so do not repeat the
+   formId beside it. If they would rather not leave the conversation, ask that
+   turn's questions in prose instead. Either way, do not re-render and hope.
 12. **`get_form_state` and `save_draft` are the renderer's, not yours.** They
    exist so a reopened form can hydrate itself and autosave. Some hosts hide
    them from you; some (Claude Code) do not. `get_form_state` returns the entire

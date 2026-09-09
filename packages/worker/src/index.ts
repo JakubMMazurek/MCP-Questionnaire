@@ -50,26 +50,37 @@ export const MCP_ROUTE = "/mcp";
 let mcpHandler: ReturnType<typeof createMcpHandler> | undefined;
 
 function handlerFor(env: WorkerEnv) {
-  mcpHandler ??= createMcpHandler(() => createServer(env), {
-    route: MCP_ROUTE,
-    /**
-     * Custom connectors are dialled server-to-server from Anthropic's cloud,
-     * so there is no browser Origin to police and no cross-origin page that
-     * needs to reach this endpoint. The handler's default is wildcard CORS
-     * plus Origin validation (malformed, opaque and non-HTTP Origins get 403),
-     * which is the right shape: an absent Origin — every non-browser MCP
-     * client — stays valid.
-     *
-     * `allowedHostnames` is deliberately unset: localhost and workers.dev get
-     * matching defaults, and a custom domain relies on Cloudflare routing.
-     */
-    onerror: (error) => {
-      // Closed-vocabulary reporting only. An MCP error message can quote the
-      // offending request, which for this server means answers and schemas
-      // (§3 — never log payloads), so the name is logged and nothing else.
-      logConfigError(`mcp_handler_error:${error.name}`);
+  /**
+   * The factory receives the SDK's per-request context, whose `requestInfo` is
+   * the original HTTP request — which is how `get_form_link` learns the origin
+   * to mint a URL on. Deriving it per request keeps the same deployment
+   * working on workers.dev, on localhost under `wrangler dev`, and in workerd
+   * under test, which a configured absolute URL would not.
+   */
+  mcpHandler ??= createMcpHandler(
+    (context) =>
+      createServer(env, context.requestInfo ? new URL(context.requestInfo.url).origin : null),
+    {
+      route: MCP_ROUTE,
+      /**
+       * Custom connectors are dialled server-to-server from Anthropic's cloud,
+       * so there is no browser Origin to police and no cross-origin page that
+       * needs to reach this endpoint. The handler's default is wildcard CORS
+       * plus Origin validation (malformed, opaque and non-HTTP Origins get 403),
+       * which is the right shape: an absent Origin — every non-browser MCP
+       * client — stays valid.
+       *
+       * `allowedHostnames` is deliberately unset: localhost and workers.dev get
+       * matching defaults, and a custom domain relies on Cloudflare routing.
+       */
+      onerror: (error) => {
+        // Closed-vocabulary reporting only. An MCP error message can quote the
+        // offending request, which for this server means answers and schemas
+        // (§3 — never log payloads), so the name is logged and nothing else.
+        logConfigError(`mcp_handler_error:${error.name}`);
+      },
     },
-  });
+  );
   return mcpHandler;
 }
 
