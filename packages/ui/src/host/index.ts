@@ -33,3 +33,12 @@ export {
   type StyleVariables,
   type ToolCallResult,
 } from "./protocol.js";
+export {
+  BOOTSTRAP_ID,
+  createStandaloneBridge,
+  OFFLINE_NOTICE,
+  readBootstrap,
+  type StandaloneBootstrap,
+  type StandaloneBridgeOptions,
+  SUBMITTED_NOTICE,
+} from "./standalone.js";

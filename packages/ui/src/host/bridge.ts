@@ -55,7 +55,7 @@ export const SAVE_DRAFT_DEBOUNCE_MS = 3_000;
 export const INVALID_GRACE_MS = 800;
 
 /** After this many consecutive failures we stop trying (the tool may not exist). */
-const SAVE_DRAFT_GIVE_UP_AFTER = 3;
+export const SAVE_DRAFT_GIVE_UP_AFTER = 3;
 
 export type DraftOutcome =
   | { kind: "saved" }
@@ -109,7 +109,7 @@ export type Bridge = {
   stop: () => void;
 };
 
-type Debounced = {
+export type Debounced = {
   /** `delayMs` overrides the default — how a throttled draft backs off. */
   schedule: (delayMs?: number) => void;
   cancel: () => void;
@@ -117,7 +117,12 @@ type Debounced = {
   flush: (options?: { force?: boolean }) => Promise<void>;
 };
 
-function debounce(run: () => Promise<void> | void, ms: number): Debounced {
+/**
+ * Exported for the standalone carrier, which needs the same pacing — including
+ * the `delayMs` override that lets a throttled write back off by exactly what
+ * the store asked for.
+ */
+export function debounce(run: () => Promise<void> | void, ms: number): Debounced {
   let timer: ReturnType<typeof setTimeout> | undefined;
   let pending = false;
   const fire = async (): Promise<void> => {
@@ -275,6 +280,22 @@ export function draftOutcome(result: ToolCallResult | undefined): DraftOutcome {
   return { kind: "failed" };
 }
 
+/**
+ * The whole rendered view, as a submission (§4.6 — not rendered is empty).
+ *
+ * Module-level and exported because the standalone carrier builds the same
+ * object from the same store. What a submission IS must not depend on how the
+ * form was delivered, and the surest way to keep that true is one function.
+ */
+export function currentSubmission(store: EngineStore): Submission | null {
+  const state = store.getState();
+  if (!state.form || state.status !== "ready") return null;
+  return buildSubmission(state.form, state.answers, state.effects, state.prefill, {
+    rows: state.rows,
+    leaves: state.leaves,
+  });
+}
+
 export function createBridge(options: BridgeOptions): Bridge {
   const { store } = options;
   const apply = options.applyContext ?? applyHostContext;
@@ -322,19 +343,10 @@ export function createBridge(options: BridgeOptions): Bridge {
 
   /* ---------------------------- outbound pushes --------------------------- */
 
-  const currentSubmission = (): Submission | null => {
-    const state = store.getState();
-    if (!state.form || state.status !== "ready") return null;
-    return buildSubmission(state.form, state.answers, state.effects, state.prefill, {
-      rows: state.rows,
-      leaves: state.leaves,
-    });
-  };
-
   const contextPush = debounce(async () => {
     if (frozen) return;
     const state = store.getState();
-    const submission = currentSubmission();
+    const submission = currentSubmission(store);
     if (!submission || !state.form) return;
     try {
       await app.updateModelContext({
@@ -364,7 +376,7 @@ export function createBridge(options: BridgeOptions): Bridge {
     const submitted = submittedFlush;
     completeFlush = false;
     submittedFlush = false;
-    const answers = complete ? (currentSubmission()?.answers ?? state.answers) : state.answers;
+    const answers = complete ? (currentSubmission(store)?.answers ?? state.answers) : state.answers;
     try {
       const result = await app.callServerTool({
         name: SAVE_DRAFT_TOOL,
@@ -418,8 +430,15 @@ export function createBridge(options: BridgeOptions): Bridge {
     // value as it stands" is a real answer, and it is the one a fully prefilled
     // plan_confirmation exists to collect (§5.4).
     await draftPush.flush({ force: options.submitted === true || store.getState().revision > 0 });
-    completeFlush = false;
-    submittedFlush = false;
+    // The flags are NOT cleared here. `draftPush` consumes them at the top of
+    // every run, and a throttled write RE-ARMS them for its retry — clearing
+    // them after the await would wipe exactly that, and the retry would go out
+    // as a plain incremental draft. The DO's own contract says otherwise: the
+    // first submit skips its rate limit, "later submits queue like anything
+    // else, and the app preserves the flag across the retry". A second submit
+    // (the user edited something and submitted again) is the case that breaks,
+    // and it breaks silently — `submittedAt` never gets stamped, so the agent
+    // reads a finished form as still in progress.
   };
 
   /* --------------------------- inbound handling --------------------------- */
@@ -618,7 +637,7 @@ export function createBridge(options: BridgeOptions): Bridge {
 
     async submit() {
       const state = store.getState();
-      const submission = currentSubmission();
+      const submission = currentSubmission(store);
       if (!submission || !state.form) return null;
       contextPush.cancel();
       // The submit flush is what stamps the stored draft as submitted, and it

@@ -4,24 +4,13 @@
     {
       "name": "ui-harness",
       "runtimeExecutable": "pnpm",
-      "runtimeArgs": [
-        "--filter",
-        "@mcpq/ui",
-        "dev"
-      ],
+      "runtimeArgs": ["--filter", "@mcpq/ui", "dev"],
       "port": 5173
     },
     {
       "name": "ui-harness-5199",
       "runtimeExecutable": "pnpm",
-      "runtimeArgs": [
-        "--filter",
-        "@mcpq/ui",
-        "dev",
-        "--port",
-        "5199",
-        "--strictPort"
-      ],
+      "runtimeArgs": ["--filter", "@mcpq/ui", "dev", "--port", "5199", "--strictPort"],
       "port": 5199,
       "url": "http://localhost:5199"
     }

@@ -675,6 +675,48 @@ describe("draft throttle semantics (§3, step 5 stage A)", () => {
     expect(store.getState().draftStatus).toBeNull();
   });
 
+  /**
+   * The regression the standalone carrier's suite found first.
+   *
+   * The DO exempts only the FIRST submit from its rate limit, and its own
+   * comment states the other half of the contract: "later submits queue like
+   * anything else, and the app preserves the flag across the retry". The app
+   * did not. `flushComplete` cleared `completeFlush`/`submittedFlush` right
+   * after awaiting the push, wiping exactly the flags a throttle had just
+   * re-armed — so a second submit (the user edited an answer and submitted
+   * again) retried as a plain incremental draft, `submittedAt` was never
+   * stamped, and `get_answers` reported a finished form as still in progress.
+   * Silently, on the one write the receipt has already promised the agent.
+   */
+  it("retries a throttled submit as a submit, not as an autosave", async () => {
+    let refusals = 0;
+    const { host, store, bridge } = await connect({
+      onToolsCall: () => {
+        refusals += 1;
+        return refusals === 1 ? throttled : { structuredContent: { ok: true, saved: 1 } };
+      },
+    });
+    host.sendToolInput(assumptionLedger);
+    host.sendToolResult({ structuredContent: { formId: "0123456789abcdef0123456789abcdef" } });
+    await settle();
+    store.getState().setAnswer(VERDICT, "fix");
+
+    const promise = bridge.submit();
+    await vi.advanceTimersByTimeAsync(0);
+    await settle();
+    await promise;
+    expect(host.of(METHOD.toolsCall)).toHaveLength(1);
+
+    await vi.advanceTimersByTimeAsync(900);
+    await settle();
+    const retry = host.last(METHOD.toolsCall)?.params as {
+      arguments: { complete?: boolean; submitted?: boolean };
+    };
+    expect(host.of(METHOD.toolsCall)).toHaveLength(2);
+    expect(retry.arguments.complete).toBe(true);
+    expect(retry.arguments.submitted).toBe(true);
+  });
+
   it("stops retrying an oversized draft and surfaces it in the status line", async () => {
     const { host, store } = await connect({ onToolsCall: () => tooLarge });
     host.sendToolInput(assumptionLedger);

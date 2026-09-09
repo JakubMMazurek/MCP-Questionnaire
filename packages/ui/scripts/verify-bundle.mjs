@@ -20,15 +20,15 @@ import { fileURLToPath } from "node:url";
 import { gzipSync } from "node:zlib";
 
 const here = dirname(fileURLToPath(import.meta.url));
-const bundle = join(here, "..", "dist", "index.html");
-
-let html;
-try {
-  html = readFileSync(bundle, "utf8");
-} catch {
-  console.error(`verify-bundle: no build at ${bundle} — run \`pnpm build\` first.`);
-  process.exit(1);
-}
+/**
+ * One bundle, two carriers, one rule.
+ *
+ * The same file is mounted by a host as `ui://forms/renderer` and served by the
+ * Worker as a page; the page's policy loosens exactly one directive
+ * (`connect-src 'self'`, so drafts reach the DO). Neither carrier may load
+ * anything from anywhere, so the check does not care which one is running.
+ */
+const bundles = [{ name: "index.html", path: join(here, "..", "dist", "index.html") }];
 
 const offences = [
   [/<script[^>]+\bsrc\s*=/i, "a <script src> — every script must be inlined"],
@@ -39,11 +39,29 @@ const offences = [
   [/@font-face/i, "an @font-face — no external fonts (§8)"],
 ];
 
-const found = offences.filter(([pattern]) => pattern.test(html));
-for (const [, description] of found) console.error(`verify-bundle: FAIL — found ${description}`);
-if (found.length > 0) process.exit(1);
-
-const raw = statSync(bundle).size;
-const gzip = gzipSync(html).length;
 const kb = (bytes) => `${(bytes / 1024).toFixed(1)} kB`;
-console.log(`verify-bundle: self-contained. ${kb(raw)} raw, ${kb(gzip)} gzip.`);
+let failed = false;
+
+for (const bundle of bundles) {
+  let html;
+  try {
+    html = readFileSync(bundle.path, "utf8");
+  } catch {
+    console.error(`verify-bundle: no build at ${bundle.path} — run \`pnpm build\` first.`);
+    process.exit(1);
+  }
+
+  const found = offences.filter(([pattern]) => pattern.test(html));
+  for (const [, description] of found) {
+    console.error(`verify-bundle: FAIL — ${bundle.name} has ${description}`);
+    failed = true;
+  }
+
+  const raw = statSync(bundle.path).size;
+  const gzip = gzipSync(html).length;
+  if (found.length === 0) {
+    console.log(`verify-bundle: ${bundle.name} self-contained. ${kb(raw)} raw, ${kb(gzip)} gzip.`);
+  }
+}
+
+if (failed) process.exit(1);

@@ -4,6 +4,14 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>MCP Questionnaire</title>
+    <!--
+      Empty in the `ui://` resource, filled by the Worker when it serves this
+      same bundle as a page. Which carrier the app is on is decided by whether
+      anything is here — see `readBootstrap` in src/host/standalone.ts. It is an
+      `application/json` script so the payload is DATA to the parser: a schema
+      or an answer containing `</script>` cannot become code.
+    -->
+    <script type="application/json" id="mcpq-bootstrap">null</script>
   </head>
   <body>
     <div id="root"></div>
