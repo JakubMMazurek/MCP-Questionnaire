@@ -1,7 +1,8 @@
 # Proposal — the standalone browser route (a §10 for DESIGN.html)
 
-**Status: proposal.** Nothing here is a `decided` chip. Two questions at the end
-need Jakub's answer before any code. Written 2026-09-09 against DESIGN.html
+**Status: proposal, with §8 resolved 2026-09-09.** Both open questions were
+answered by Jakub and are recorded there as `decided`; the rest still awaits a
+fold into DESIGN.html. Written 2026-09-09 against DESIGN.html
 §3, §7.1–§7.4, §8.1, and the code as it stands at commit `08f740c`.
 
 ## 1. The problem this solves
@@ -111,7 +112,13 @@ The formId is a capability internally (§3) and must not become a URL you can
 paste. The token is instead an HMAC over `formId`, an expiry and the GitHub
 login that requested it, signed with a worker **secret**.
 
-- Short TTL (proposed: 30 minutes), checked on both routes.
+- TTL of 12 hours (`decided` — see §8 Q2), checked on both routes. Long enough
+  that a form survives lunch, a laptop lid, or being forwarded to a colleague's
+  machine; short enough that a leaked link is not a standing grant. The DO's own
+  30-day idle expiry is unchanged and independent.
+- The GitHub login is signed INTO the token for provenance and revocation, and
+  is deliberately not checked against the viewer — the page has no login, and
+  forwarding a form to the person who should answer it is a legitimate use.
 - An expired token renders a page that says what happened and what to do — the
   §6.3 standard for error text applies to this page too.
 - **Deploy trap, already bitten once:** the signing key is a `wrangler secret`,
@@ -167,27 +174,28 @@ Colocated as always, per CLAUDE.md.
   token on `/mcp`, and it is the reason for the short TTL.
 - Drafts now have two write paths into the same DO method.
 
-## 8. Two questions before any code
+## 8. The two questions, answered
 
-**Q1 — the CSP for the standalone page.** §8's `connect-src 'none'` is the
-*host's* default under MCP Apps, applied because §7.1 deliberately omits
-`ui.csp`; it is not a policy this repo chose for itself, and there is no host
-here to impose one. Two honest readings:
+**Q1 — the CSP for the standalone page. `connect-src 'self'`.** `decided
+2026-09-09` §8's `connect-src 'none'` is the *host's* default under MCP Apps,
+applied because §7.1 deliberately omits `ui.csp`; it is not a policy this repo
+chose for itself, and there is no host here to impose one. §3 put drafts in the
+DO because the iframe *could not* POST — that constraint is absent from a page
+we serve ourselves. So the page may talk to its own origin and nothing else,
+and drafts autosave into the DO exactly as §3 intends.
 
-- **(a) `connect-src 'self'`** — drafts autosave to the DO exactly as §3
-  intends, at the price of the page being able to talk to its own origin.
-- **(b) keep `connect-src 'none'`** — answers travel by native
-  `<form method="post">` (`form-action` is a separate directive, so no fetch
-  ever happens). Preserves the letter of §8; costs a page navigation on submit
-  and, realistically, means no mid-fill autosave.
+Rejected, and why worth recording: keeping `'none'` and submitting through a
+native `<form method="post">` preserves the letter of §8 (`form-action` is a
+separate directive, so no fetch occurs) but costs mid-fill autosave; keeping
+`'none'` with `localStorage` drafts keeps autosave but silently moves a
+person's half-finished answers out of the DO and into their browser.
 
-Recommendation: **(a)**. §3 put drafts in the DO because the iframe *could not*
-POST; standalone has no such constraint, and (b) would either drop autosave or
-move drafts into `localStorage`, which silently changes where a person's
-half-finished answers live.
+Everything else §8 asks for still holds and is not negotiable here: one
+self-contained bundle, no CDN, no external fonts, no telemetry.
 
-**Q2 — token or login?** A signed URL is frictionless and the standard shape for
-"open this form". Requiring the GitHub OAuth flow on `/f/:token` would tie the
-page to the same identity that guards `/mcp`, at the cost of a login round trip
-before every form. Recommendation: signed URL with a 30-minute TTL, revisit if
-these ever carry anything sensitive.
+**Q2 — token or login? Signed URL, 12-hour TTL.** `decided 2026-09-09`
+Requiring the GitHub OAuth flow before every form was rejected as too much
+friction for someone who just wants to answer four questions. The signed URL is
+weaker than the bearer token on `/mcp` — that is stated plainly in §7 above —
+and the TTL is what bounds the exposure. Revisit if a form ever carries
+something that would matter in a leaked link.
