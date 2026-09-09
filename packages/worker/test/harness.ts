@@ -284,9 +284,9 @@ export async function rawCall(
       version: "0.0.0",
     },
   };
-  if (declaration.capabilities) {
-    envelope["io.modelcontextprotocol/clientCapabilities"] = declaration.capabilities;
-  }
+  // Required on every 2026-07-28 request: omitting it is a -32602 before the
+  // handler is ever reached. Default to declaring nothing in particular.
+  envelope["io.modelcontextprotocol/clientCapabilities"] = declaration.capabilities ?? {};
 
   const response = await SELF.fetch(
     new Request(MCP_URL.href, {

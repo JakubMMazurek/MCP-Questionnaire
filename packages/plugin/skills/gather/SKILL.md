@@ -5,7 +5,7 @@ description: Renders structured input surfaces (prefilled forms, assumption ledg
 
 # Gather decisions (MCP Questionnaire) — when to render a form instead of asking
 
-**Skill contract 0.4.0.** The `gather_decisions` tool description states the
+**Skill contract 0.5.0.** The `gather_decisions` tool description states the
 contract the deployed server expects. If it names a number higher than this one,
 this file is stale — tell the user in one line to run
 `/plugin update mcp-questionnaire`, and follow the tool descriptions and
@@ -99,16 +99,19 @@ names. If you are about to:
 10. If the tool returns validation errors, they include the fix and a worked
    example — correct the schema and call again; never fall back to prose bullets
    after a single failure.
-11. **If the user says they see nothing, believe them and send a link.** The
-   tool result is a stub whether or not anything rendered, so you cannot tell
-   from your side. Not every host mounts MCP UI resources — Claude Code installs
-   this skill and calls these tools but shows no surface. Call
-   `get_form_link(formId)` and give them the URL: it opens the same form as a
-   page, in a browser tab or in Claude Code's own browser pane, and their
-   answers land in the same place, so you still read them with `get_answers`.
-   Hand over the URL and nothing else — it is a capability, so do not repeat the
-   formId beside it. If they would rather not leave the conversation, ask that
-   turn's questions in prose instead. Either way, do not re-render and hope.
+11. **When the form is a link, wait for it with `await_answers(formId)`.** On a
+   client that cannot render inline the tool result carries a URL instead of a
+   stub — give the user that URL by itself (it is a capability; don't repeat the
+   formId beside it), then **call `await_answers(formId)` immediately**. A page
+   cannot speak into the conversation, so without that call they submit, nothing
+   happens, and they have to come back and ask you to read their own answers —
+   the exact busywork the form removes. It waits ~45s per call and returns their
+   answers the moment they land; if it says they are still filling it in, call it
+   again, as many times as it takes. **Never ask "have you submitted yet?"** —
+   that tool is how you find out, and asking mid-typing is the interruption a
+   form exists to prevent. If they say they see nothing at all and want no link,
+   call `get_form_link(formId)` for a fresh URL or fall back to prose questions;
+   either way, do not re-render and hope.
 12. **`get_form_state` and `save_draft` are the renderer's, not yours.** They
    exist so a reopened form can hydrate itself and autosave. Some hosts hide
    them from you; some (Claude Code) do not. `get_form_state` returns the entire

@@ -32,7 +32,7 @@
  * packages/plugin/.claude-plugin/plugin.json; verify-contract.mjs fails the
  * build if they drift.
  */
-export const SKILL_CONTRACT = "0.4.0";
+export const SKILL_CONTRACT = "0.5.0";
 
 export const GATHER_DECISIONS_DESCRIPTION = `Render a structured input surface (a form) in the conversation and collect the user's answers.
 
@@ -81,6 +81,14 @@ export const GET_FORM_LINK_DESCRIPTION = `Mint a link that opens an already-stor
 Use it when the form did not appear. Some clients — Claude Code among them — run the tools but mount no UI, so the user sees your text and no form. If they say they cannot see it, or you are in a client where forms have not been appearing, call this and give them the link.
 
 The page is the same renderer, so answers land in the same place: when they submit, read the answers with get_answers exactly as you would have. The link is good for 12 hours; call this again for a fresh one. Hand over the URL and nothing else — it is a capability, so do not repeat the formId beside it in the conversation.`;
+
+export const AWAIT_ANSWERS_DESCRIPTION = `Wait for the user to submit a form, and return their answers the moment they do. Takes the formId from gather_decisions.
+
+CALL THIS IMMEDIATELY AFTER YOU GIVE SOMEONE A FORM LINK. A link opens a page, and a page cannot speak into this conversation — without this tool the user submits, nothing happens, and they have to come back and ask you to read their own answers. That is the busywork the form existed to remove.
+
+It waits about 45 seconds per call. If they have not submitted yet it says so and tells you what has been saved so far; call it again with the same formId, as many times as it takes. Do NOT ask the user whether they are finished — this tool is how you find that out, and asking while they are typing is the interruption a form is supposed to prevent.
+
+When it returns their answers, act on them. There is no need to call get_answers afterwards: what comes back is the same report.`;
 
 export const LOAD_FORM_DESCRIPTION = `Render an already-stored form again, for the USER to look at. Takes the formId returned by gather_decisions.
 

@@ -27,6 +27,7 @@ import { isFormId, mintFormId } from "./form-id.js";
 import { formStore } from "./form-store.js";
 import { formUrl, mintFormToken } from "./form-url.js";
 import {
+  AWAIT_ANSWERS_DESCRIPTION,
   GATHER_DECISIONS_DESCRIPTION,
   GET_ANSWERS_DESCRIPTION,
   GET_FORM_GUIDE_DESCRIPTION,
@@ -175,6 +176,37 @@ async function stubFor(
   logEvent({ event: "stub_served", code: "link" });
   return linkStub(formId, formUrl(origin, token));
 }
+
+/** One rendering of "here are the answers", shared by get_answers and await_answers. */
+function answersReport(formId: string, state: FormState): ToolResult {
+  const report = reportAnswers(state.form, state.answers);
+  const when = new Date(state.submittedAt ?? state.updatedAt).toISOString();
+  const status =
+    state.submittedAt === null
+      ? `NOT YET SUBMITTED — this is the draft as it stands at ${when}. The user may still be filling it in.`
+      : `Submitted ${when}.`;
+  logEvent({ event: "answers_served", count: report.answered });
+  return {
+    content: [
+      {
+        type: "text",
+        text: [`"${state.form.title}" (formId ${formId})`, status, "", report.text].join("\n"),
+      },
+    ],
+  };
+}
+
+/**
+ * How long one `await_answers` hop waits, and how often it looks.
+ *
+ * 45s sits under Claude Code's 60-second first-byte timer with room to spare,
+ * and well under the five-minute idle abort. The poll is a Durable Object read
+ * on the same instance the writes go to, so it is cheap and strongly
+ * consistent — a submit is visible on the next look, not eventually.
+ */
+const DEFAULT_WAIT_MS = 45_000;
+const MAX_WAIT_MS = 55_000;
+const POLL_INTERVAL_MS = 1_000;
 
 const NOT_FOUND = (formId: string) =>
   `form ${formId} not found — it may have expired (30-day idle TTL, reset on every read or write). Forms are not recoverable once expired: render a fresh one with gather_decisions, prefilled from what you already know.`;
@@ -425,16 +457,78 @@ export function createServer(
       if (!isFormId(formId)) return failure(NOT_FOUND(formId));
       const state: FormState | null = await formStore(env, formId).getState();
       if (!state) return failure(NOT_FOUND(formId));
+      return answersReport(formId, state);
+    },
+  );
 
-      const report = reportAnswers(state.form, state.answers);
-      const when = new Date(state.submittedAt ?? state.updatedAt).toISOString();
-      const status =
-        state.submittedAt === null
-          ? `NOT YET SUBMITTED — this is the draft as it stands at ${when}. The user may still be filling it in.`
-          : `Submitted ${when}.`;
+  /* ----------------------------- await_answers --------------------------- */
 
-      logEvent({ event: "answers_served", count: report.answered });
-      return text([`"${state.form.title}" (formId ${formId})`, status, "", report.text].join("\n"));
+  /**
+   * The other half of the link carrier (PROPOSAL-standalone-route.md §5).
+   *
+   * On the `ui://` carrier the app sends `ui/message` when the user submits:
+   * a receipt lands in the conversation and the agent takes its turn. A web
+   * page has no conversation to speak into, so the loop ended with the person
+   * going back to their session and asking to have their own answers read —
+   * which is precisely the busywork the form was supposed to remove.
+   *
+   * So the waiting moves to the server. The agent calls this the moment it
+   * hands over a link; it returns the answers the instant they land.
+   *
+   * It waits in SHORT hops rather than one long block, because Claude Code
+   * starts a per-request timer covering everything up to the server's first
+   * response byte, and that timer is 60 seconds unless the server entry
+   * configures otherwise. A single four-minute block would trip it. A hop that
+   * answers inside the window and says "call me again" cannot, and the retry
+   * costs the user nothing — they are filling in a form, not watching this.
+   */
+  server.registerTool(
+    "await_answers",
+    {
+      title: "Await answers",
+      description: AWAIT_ANSWERS_DESCRIPTION,
+      inputSchema: z.object({
+        formId: z.string().describe("The id returned by gather_decisions."),
+        waitMs: z
+          .number()
+          .optional()
+          .describe(
+            "How long to wait before answering that nothing has arrived yet. Default 45000, capped at 55000.",
+          ),
+      }),
+      _meta: textOnlyMeta,
+    },
+    async ({ formId, waitMs }) => {
+      if (!isFormId(formId)) return failure(NOT_FOUND(formId));
+      const store = formStore(env, formId);
+      const deadline = Date.now() + Math.min(Math.max(waitMs ?? DEFAULT_WAIT_MS, 0), MAX_WAIT_MS);
+
+      for (;;) {
+        const state: FormState | null = await store.getState();
+        if (!state) return failure(NOT_FOUND(formId));
+        if (state.submittedAt !== null) {
+          logEvent({ event: "await_resolved" });
+          return answersReport(formId, state);
+        }
+        if (Date.now() >= deadline) {
+          logEvent({ event: "await_timeout" });
+          const report = reportAnswers(state.form, state.answers);
+          return {
+            ...text(
+              [
+                `Not submitted yet — "${state.form.title}" is still open.`,
+                report.answered > 0
+                  ? `${report.answered} answer(s) saved so far, so they are filling it in.`
+                  : "Nothing saved yet.",
+                "",
+                "Call await_answers again with the same formId to keep waiting. Do not ask the user whether they are done — this tool is what finds out.",
+              ].join("\n"),
+            ),
+            structuredContent: { formId, submitted: false, answered: report.answered },
+          };
+        }
+        await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
+      }
     },
   );
 

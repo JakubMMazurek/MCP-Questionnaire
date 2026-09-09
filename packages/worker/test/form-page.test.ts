@@ -326,3 +326,48 @@ describe("choosing the carrier", () => {
     expect((result.structuredContent as { url?: string }).url).toMatch(/\/f\/1\./);
   });
 });
+
+describe("await_answers", () => {
+  /**
+   * The gap this closes: a page cannot send `ui/message`, so without this the
+   * person submits, nothing happens, and they come back to ask for their own
+   * answers to be read out. Jakub hit exactly that, 2026-09-09.
+   */
+  it("returns the answers as soon as a submit lands", async () => {
+    const formId = await storedForm();
+    const { path } = await linkFor(formId);
+
+    // The wait starts BEFORE the submit, as it does in life.
+    const waiting = rawCall("await_answers", { formId, waitMs: 8_000 });
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    await post(path, { answers: answered("confirm"), complete: true, submitted: true });
+
+    const result = await waiting;
+    expect(firstText(result)).toMatch(/Submitted/);
+    expect(firstText(result)).toContain("confirm");
+  });
+
+  it("says what is saved so far rather than pretending, when nothing arrives", async () => {
+    const formId = await storedForm();
+    const { path } = await linkFor(formId);
+    await post(path, { answers: answered("fix") });
+
+    const result = await rawCall("await_answers", { formId, waitMs: 0 });
+    expect(firstText(result)).toContain("Not submitted yet");
+    // It tells the agent to keep waiting, not to go and pester the user.
+    expect(firstText(result)).toContain("await_answers again");
+    expect(firstText(result)).toMatch(/Do not ask the user/i);
+    expect(result.structuredContent).toMatchObject({ submitted: false, answered: 1 });
+  });
+
+  it("returns immediately for a form already submitted", async () => {
+    const formId = await storedForm();
+    const { path } = await linkFor(formId);
+    await post(path, { answers: answered("confirm"), complete: true, submitted: true });
+
+    const started = Date.now();
+    const result = await rawCall("await_answers", { formId, waitMs: 30_000 });
+    expect(Date.now() - started).toBeLessThan(5_000);
+    expect(firstText(result)).toMatch(/Submitted/);
+  });
+});
