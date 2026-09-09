@@ -86,10 +86,13 @@ and reuses everything above it:
 | `reportSize` / `observe` | `ui/notifications/size-changed` | no-op |
 | `formId` | learned from the §3 stub result | in the page, from the signed URL |
 
-**Build:** a second Vite entry (`standalone.html`) beside `index.html`, same
-`vite-plugin-singlefile`, same zero external references. `packages/ui/dist/`
-gains one more self-contained file; the ASSETS binding already serves that
-directory.
+**Build: one bundle, not two.** `built 2026-09-09` The proposal said a second
+Vite entry; `vite-plugin-singlefile` cannot inline two, and the attempt was the
+right kind of failure. The bundle now decides its own carrier at startup by
+whether the document carries a bootstrap — the Worker writes one, a host does
+not — so there is one file, one build, one self-containment check, and no
+second artefact to keep true. The same reasoning §7.1 gives for one `ui://`
+resource applies to one bundle.
 
 ## 4. New worker surface
 
@@ -147,8 +150,13 @@ One URL, three ways to hand it over, in descending order of polish:
    opens the system browser and waits for the user to confirm, then the tool
    call resumes. Documented client behaviour, and the SDK in this repo already
    has the params type.
-3. **A link in the receipt.** Any client at all, terminal CLI included. The
-   agent then polls `get_answers` exactly as it does today.
+3. **A link from `get_form_link(formId)`.** `built 2026-09-09` Any client at
+   all, terminal CLI included. A new model-visible tool that mints a fresh
+   signed URL for a stored form — model-visible because the model is who
+   notices the form did not appear. It mints rather than stores: a link is a
+   capability with a clock on it, and re-minting costs one round trip and no
+   state. Skill contract 0.4.0 carries the rule change: where rule 11 used to
+   say "believe them and switch to prose", it now says to send the link.
 
 All three end in the same place: answers in the DO, `get_answers` renders them
 as prose.
@@ -156,6 +164,10 @@ as prose.
 ## 6. Test plan
 
 Colocated as always, per CLAUDE.md.
+
+**Status: §3–§6 built and committed 2026-09-09** (`48aba91`, `51da43e`) —
+424 tests green, the standalone page verified in the Browser pane against the
+dev harness. Not yet deployed, and URL-mode elicitation (§5.2) is not built.
 
 - **Worker (`@cloudflare/vitest-pool-workers`):** token accepted / expired /
   tampered / wrong-user; `GET` returns the bundle with the schema inlined;
