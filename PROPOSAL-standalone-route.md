@@ -129,7 +129,10 @@ login that requested it, signed with a worker **secret**.
 
 The page is served by us, so the CSP is ours to set rather than the host's:
 `default-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'self'
-'unsafe-inline'; img-src 'self' data:; frame-ancestors 'none'`. Self-contained
+'unsafe-inline'; img-src 'self' data:; connect-src 'self'; form-action 'none';
+frame-ancestors 'none'`. `connect-src 'self'` is Q1's answer and the only
+loosening; `frame-ancestors 'none'` keeps the page out of anyone else's iframe,
+including the widget sandbox that started this. Self-contained
 bundle, no CDN, no external fonts, no telemetry — §8's substance, restated for a
 context that has no host to impose it.
 
