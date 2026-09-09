@@ -49,13 +49,44 @@ export type ValueContext = {
   overlays: Overlays;
 };
 
+/**
+ * Filtered multi-select values, by the array they came from.
+ *
+ * `effectiveValue` is the read path for EVERY value in the app, and per-path
+ * selectors call it on every render. A `filter` that allocates a fresh array
+ * each time hands React a new snapshot identity every render, which
+ * `useSyncExternalStore` reads as "the store changed" — and that is an infinite
+ * render loop, not a slow one.
+ *
+ * It shipped and reached a user: a form with `filter_options` over a prefilled
+ * `multi_select` rendered as a blank page and React error #185, "maximum update
+ * depth exceeded" (2026-09-09). Nothing was even being filtered out — the
+ * prefilled values all survived — because the allocation happens either way.
+ *
+ * So identity is stable here: the same source array under the same filter gives
+ * back the same array instance, and a filter that removes nothing gives back
+ * the ORIGINAL. The map is weak, so it holds nothing alive.
+ */
+const filteredArrays = new WeakMap<readonly unknown[], { key: string; kept: readonly unknown[] }>();
+
+function keptFrom(value: readonly unknown[], surviving: readonly Value[]): readonly unknown[] {
+  const key = surviving.join("\u0000");
+  const cached = filteredArrays.get(value);
+  if (cached && cached.key === key) return cached.kept;
+  const filtered = value.filter((v) => surviving.includes(v as Value));
+  // Nothing removed means nothing to allocate: hand back what came in.
+  const kept = filtered.length === value.length ? value : filtered;
+  filteredArrays.set(value, { key, kept });
+  return kept;
+}
+
 function survivesFilter(
   value: unknown,
   surviving: readonly Value[] | undefined,
 ): { ok: true; value: unknown } | { ok: false } {
   if (!surviving) return { ok: true, value };
   if (Array.isArray(value)) {
-    const kept = value.filter((v) => surviving.includes(v as Value));
+    const kept = keptFrom(value, surviving);
     return kept.length > 0 ? { ok: true, value: kept } : { ok: false };
   }
   return surviving.includes(value as Value) ? { ok: true, value } : { ok: false };

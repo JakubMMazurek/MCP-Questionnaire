@@ -1,0 +1,212 @@
+{
+  "version": 1,
+  "title": "Your dev experience — five questions",
+  "description": "I've guessed from this repo and your setup — check the amber ones and correct me. Partial is fine, or just tell me in chat.",
+  "display": "inline",
+  "submitLabel": "That's me — go",
+  "sections": [
+    {
+      "id": "you",
+      "title": "The five",
+      "fields": [
+        {
+          "id": "unreviewed",
+          "label": "needing review",
+          "type": "computed",
+          "compute": {
+            "op": "count_needs_review",
+            "targets": ["primary_area", "focus", "friction", "years_experience"]
+          }
+        },
+        {
+          "id": "years_experience",
+          "label": "How long have you been writing software?",
+          "skipOptions": [{ "value": "rather_not", "label": "Skip" }],
+          "type": "single_select",
+          "options": [
+            { "value": "under_2", "label": "< 2 yrs" },
+            { "value": "2_5", "label": "2–5" },
+            { "value": "5_10", "label": "5–10" },
+            { "value": "over_10", "label": "10+" }
+          ],
+          "render": "segmented"
+        },
+        {
+          "id": "primary_area",
+          "label": "Where does most of your working day go?",
+          "description": "This decides what I ask next.",
+          "type": "single_select",
+          "options": [
+            { "value": "salesforce", "label": "Salesforce platform (Apex, flows, integrations)" },
+            { "value": "web_ts", "label": "Web / TypeScript app work" },
+            { "value": "edge_infra", "label": "Edge + infra (Workers, DOs, deploys)" },
+            { "value": "data_other", "label": "Data, or something else" }
+          ],
+          "render": "radio"
+        },
+        {
+          "id": "focus",
+          "label": "And which parts of it do you actually touch?",
+          "description": "Narrowed by your answer above.",
+          "type": "multi_select",
+          "options": [
+            { "value": "apex", "label": "Apex" },
+            { "value": "sf_integrations", "label": "Integrations & callouts" },
+            { "value": "sf_metadata", "label": "Metadata & deploys" },
+            { "value": "sf_data", "label": "Data / reporting" },
+            { "value": "react_ui", "label": "React UI" },
+            { "value": "node_ts", "label": "Node / TypeScript" },
+            { "value": "design_systems", "label": "Design systems" },
+            { "value": "workers", "label": "Workers" },
+            { "value": "durable_objects", "label": "Durable Objects" },
+            { "value": "testing", "label": "Tests & CI" }
+          ],
+          "render": "chips"
+        },
+        {
+          "id": "agent_reliance",
+          "label": "Who types the code these days?",
+          "type": "slider",
+          "min": 0,
+          "max": 10,
+          "minLabel": "I write it",
+          "maxLabel": "I direct agents"
+        },
+        {
+          "id": "friction",
+          "label": "What wastes the most of your time?",
+          "skipOptions": [{ "value": "you_decide", "label": "You tell me" }],
+          "type": "single_select",
+          "options": [
+            {
+              "value": "context_transfer",
+              "label": "Getting context into someone's head (mine included)"
+            },
+            { "value": "verification", "label": "Proving a change actually works" },
+            { "value": "platform_drift", "label": "Platform facts going stale under me" },
+            { "value": "deploy_plumbing", "label": "Deploy & secrets plumbing" },
+            { "value": "review_load", "label": "Review and rework" }
+          ],
+          "render": "radio"
+        }
+      ]
+    },
+    {
+      "id": "sf_detail",
+      "title": "The Salesforce half",
+      "description": "Shown because you said Salesforce is the day job.",
+      "fields": [
+        {
+          "id": "sf_pain",
+          "label": "Which bit of it is worst?",
+          "type": "single_select",
+          "options": [
+            { "value": "apex_limits", "label": "Apex governor & callout limits" },
+            { "value": "metadata_deploys", "label": "Metadata deploys between orgs" },
+            { "value": "sandbox_refresh", "label": "Sandbox refresh / data setup" },
+            { "value": "integrations", "label": "Third-party integrations breaking" }
+          ],
+          "render": "radio"
+        }
+      ]
+    },
+    {
+      "id": "agent_detail",
+      "title": "Because you lean on agents",
+      "description": "Shown because you put the slider past the middle.",
+      "fields": [
+        {
+          "id": "agent_pain",
+          "label": "When it goes wrong, how does it usually go wrong?",
+          "type": "single_select",
+          "options": [
+            { "value": "stale_facts", "label": "Confident answers built on stale platform facts" },
+            { "value": "scope_drift", "label": "Quietly doing more than I asked" },
+            { "value": "silent_skips", "label": "Claiming done with tests skipped" },
+            { "value": "invented_apis", "label": "APIs that don't exist" },
+            { "value": "fine_actually", "label": "Honestly, it mostly holds up" }
+          ],
+          "render": "radio"
+        }
+      ]
+    }
+  ],
+  "rules": [
+    {
+      "when": { "field": "primary_area", "op": "eq", "value": "salesforce" },
+      "then": {
+        "action": "filter_options",
+        "targets": ["focus"],
+        "options": ["apex", "sf_integrations", "sf_metadata", "sf_data", "testing"]
+      }
+    },
+    {
+      "when": { "field": "primary_area", "op": "eq", "value": "web_ts" },
+      "then": {
+        "action": "filter_options",
+        "targets": ["focus"],
+        "options": ["react_ui", "node_ts", "design_systems", "testing"]
+      }
+    },
+    {
+      "when": { "field": "primary_area", "op": "eq", "value": "edge_infra" },
+      "then": {
+        "action": "filter_options",
+        "targets": ["focus"],
+        "options": ["workers", "durable_objects", "node_ts", "testing"]
+      }
+    },
+    {
+      "when": { "field": "primary_area", "op": "eq", "value": "salesforce" },
+      "then": { "action": "show", "targets": ["sf_detail"] }
+    },
+    {
+      "when": { "field": "agent_reliance", "op": "gt", "value": 6 },
+      "then": { "action": "show", "targets": ["agent_detail"] }
+    },
+    {
+      "when": { "field": "agent_reliance", "op": "gt", "value": 6 },
+      "then": { "action": "require", "targets": ["agent_pain"] }
+    },
+    {
+      "when": { "field": "agent_reliance", "op": "gt", "value": 6 },
+      "then": { "action": "set_default", "targets": ["agent_pain"], "value": "stale_facts" }
+    }
+  ],
+  "prefill": {
+    "years_experience": {
+      "value": "5_10",
+      "source": "inferred",
+      "confidence": "low",
+      "rationale": "the repo reads like practice, not first attempt — but I'm guessing",
+      "needsReview": true
+    },
+    "primary_area": {
+      "value": "salesforce",
+      "source": "inferred",
+      "confidence": "low",
+      "rationale": "your Apex/Bonafidee tooling sits next to a TypeScript edge repo — I can't tell which one pays the bills",
+      "needsReview": true
+    },
+    "focus": {
+      "value": ["apex", "sf_integrations"],
+      "source": "inferred",
+      "confidence": "low",
+      "rationale": "the doc-retrieval skill you wrote is all callouts and integrations",
+      "needsReview": true
+    },
+    "agent_reliance": {
+      "value": 7,
+      "source": "inferred",
+      "confidence": "high",
+      "rationale": "you build Claude Code plugins and wrote a spec for agents to follow"
+    },
+    "friction": {
+      "value": "platform_drift",
+      "source": "inferred",
+      "confidence": "low",
+      "rationale": "CLAUDE.md's currency rule — verify against live docs, assume anything platform-shaped ages — reads like scar tissue",
+      "needsReview": true
+    }
+  }
+}
