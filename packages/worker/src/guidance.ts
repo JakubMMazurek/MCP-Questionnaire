@@ -86,7 +86,9 @@ export const AWAIT_ANSWERS_DESCRIPTION = `Wait for the user to submit a form, an
 
 CALL THIS IMMEDIATELY AFTER YOU GIVE SOMEONE A FORM LINK. A link opens a page, and a page cannot speak into this conversation — without this tool the user submits, nothing happens, and they have to come back and ask you to read their own answers. That is the busywork the form existed to remove.
 
-It waits about 45 seconds per call. If they have not submitted yet it says so and tells you what has been saved so far; call it again with the same formId, as many times as it takes. Do NOT ask the user whether they are finished — this tool is how you find that out, and asking while they are typing is the interruption a form is supposed to prevent.
+Pass \`waitMs: 600000\` — the plugin's own server config raises the client's timeout so a single call can cover the whole time someone spends on a form, and one quiet call beats fifteen noisy ones. If that call comes back as a timeout ERROR rather than a result, this client's timeout was not raised: fall back to the 45-second default and call again each time it says they are still filling it in.
+
+If it returns without their answers it tells you what has been saved so far; call it again with the same formId, as many times as it takes. Do NOT ask the user whether they are finished — this tool is how you find that out, and asking while they are typing is the interruption a form is supposed to prevent.
 
 When it returns their answers, act on them. There is no need to call get_answers afterwards: what comes back is the same report.`;
 

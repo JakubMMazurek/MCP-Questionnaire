@@ -1,6 +1,7 @@
 {
   "mcp-questionnaire": {
     "type": "http",
-    "url": "https://mcp-questionnaire.qba0550.workers.dev/mcp"
+    "url": "https://mcp-questionnaire.qba0550.workers.dev/mcp",
+    "timeout": 900000
   }
 }

@@ -371,3 +371,33 @@ describe("await_answers", () => {
     expect(firstText(result)).toMatch(/Submitted/);
   });
 });
+
+describe("how long a hop may wait", () => {
+  /**
+   * The default has to survive a client nobody configured: Claude Code times
+   * every request to the first response byte, 60s unless the server entry
+   * raises it. The cap is for the case where the plugin's own .mcp.json HAS
+   * raised it (timeout: 900000, which also floors the idle abort), so one call
+   * covers the whole fill instead of fifteen.
+   */
+  it("caps a long request rather than refusing it", async () => {
+    const formId = await storedForm();
+    const { path } = await linkFor(formId);
+
+    const waiting = rawCall("await_answers", { formId, waitMs: 840_000 });
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    await post(path, { answers: answered("confirm"), complete: true, submitted: true });
+
+    // It returns on the submit, not on the clock.
+    const result = await waiting;
+    expect(firstText(result)).toMatch(/Submitted/);
+  });
+
+  it("clamps a wait longer than the cap instead of hanging forever", async () => {
+    const formId = await storedForm();
+    const started = Date.now();
+    const result = await rawCall("await_answers", { formId, waitMs: -1 });
+    expect(Date.now() - started).toBeLessThan(5_000);
+    expect(firstText(result)).toContain("Not submitted yet");
+  });
+});

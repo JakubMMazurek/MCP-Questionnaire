@@ -199,13 +199,24 @@ function answersReport(formId: string, state: FormState): ToolResult {
 /**
  * How long one `await_answers` hop waits, and how often it looks.
  *
- * 45s sits under Claude Code's 60-second first-byte timer with room to spare,
- * and well under the five-minute idle abort. The poll is a Durable Object read
- * on the same instance the writes go to, so it is cheap and strongly
- * consistent — a submit is visible on the next look, not eventually.
+ * The default is deliberately short. Claude Code times each request from the
+ * call to the server's FIRST RESPONSE BYTE, and that timer is 60 seconds
+ * unless the client's server entry raises it — so 45s is what is safe to
+ * assume about a client we know nothing about.
+ *
+ * The cap is not. This plugin's own `.mcp.json` sets `timeout: 900000`, which
+ * raises both that timer and the idle abort (a per-server timeout floors the
+ * idle window, Claude Code ≥ 2.1.203). Where that config is in force one hop
+ * can cover the whole time someone spends filling a form, and the agent should
+ * ask for it — hence a cap in the minutes rather than the seconds, and a tool
+ * description that says when to reach for it.
+ *
+ * The poll is a Durable Object read on the same instance the writes go to, so
+ * it is cheap and strongly consistent: a submit is visible on the next look,
+ * not eventually.
  */
 const DEFAULT_WAIT_MS = 45_000;
-const MAX_WAIT_MS = 55_000;
+const MAX_WAIT_MS = 840_000;
 const POLL_INTERVAL_MS = 1_000;
 
 const NOT_FOUND = (formId: string) =>
@@ -493,7 +504,7 @@ export function createServer(
           .number()
           .optional()
           .describe(
-            "How long to wait before answering that nothing has arrived yet. Default 45000, capped at 55000.",
+            "How long to wait before answering that nothing has arrived yet. Default 45000 (safe on any client), capped at 840000. Pass 600000 when this server was installed from the mcp-questionnaire plugin — its config raises the client's timeout so one call can cover the whole fill.",
           ),
       }),
       _meta: textOnlyMeta,
