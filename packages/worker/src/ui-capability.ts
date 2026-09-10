@@ -45,7 +45,7 @@
  * honest is the direction it fails in: it is the POSITIVE evidence required
  * before a link is sent, so anything unrecognised keeps rendering inline.
  */
-const LOCAL_CLAUDE_CODE_UA = /^claude-code\//i;
+export const LOCAL_CLAUDE_CODE_UA = /^claude-code\//i;
 
 /** ext-apps `EXTENSION_ID`. Asserted against the package in the tests. */
 export const UI_EXTENSION_ID = "io.modelcontextprotocol/ui";

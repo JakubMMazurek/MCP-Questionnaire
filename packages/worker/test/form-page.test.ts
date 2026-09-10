@@ -393,6 +393,32 @@ describe("how long a hop may wait", () => {
     expect(firstText(result)).toMatch(/Submitted/);
   });
 
+  /**
+   * Every hop is a round trip the user pays for. Where the client can hold a
+   * long call, the not-yet result has to SAY so — leaving it to the model to
+   * remember is how a ten-minute form becomes thirteen billed turns.
+   */
+  it("tells a local Claude Code to wait long next time", async () => {
+    const formId = await storedForm();
+    const result = await rawCall(
+      "await_answers",
+      { formId, waitMs: 0 },
+      {
+        clientName: "claude-code",
+        userAgent: "claude-code/2.1.260 (claude-desktop; external, cli)",
+      },
+    );
+    expect(firstText(result)).toContain("waitMs: 600000");
+    expect(result.structuredContent).toMatchObject({ retryWaitMs: 600_000 });
+  });
+
+  it("does not promise a long wait to a client that cannot hold one", async () => {
+    const formId = await storedForm();
+    const result = await rawCall("await_answers", { formId, waitMs: 0 });
+    expect(firstText(result)).not.toContain("waitMs: 600000");
+    expect(result.structuredContent).not.toMatchObject({ retryWaitMs: 600_000 });
+  });
+
   it("clamps a wait longer than the cap instead of hanging forever", async () => {
     const formId = await storedForm();
     const started = Date.now();

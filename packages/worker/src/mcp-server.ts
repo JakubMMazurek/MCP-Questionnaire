@@ -46,7 +46,7 @@ import {
   RENDERER_URI,
   readRendererBundle,
 } from "./renderer-resource.js";
-import { clientFingerprint, needsLink } from "./ui-capability.js";
+import { clientFingerprint, LOCAL_CLAUDE_CODE_UA, needsLink } from "./ui-capability.js";
 import { diagnosticsWithExample, serialiseExample } from "./worked-example.js";
 
 export const SERVER_INFO = { name: "mcp-questionnaire", version: "0.3.0" } as const;
@@ -524,6 +524,15 @@ export function createServer(
         if (Date.now() >= deadline) {
           logEvent({ event: "await_timeout" });
           const report = reportAnswers(state.form, state.answers);
+          /**
+           * Every hop is a round trip the user pays for in tokens, so the
+           * short default must not become the habit. Where the client is a
+           * local Claude Code — the plugin's own install, whose `.mcp.json`
+           * sets `timeout: 900000` and thereby raises both the first-byte
+           * timer and the idle floor — say plainly that a long wait is
+           * available. One call across a ten-minute fill instead of thirteen.
+           */
+          const longWaitAvailable = LOCAL_CLAUDE_CODE_UA.test(userAgent ?? "");
           return {
             ...text(
               [
@@ -532,10 +541,18 @@ export function createServer(
                   ? `${report.answered} answer(s) saved so far, so they are filling it in.`
                   : "Nothing saved yet.",
                 "",
-                "Call await_answers again with the same formId to keep waiting. Do not ask the user whether they are done — this tool is what finds out.",
+                longWaitAvailable
+                  ? "Call await_answers again with the same formId AND waitMs: 600000. This client is configured for a long wait, and one long call costs a fraction of the tokens that repeated short ones do."
+                  : "Call await_answers again with the same formId to keep waiting.",
+                "Do not ask the user whether they are done — this tool is what finds out.",
               ].join("\n"),
             ),
-            structuredContent: { formId, submitted: false, answered: report.answered },
+            structuredContent: {
+              formId,
+              submitted: false,
+              answered: report.answered,
+              ...(longWaitAvailable ? { retryWaitMs: 600_000 } : {}),
+            },
           };
         }
         await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
