@@ -7,7 +7,7 @@ wrong (DESIGN.html §6.4).
 ## Access control: a GitHub allowlist
 
 `.mcp.json` carries the deployed connector URL
-(`https://mcp-questionnaire.<account>.workers.dev/mcp`). The URL is public and
+(`https://mcp-questionnaire.365finance.workers.dev/mcp`). The URL is public and
 carries nothing: the server authenticates every MCP request with OAuth, and the
 sign-in is GitHub. On first connect your client registers itself, sends you to
 GitHub, and the server checks the login GitHub returns against

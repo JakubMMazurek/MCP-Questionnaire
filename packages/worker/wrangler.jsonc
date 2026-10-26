@@ -3,6 +3,13 @@
   "name": "mcp-questionnaire",
   "main": "src/index.ts",
 
+  // Pinned, not inferred. Wrangler caches a chosen account in
+  // node_modules/.cache/wrangler/wrangler-account.json, and that cache
+  // outlived a move between accounts: every API call 401d against the
+  // old personal account while the token was for this one. Naming the
+  // account here makes the cache irrelevant.
+  "account_id": "c097d9123b26798f35337a997ce9ce73",
+
   // ≥ 2026-02-24 is load-bearing, not cosmetic (DESIGN.html §3): from that date
   // `ctx.storage.deleteAll()` also deletes the active alarm, so the form's TTL
   // handler is a single call instead of deleteAll() + deleteAlarm().
@@ -63,8 +70,8 @@
   "kv_namespaces": [
     {
       "binding": "OAUTH_KV",
-      // Title `mcp-questionnaire-OAUTH_KV`, created for this Worker.
-      "id": "1f649315f1e64c63bc86d3e34728f0f2"
+      // Title `OAUTH_KV`, on the 365 Finance account.
+      "id": "35736a7041914e9188cb978cd9002adb"
     }
   ],
 

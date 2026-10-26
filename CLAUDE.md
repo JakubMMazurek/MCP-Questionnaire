@@ -2,7 +2,7 @@
 
 **Status (2026-08-26): all seven §9 build steps are DONE, field-tested twice on claude.ai** — 384 tests across
 `packages/{schema,ui,worker}` (`@mcpq/*` scope), deployed to
-`mcp-questionnaire.qba0550.workers.dev`. **Auth is GitHub OAuth** (step 7):
+`mcp-questionnaire.365finance.workers.dev`. **Auth is GitHub OAuth** (step 7):
 `@cloudflare/workers-oauth-provider` owns the Worker's fetch, MCP is served at
 plain `/mcp` behind a bearer token, and `GITHUB_ALLOWED_USERS` in
 `wrangler.jsonc` `vars` decides who may hold one (comma-separated logins,

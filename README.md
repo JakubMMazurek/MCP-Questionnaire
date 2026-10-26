@@ -75,7 +75,7 @@ the GitHub OAuth app's credentials —
     wrangler secret put GITHUB_CLIENT_SECRET
 
 — from a GitHub OAuth app whose **Authorization callback URL** is
-`https://mcp-questionnaire.<account>.workers.dev/callback`. Pipe secrets with
+`https://mcp-questionnaire.365finance.workers.dev/callback`. Pipe secrets with
 `tr -d '\n'`: a trailing newline has bitten this deploy before. The allowlist
 (`GITHUB_ALLOWED_USERS`) is a `vars` entry, not a secret, so it ships in
 `wrangler.jsonc` and changes in a reviewable diff. `.dev.vars` holds obvious
