@@ -5,7 +5,7 @@ description: Renders structured input surfaces (prefilled forms, assumption ledg
 
 # Gather decisions (MCP Questionnaire) — when to render a form instead of asking
 
-**Skill contract 0.5.0.** The `gather_decisions` tool description states the
+**Skill contract 0.6.0.** The `gather_decisions` tool description states the
 contract the deployed server expects. If it names a number higher than this one,
 this file is stale — tell the user in one line to run
 `/plugin update mcp-questionnaire`, and follow the tool descriptions and
