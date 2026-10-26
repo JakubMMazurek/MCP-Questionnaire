@@ -3,10 +3,15 @@
  * section rail (§4.8, fullscreen and more than one section), the sections, and
  * the action bar.
  *
- * The action bar is the §5.1 mockup: bulk affirm is the PRIMARY action on a
- * ledger — with forty rows where thirty-eight are right, that is the primary
- * interaction — then submit, then the chat escape hatch, which costs nothing and
+ * The action bar is submit, then the chat escape hatch, which costs nothing and
  * turns a mistriggered form from a dead end into a minor annoyance (§5.6).
+ *
+ * Submit is the sole primary action. §5.1 originally called bulk affirm the
+ * primary interaction on a ledger, and the mockup gave it equal weight beside
+ * submit — two primary buttons side by side. In use that read as competition
+ * rather than a shortcut: the eye lands on the wrong one, and the control that
+ * actually ends the task is the one that loses. Removed 2026-10-26 by the
+ * owner's call; §5.1 is amended to match rather than left claiming otherwise.
  *
  * Submit is never gated by `require` (§4.6/§6.3). Only malformed values block.
  */
@@ -14,20 +19,12 @@
 import type { Form, Section } from "@mcpq/schema";
 import { memo, useState } from "react";
 import { Button, StatusLine } from "./components/primitives";
-import {
-  computeContext,
-  effectiveValue,
-  highConfidence,
-  isVisible,
-  malformedValues,
-  needsReviewPaths,
-} from "./engine/index.js";
+import { effectiveValue, isVisible, malformedValues } from "./engine/index.js";
 import { CounterPill, FieldView, isComputedField, jumpToPath } from "./fields/field";
 import {
   useBridge,
   useDraftStatus,
   useEngine,
-  useEngineStore,
   useFrozen,
   useVisible,
 } from "./state";
@@ -130,15 +127,11 @@ const SectionView = memo(function SectionView({
 });
 
 export function ActionBar({ form }: { form: Form }) {
-  const store = useEngineStore();
   const bridge = useBridge();
   const frozen = useFrozen();
   const status = useDraftStatus();
   const [sent, setSent] = useState(false);
 
-  const affirmable = useEngine(
-    (state) => needsReviewPaths(computeContext(state), highConfidence).length,
-  );
   const blocking = useEngine((state) => {
     const values = { answers: state.answers, prefill: state.prefill, overlays: state.effects };
     return malformedValues(state.leaves, values, state.effects).length;
@@ -163,21 +156,8 @@ export function ActionBar({ form }: { form: Form }) {
 
   return (
     <div className="bar">
-      {affirmable > 0 ? (
-        <Button
-          primary
-          disabled={frozen || sent}
-          title="Accepts the inferred values that are not marked low confidence"
-          onClick={() => {
-            const state = store.getState();
-            state.bulkAffirm(needsReviewPaths(computeContext(state), highConfidence));
-          }}
-        >
-          Confirm all high-confidence
-        </Button>
-      ) : null}
       <Button
-        primary={affirmable === 0}
+        primary
         disabled={blocking > 0 || frozen || sent}
         {...(blockingText ? { title: blockingText } : {})}
         onClick={submit}

@@ -469,7 +469,7 @@ $self.detail</code></pre>
 
   <h3>5.1 Assumption ledger — <em>build this first</em></h3>
   <p>The highest-value surface, and the one that justifies the project. The failure mode it fixes: a plan requires forty small inferences. The user catches two wrong ones on read-through and the other thirty-eight stay wrong <em>silently</em> — not agreed to, just invisible. Nobody audits a paragraph for premises.</p>
-  <p>Shape: dense list of inferences, each a <code>single_select</code> with <code>render: segmented</code>, plus agent-defined defer options ("You decide" / "TBD"), plus optional per-row <code>note</code> and a conditional correction input. Every row carries <code>source</code> + <code>rationale</code> — and <strong>row provenance is not a row property</strong> (audited 2026-08-26): each verdict is prefilled <code>confirm</code> with <code>source</code>/<code>confidence</code>/<code>rationale</code>/<code>needsReview</code>, so the provenance chip, the <code>count_needs_review</code> counter and bulk affirm all read the one §4.7 envelope — bulk affirm is "accept the needs-review prefills". With forty rows of identical shape, generate it columns+data (§4.2 <code>table</code>): the segmented options are declared once as a column definition, rows are data.</p>
+  <p>Shape: dense list of inferences, each a <code>single_select</code> with <code>render: segmented</code>, plus agent-defined defer options ("You decide" / "TBD"), plus optional per-row <code>note</code> and a conditional correction input. Every row carries <code>source</code> + <code>rationale</code> — and <strong>row provenance is not a row property</strong> (audited 2026-08-26): each verdict is prefilled <code>confirm</code> with <code>source</code>/<code>confidence</code>/<code>rationale</code>/<code>needsReview</code>, so the provenance chip and the <code>count_needs_review</code> counter both read the one §4.7 envelope. With forty rows of identical shape, generate it columns+data (§4.2 <code>table</code>): the segmented options are declared once as a column definition, rows are data.</p>
   </div>
 
   <div class="mock" id="ledgerMock">
@@ -484,8 +484,7 @@ $self.detail</code></pre>
       </div>
       <div id="ledgerRows"></div>
       <div class="bulkbar">
-        <button class="btn primary" id="bulkAffirm">Confirm all high-confidence</button>
-        <button class="btn">Submit as-is</button>
+        <button class="btn primary">Submit as-is</button>
         <span class="escape">…or <a href="#archetypes" onclick="return false">just tell me in chat</a></span>
       </div>
     </div>
@@ -493,7 +492,9 @@ $self.detail</code></pre>
   </div>
 
   <div class="measure">
-  <p>Requirements it drives: per-row conditional follow-up → <code>$self</code> (§4.6); <strong>bulk affirm</strong> — with forty rows where thirty-eight are right, <em>this is the primary interaction</em>; the <code>computed</code> header counter. Small enough to be v1 on its own.</p>
+  <p>Requirements it drives: per-row conditional follow-up → <code>$self</code> (§4.6); the <code>computed</code> header counter. Small enough to be v1 on its own.</p>
+
+  <p><span class="chip decided">reversed 2026-10-26</span> <strong>Bulk affirm is gone.</strong> This section used to call it <em>the primary interaction</em> on a ledger — forty rows, thirty-eight right, one button. The reasoning still holds in the abstract; what it missed is that the bar only has one primary slot. Shipped, bulk affirm took that slot whenever anything was left to affirm, which is precisely when a long ledger makes submit hardest to find, so the two buttons competed and the one that ends the task lost. Submit is now the sole primary action. The §4.7 envelope that fed bulk affirm stays exactly as it is — the provenance chip and the <code>count_needs_review</code> counter still read it, and per-row confirm is unchanged. Owner's call after field use; <code>needsReviewPaths</code>/<code>highConfidence</code> remain in the engine API, unused by the shell.</p>
 
   <h3>5.2 Elicitation</h3>
   <p>Agent needs input to start. 4–8 fields, 1–2 sections, <strong>inline card, never fullscreen</strong> — it's replacing three turns of Q&amp;A, not running a project kickoff. Mostly <code>single_select</code> and <code>boolean</code>, defaults prefilled. Include a <strong>tradeoff control</strong> where relevant — sliders or <code>allocation</code> over speed / cost / thoroughness. Forced tradeoffs beat stated preferences; asking "what matters?" in prose returns "all of them".</p>
@@ -898,16 +899,6 @@ $self.detail</code></pre>
     n.addEventListener('click',function(){ nr.classList.toggle('open'); if(nr.classList.contains('open')) ni.focus(); });
     d.appendChild(n); d.appendChild(nr);
     host.appendChild(d);
-  });
-  document.getElementById('bulkAffirm').addEventListener('click',function(){
-    rows.forEach(function(r,i){
-      if(r.state===0 && r.src.indexOf('low')===-1){
-        r.state=1;
-        var seg = host.children[i].querySelector('.seg');
-        Array.prototype.forEach.call(seg.children,function(bb,k){ bb.className = k===0? CLS[0]:''; });
-      }
-    });
-    renderCounter();
   });
   renderCounter();
 

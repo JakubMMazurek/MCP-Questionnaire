@@ -117,27 +117,29 @@ describe("notes (§4.4)", () => {
   });
 });
 
-describe("bulk affirm (§5.1)", () => {
-  it("does what its label says: everything except low-confidence inferences", () => {
-    const store = mount();
-    fireEvent.click(screen.getByText("Confirm all high-confidence"));
+describe("the action bar (§5.1)", () => {
+  it("offers submit as the sole primary action", () => {
+    mount();
 
-    expect(Object.keys(store.getState().answers).sort()).toEqual([
-      "assumptions[r_eu][verdict]",
-      "assumptions[r_legacy][verdict]",
-      "assumptions[r_salesops][verdict]",
-    ]);
-    expect(screen.getByLabelText("2 needing review")).toBeDefined();
+    const primary = document.querySelectorAll(".bar .btn-primary");
+    expect(primary).toHaveLength(1);
+    expect(primary[0]?.textContent).toBe("Use these assumptions");
   });
 
-  it("disappears once there is nothing left to affirm", () => {
+  it("keeps submit primary while rows are still unresolved", () => {
     const store = mount();
+
+    // The removed bulk-affirm button used to take the primary slot whenever
+    // anything was left to affirm, demoting submit exactly when a long ledger
+    // made submit hardest to find. Unresolved rows must not change the bar.
+    expect(screen.getByLabelText("5 needing review")).toBeDefined();
+    expect(document.querySelectorAll(".bar .btn-primary")).toHaveLength(1);
+
     act(() => {
-      for (const row of ["r_eu", "r_salesops", "r_cutover", "r_legacy", "r_revops"]) {
-        store.getState().setAnswer(`assumptions[${row}][verdict]`, "confirm");
-      }
+      store.getState().setAnswer("assumptions[r_eu][verdict]", "confirm");
     });
-    expect(screen.queryByText("Confirm all high-confidence")).toBeNull();
+
+    expect(document.querySelectorAll(".bar .btn-primary")).toHaveLength(1);
     expect(screen.getByText("Use these assumptions")).toBeDefined();
   });
 });
