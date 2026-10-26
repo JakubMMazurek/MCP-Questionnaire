@@ -112,6 +112,9 @@ importers:
       agents:
         specifier: ^0.21.0
         version: 0.21.0(@babel/core@7.29.7)(@babel/runtime@7.29.7)(@cloudflare/workers-types@5.20260826.1)(@modelcontextprotocol/client@2.0.0)(@modelcontextprotocol/sdk@1.30.0(@cfworker/json-schema@4.1.1)(zod@4.4.3))(@modelcontextprotocol/server@2.0.0)(react@19.2.8)(rolldown@1.2.6)(vite@8.2.2(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.0))(zod@4.4.3)
+      jose:
+        specifier: 6.2.10
+        version: 6.2.10
       zod:
         specifier: ^4.4.3
         version: 4.4.3

@@ -1,73 +1,94 @@
 /**
- * The GitHub authorization flow — OAuthProvider's `defaultHandler` (§3, step 7).
+ * The Cloudflare Access authorization flow — OAuthProvider's `defaultHandler`.
  *
- * OAuthProvider owns `/token`, `/register` and both `.well-known` documents and
- * mints its OWN tokens for MCP clients. This handler owns only the two hops
- * that are specific to the upstream identity provider:
+ * Replaces the GitHub flow (2026-10-26). The shape is identical, because the
+ * shape was never about GitHub: OAuthProvider owns `/token`, `/register` and
+ * both `.well-known` documents and mints its OWN tokens for MCP clients, and
+ * this handler owns only the two hops that are specific to the upstream
+ * identity provider:
  *
  *   GET /authorize  parse the MCP client's OAuth request, stash it, bounce the
- *                   browser to GitHub
- *   GET /callback   exchange GitHub's code, read the login, CHECK THE
- *                   ALLOWLIST, and only then complete the authorization
+ *                   browser to Cloudflare Access
+ *   GET /callback   exchange Access's code, verify the ID token, read the
+ *                   email, and complete the authorization
  *
  * Everything else 404s, `/` included — the renderer bundle is not a public page
  * (`run_worker_first: true`), and it never was.
  *
- * Deliberate departures from Cloudflare's remote-mcp-github-oauth demo:
+ * WHY ACCESS AND NOT ENTRA DIRECTLY. The company already runs Zero Trust with
+ * Microsoft Entra ID as its identity provider and a "Tech Team" policy that
+ * gates the docs and platform apps. Pointing this Worker at Entra itself would
+ * have meant a second app registration and a second copy of the membership
+ * question. Access sits in front of Entra and answers both: it is an OIDC
+ * provider in its own right ("Access for SaaS"), so this Worker federates to
+ * it exactly as it used to federate to GitHub, and the Access policy decides
+ * who may complete the flow.
  *
- * - **No approval dialog.** The demo renders a consent screen and remembers
- *   approved clients in a signed cookie. Here the grant is gated on an
- *   allowlist of named humans, so the dialog would ask the one person who is
- *   allowed in whether they meant it, immediately after GitHub asked them the
- *   same question. GitHub's own consent screen is the consent screen.
- * - **No Hono, no Octokit.** Two routes and one `GET /user` do not need a
- *   router and an API client, and §8's "everything inlined" instinct applies to
- *   the server too.
- * - **The GitHub access token is not kept.** The demo puts it in `props`; this
- *   server never calls GitHub again after the callback, so keeping it would
- *   store a credential at rest for no purpose. `props` is `{ login }`.
+ * THERE IS NO ALLOWLIST HERE ANY MORE, and that is the point. `GITHUB_ALLOWED_
+ * USERS` was twenty logins in `vars` that someone had to remember to edit.
+ * The gate is now the Tech Team policy in Zero Trust: Access refuses the user
+ * at its own login page and never redirects back, so a refusal costs this
+ * Worker nothing and leaves no half-finished grant. A leaver loses access when
+ * their Entra account is disabled, because the policy requires Entra as the
+ * login method — not when someone remembers to open a pull request.
  *
  * What is NOT dropped is the CSRF story, because it is the one part of this
- * flow that is load-bearing. GitHub hands the `state` value back to whoever
- * follows the callback URL, so `state` alone proves only "this server started
- * SOME flow". Every authorize mints a one-time state token (stored in
- * `OAUTH_KV`, 10-minute TTL) AND a session token set as a host-locked cookie;
- * the callback requires both to match before it will spend the code. An
- * attacker who replays a victim's callback URL has the state but not the
- * cookie, and gets nothing.
+ * flow that is load-bearing and it is upstream-agnostic. Access hands the
+ * `state` value back to whoever follows the callback URL, so `state` alone
+ * proves only "this server started SOME flow". Every authorize mints a
+ * one-time state token (stored in `OAUTH_KV`, 10-minute TTL) AND a session
+ * token set as a host-locked cookie; the callback requires both to match
+ * before it will spend the code. An attacker who replays a victim's callback
+ * URL has the state but not the cookie, and gets nothing.
  */
 
 import { AuthorizationError, type AuthRequest } from "@cloudflare/workers-oauth-provider";
-import { ALLOWLIST_UNSET, isAllowedLogin, parseAllowlist } from "./allowlist.js";
+import { createRemoteJWKSet, jwtVerify } from "jose";
 import type { AuthProps, WorkerEnv } from "./env.js";
 import { handleFormPage } from "./form-page.js";
 import { logConfigError, logEvent } from "./log.js";
 
 /* -------------------------------------------------------------------------- */
-/* upstream constants                                                         */
+/* upstream endpoints                                                         */
 /* -------------------------------------------------------------------------- */
 
-const GITHUB_AUTHORIZE_URL = "https://github.com/login/oauth/authorize";
-const GITHUB_TOKEN_URL = "https://github.com/login/oauth/access_token";
-const GITHUB_USER_URL = "https://api.github.com/user";
+/**
+ * Access publishes a discovery document and the three endpoints below hang off
+ * the issuer by a fixed suffix. Verified 2026-10-26 against the live document
+ * for this application:
+ *
+ *   GET <issuer>/.well-known/openid-configuration
+ *   → authorization_endpoint <issuer>/authorization
+ *     token_endpoint         <issuer>/token
+ *     jwks_uri               <issuer>/jwks
+ *
+ * Deriving them from one configured issuer beats three `vars` that have to
+ * agree with each other: there is one value to get wrong instead of three, and
+ * a wrong one fails loudly at the first hop. If Cloudflare ever moves them,
+ * the discovery document is the source of truth and this is where to look.
+ */
+const authorizationUrl = (issuer: string) => `${issuer}/authorization`;
+const tokenUrl = (issuer: string) => `${issuer}/token`;
+const jwksUrl = (issuer: string) => `${issuer}/jwks`;
 
 /**
- * The narrowest scope GitHub offers that still returns `login` from
- * `GET /user`. Not `read:user` (the demo's choice): the default no-scope token
- * already reads a public profile, and this flow needs the login and nothing
- * else. An empty `scope` parameter is what GitHub documents for that.
+ * `openid` is required by OIDC; `email` carries the identity this server
+ * actually uses. `profile` and `groups` are offered by the application and
+ * deliberately not requested — nothing here reads a display name or a group,
+ * and a scope you do not ask for is a claim you cannot accidentally start
+ * depending on.
  */
-const GITHUB_SCOPE = "";
+const ACCESS_SCOPE = "openid email";
 
-/** GitHub's API rejects requests without one. */
-const USER_AGENT = "mcp-questionnaire (Cloudflare Worker)";
+const CONFIG_UNSET =
+  "ACCESS_CLIENT_ID, ACCESS_CLIENT_SECRET or ACCESS_ISSUER is unset — no authorization can be granted";
 
 /* -------------------------------------------------------------------------- */
 /* one-time state, bound to the browser session                               */
 /* -------------------------------------------------------------------------- */
 
 /** Namespaced away from OAuthProvider's own `token:` / `grant:` / `client:` keys. */
-const STATE_KEY_PREFIX = "github_state:";
+const STATE_KEY_PREFIX = "access_state:";
 const STATE_TTL_SECONDS = 600;
 
 /**
@@ -124,7 +145,7 @@ function tokensMatch(a: string, b: string): boolean {
 
 /**
  * Self-contained HTML, no external anything — the same §8 rule the renderer
- * bundle lives under, applied to the two pages a human ever sees here. Colours
+ * bundle lives under, applied to the pages a human ever sees here. Colours
  * come from `color-scheme` plus system defaults rather than a palette, because
  * an error page that fights the OS theme is worse than a plain one.
  */
@@ -146,7 +167,6 @@ function page(title: string, body: string, status: number): Response {
   );
 }
 
-/** Minimal HTML escaping — the only value interpolated is a GitHub login. */
 function escapeHtml(value: string): string {
   return value.replace(
     /[&<>"']/g,
@@ -154,27 +174,65 @@ function escapeHtml(value: string): string {
   );
 }
 
+/* -------------------------------------------------------------------------- */
+/* the ID token                                                               */
+/* -------------------------------------------------------------------------- */
+
 /**
- * The refusal page.
+ * One JWKS fetcher per issuer, cached for the isolate's life.
  *
- * It names the visitor's OWN login and nothing else: no other allowlisted
- * name, no client id, no token, no hint about who is on the list. Telling
- * someone which account they are signed in as is the difference between "this
- * is broken" and "you are signed into the wrong GitHub account", which is the
- * single most likely cause — and it is information they already had.
+ * `createRemoteJWKSet` does its own caching and key-rollover handling, so the
+ * cost of verification is one fetch per isolate rather than one per sign-in.
+ * Keyed by issuer because the type permits it to change between requests under
+ * test even though production has exactly one.
  */
-function refusalPage(login: string): Response {
-  return page(
-    "Not authorized",
-    `<p>You are signed in to GitHub as <code>${escapeHtml(login)}</code>, which is not on this server's allowlist.</p>` +
-      `<p>Nothing was granted and no token was issued. If you should have access, ask the owner of this deployment to add your GitHub login to <code>GITHUB_ALLOWED_USERS</code> and redeploy.</p>`,
-    403,
-  );
+const jwkSets = new Map<string, ReturnType<typeof createRemoteJWKSet>>();
+
+function jwkSetFor(issuer: string): ReturnType<typeof createRemoteJWKSet> {
+  let set = jwkSets.get(issuer);
+  if (!set) {
+    set = createRemoteJWKSet(new URL(jwksUrl(issuer)));
+    jwkSets.set(issuer, set);
+  }
+  return set;
+}
+
+/**
+ * Verifies the ID token and returns the email it asserts.
+ *
+ * The signature is checked even though the token arrived over TLS from a
+ * direct, client-authenticated POST — the flow where OIDC Core §3.1.3.7 says
+ * verification MAY be skipped. It is not skipped here because `jwtVerify` is
+ * also what checks `iss`, `aud` and `exp`, and those three are the claims that
+ * stop a token minted for some OTHER Access application being replayed at this
+ * one. Getting them for free alongside a library-grade signature check is a
+ * better trade than hand-rolling the three on a payload nobody verified.
+ *
+ * Returns null on any failure. The caller never learns which failure, and
+ * neither does the visitor.
+ */
+async function emailFromIdToken(idToken: string, env: WorkerEnv): Promise<string | null> {
+  const issuer = env.ACCESS_ISSUER;
+  if (!issuer) return null;
+  try {
+    const { payload } = await jwtVerify(idToken, jwkSetFor(issuer), {
+      issuer,
+      audience: env.ACCESS_CLIENT_ID,
+    });
+    const email = payload.email;
+    return typeof email === "string" && email.length > 0 ? email : null;
+  } catch {
+    return null;
+  }
 }
 
 /* -------------------------------------------------------------------------- */
 /* GET /authorize                                                             */
 /* -------------------------------------------------------------------------- */
+
+function configured(env: WorkerEnv): boolean {
+  return Boolean(env.ACCESS_CLIENT_ID && env.ACCESS_CLIENT_SECRET && env.ACCESS_ISSUER);
+}
 
 async function handleAuthorize(request: Request, env: WorkerEnv): Promise<Response> {
   let oauthRequest: AuthRequest;
@@ -198,14 +256,14 @@ async function handleAuthorize(request: Request, env: WorkerEnv): Promise<Respon
     return Response.redirect(redirect.href, 302);
   }
 
-  // Fail closed BEFORE bouncing to GitHub: with no allowlist nobody can ever
-  // complete this flow, so sending the user to GitHub first would only waste
-  // their consent on a grant that cannot be issued.
-  if (parseAllowlist(env.GITHUB_ALLOWED_USERS).length === 0) {
-    logConfigError(ALLOWLIST_UNSET);
+  // Fail closed BEFORE bouncing to Access: with no client credentials the
+  // callback could never spend the code, so sending the user through a
+  // Microsoft sign-in first would only waste it on a grant that cannot issue.
+  if (!configured(env)) {
+    logConfigError(CONFIG_UNSET);
     return page(
       "Not authorized",
-      "<p>This server has no authorized users configured, so no authorization can be granted.</p>",
+      "<p>This server has no identity provider configured, so no authorization can be granted.</p>",
       403,
     );
   }
@@ -217,10 +275,11 @@ async function handleAuthorize(request: Request, env: WorkerEnv): Promise<Respon
     expirationTtl: STATE_TTL_SECONDS,
   });
 
-  const upstream = new URL(GITHUB_AUTHORIZE_URL);
-  upstream.searchParams.set("client_id", env.GITHUB_CLIENT_ID);
+  const upstream = new URL(authorizationUrl(env.ACCESS_ISSUER as string));
+  upstream.searchParams.set("response_type", "code");
+  upstream.searchParams.set("client_id", env.ACCESS_CLIENT_ID as string);
   upstream.searchParams.set("redirect_uri", new URL("/callback", request.url).href);
-  upstream.searchParams.set("scope", GITHUB_SCOPE);
+  upstream.searchParams.set("scope", ACCESS_SCOPE);
   upstream.searchParams.set("state", stateToken);
 
   logEvent({ event: "oauth_authorize_started" });
@@ -238,46 +297,35 @@ async function handleAuthorize(request: Request, env: WorkerEnv): Promise<Respon
 /* GET /callback                                                              */
 /* -------------------------------------------------------------------------- */
 
-/** Exchanges GitHub's `code` for an access token. Returns null on any failure. */
+/**
+ * Exchanges Access's `code` for an ID token. Returns null on any failure.
+ *
+ * `client_secret_post` rather than Basic: the discovery document offers both,
+ * and a form field avoids a base64 header whose encoding of a secret with
+ * exotic bytes is one more thing to be subtly wrong.
+ */
 async function exchangeCode(
   env: WorkerEnv,
   code: string,
   redirectUri: string,
 ): Promise<string | null> {
-  const response = await fetch(GITHUB_TOKEN_URL, {
+  const response = await fetch(tokenUrl(env.ACCESS_ISSUER as string), {
     method: "POST",
     headers: {
       "Content-Type": "application/x-www-form-urlencoded",
       Accept: "application/json",
-      "User-Agent": USER_AGENT,
     },
     body: new URLSearchParams({
-      client_id: env.GITHUB_CLIENT_ID,
-      client_secret: env.GITHUB_CLIENT_SECRET,
+      grant_type: "authorization_code",
+      client_id: env.ACCESS_CLIENT_ID as string,
+      client_secret: env.ACCESS_CLIENT_SECRET as string,
       code,
       redirect_uri: redirectUri,
     }).toString(),
   });
   if (!response.ok) return null;
-  // GitHub answers 200 with `{ error: ... }` on a bad code, so the body decides.
-  const body = (await response.json()) as { access_token?: unknown };
-  return typeof body.access_token === "string" && body.access_token.length > 0
-    ? body.access_token
-    : null;
-}
-
-/** Reads the authenticated user's login. Returns null on any failure. */
-async function fetchLogin(accessToken: string): Promise<string | null> {
-  const response = await fetch(GITHUB_USER_URL, {
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      Accept: "application/vnd.github+json",
-      "User-Agent": USER_AGENT,
-    },
-  });
-  if (!response.ok) return null;
-  const body = (await response.json()) as { login?: unknown };
-  return typeof body.login === "string" && body.login.length > 0 ? body.login : null;
+  const body = (await response.json()) as { id_token?: unknown };
+  return typeof body.id_token === "string" && body.id_token.length > 0 ? body.id_token : null;
 }
 
 async function handleCallback(request: Request, env: WorkerEnv): Promise<Response> {
@@ -288,7 +336,7 @@ async function handleCallback(request: Request, env: WorkerEnv): Promise<Respons
 
   if (!code || !stateToken) {
     return withHeaders(
-      page("Sign-in failed", "<p>GitHub did not return an authorization code.</p>", 400),
+      page("Sign-in failed", "<p>Access did not return an authorization code.</p>", 400),
       headers,
     );
   }
@@ -314,37 +362,40 @@ async function handleCallback(request: Request, env: WorkerEnv): Promise<Respons
     );
   }
 
-  const accessToken = await exchangeCode(env, code, new URL("/callback", request.url).href);
-  if (!accessToken) {
+  if (!configured(env)) {
+    logConfigError(CONFIG_UNSET);
+    return withHeaders(
+      page("Not authorized", "<p>This server has no identity provider configured.</p>", 403),
+      headers,
+    );
+  }
+
+  const idToken = await exchangeCode(env, code, new URL("/callback", request.url).href);
+  if (!idToken) {
     logEvent({ event: "oauth_callback_rejected", code: "code_exchange" });
     return withHeaders(
-      page("Sign-in failed", "<p>GitHub rejected the authorization code.</p>", 400),
+      page("Sign-in failed", "<p>Access rejected the authorization code.</p>", 400),
       headers,
     );
   }
 
-  const login = await fetchLogin(accessToken);
-  if (!login) {
-    logEvent({ event: "oauth_callback_rejected", code: "user_lookup" });
+  const email = await emailFromIdToken(idToken, env);
+  if (!email) {
+    // Distinct from a refusal: Access only redirects back when its policy
+    // already said yes, so reaching here means the token did not verify or
+    // carried no email — a configuration fault, not an access decision.
+    logEvent({ event: "oauth_callback_rejected", code: "id_token" });
     return withHeaders(
-      page("Sign-in failed", "<p>Could not read your GitHub account.</p>", 502),
+      page("Sign-in failed", "<p>Could not verify the identity Access returned.</p>", 502),
       headers,
     );
   }
 
-  if (!isAllowedLogin(login, env.GITHUB_ALLOWED_USERS)) {
-    // Counted, never named: §3's no-payloads rule covers identities too, and a
-    // refused login in a retained log is exactly the kind of personal data
-    // this Worker has no reason to keep.
-    logEvent({ event: "oauth_login_refused" });
-    return withHeaders(refusalPage(login), headers);
-  }
-
-  const props: AuthProps = { login };
+  const props: AuthProps = { login: email };
   const { redirectTo } = await env.OAUTH_PROVIDER.completeAuthorization({
     request: stored.request,
-    userId: login,
-    metadata: { label: login },
+    userId: email,
+    metadata: { label: email },
     scope: stored.request.scope,
     props,
   });
@@ -364,7 +415,7 @@ function withHeaders(response: Response, extra: Headers): Response {
 /* the handler                                                                */
 /* -------------------------------------------------------------------------- */
 
-export const githubHandler = {
+export const accessHandler = {
   async fetch(request: Request, env: WorkerEnv): Promise<Response> {
     const url = new URL(request.url);
 

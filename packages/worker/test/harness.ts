@@ -6,13 +6,13 @@
  * bearer-token validation, `createMcpHandler`'s Streamable HTTP transport,
  * JSON-RPC framing, `inputSchema` validation, the tool handler, the
  * SQLite-backed Durable Object and the ASSETS binding. Nothing is stubbed
- * except the two calls that leave the account entirely (github.com), which is
+ * except the two calls that leave the account entirely (cloudflareaccess.com), which is
  * the point — the parts of this build most likely to be wrong are the platform
  * seams, and a mock of a seam proves nothing about the seam.
  *
  * Build step 7 replaced the unguessable base path with GitHub OAuth, so the
  * token now has to be EARNED rather than assumed. `authorize()` below walks the
- * whole grant: dynamic client registration → `/authorize` → the GitHub bounce →
+ * whole grant: dynamic client registration → `/authorize` → the Access bounce →
  * `/callback` → `/token`. That is deliberately not shortcut through
  * `getOAuthApi()`: the seam under test is exactly the one a claude.ai custom
  * connector will traverse.
@@ -20,13 +20,27 @@
 
 import { SELF } from "cloudflare:test";
 import { Client, StreamableHTTPClientTransport } from "@modelcontextprotocol/client";
+import { SignJWT, exportJWK, generateKeyPair } from "jose";
 import { vi } from "vitest";
 
 /** Plain `/mcp` now — the path stopped being a capability in build step 7. */
 export const MCP_URL = new URL("http://localhost/mcp");
 
-/** Must be on wrangler.jsonc's `vars.GITHUB_ALLOWED_USERS`, case aside. */
-export const ALLOWED_LOGIN = "JakubMMazurek";
+/**
+ * The identity Access asserts. An email now, not a GitHub login.
+ *
+ * It no longer has to match anything in wrangler.jsonc: there is no allowlist
+ * in the Worker any more, because the Cloudflare Access policy refuses an
+ * unlisted user at its own login page and never redirects back. Any address
+ * the stub asserts therefore completes the flow — which is exactly the
+ * behaviour under test. This one is a real Tech Team member for realism.
+ */
+export const ALLOWED_LOGIN = "jakub@365finance.co.uk";
+
+/** Must match wrangler.jsonc's `vars` — the Worker reads them from there. */
+const ACCESS_CLIENT_ID =
+  "3030004f67ef659a855c849396749d7810760e0fa50acca033d4562bc752c4f2";
+const ACCESS_ISSUER = `https://365-finance.cloudflareaccess.com/cdn-cgi/access/sso/oidc/${ACCESS_CLIENT_ID}`;
 
 /** The MCP client's own redirect target. Never dialled — only matched. */
 const CLIENT_REDIRECT = "http://localhost/oauth/callback";
@@ -38,27 +52,82 @@ export type ToolResult = {
 };
 
 /* -------------------------------------------------------------------------- */
-/* the github stub                                                            */
+/* the Cloudflare Access stub                                                  */
 /* -------------------------------------------------------------------------- */
 
 /**
  * `@cloudflare/vitest-plugin` 1.1.0 exposes no `fetchMock`, but its own docs
  * note that the `main` worker runs in the same isolate as the tests, so a
  * global stub applies to it too. That is the whole mechanism: replace
- * `globalThis.fetch`, answer the two github.com URLs, delegate everything else
- * to the real one. `SELF.fetch` is a Fetcher binding and is untouched.
+ * `globalThis.fetch`, answer the two cloudflareaccess.com URLs, delegate
+ * everything else to the real one. `SELF.fetch` is a Fetcher binding and is
+ * untouched.
  */
 /** Captured once, at module load, so re-stubbing never wraps a previous stub. */
 const realFetch = globalThis.fetch;
 
-export function stubGitHub(login: string): void {
+/**
+ * A real RS256 keypair, generated once per isolate.
+ *
+ * The handler verifies the ID token's signature against the JWKS it fetches,
+ * so a stub that returned an unsigned or hand-assembled token would test
+ * nothing: every sign-in would fail for the same reason a forged one does.
+ * Signing properly here is what makes "a valid token is accepted" and "a
+ * tampered one is not" two different outcomes.
+ *
+ * One keypair per isolate matters: `createRemoteJWKSet` caches inside the
+ * Worker, so a second keypair would be verified against the first one's JWKS.
+ */
+let accessKeys: Promise<{ privateKey: CryptoKey; jwks: unknown }> | undefined;
+
+function keysForAccess(): Promise<{ privateKey: CryptoKey; jwks: unknown }> {
+  accessKeys ??= (async () => {
+    const { publicKey, privateKey } = await generateKeyPair("RS256", { extractable: true });
+    const jwk = await exportJWK(publicKey);
+    return {
+      privateKey,
+      jwks: { keys: [{ ...jwk, kid: "test-key", alg: "RS256", use: "sig" }] },
+    };
+  })();
+  return accessKeys;
+}
+
+/** An ID token shaped exactly as Access issues one, signed with the test key. */
+export async function idTokenFor(
+  email: string,
+  overrides: { issuer?: string; audience?: string } = {},
+): Promise<string> {
+  const { privateKey } = await keysForAccess();
+  return new SignJWT({ email })
+    .setProtectedHeader({ alg: "RS256", kid: "test-key" })
+    .setIssuer(overrides.issuer ?? ACCESS_ISSUER)
+    .setAudience(overrides.audience ?? ACCESS_CLIENT_ID)
+    .setSubject(email)
+    .setIssuedAt()
+    .setExpirationTime("5m")
+    .sign(privateKey);
+}
+
+/**
+ * Stubs Access's token and JWKS endpoints.
+ *
+ * `token` takes an optional override so a test can hand back a token that is
+ * correctly signed but wrong in a way only verification catches.
+ */
+export function stubAccess(
+  email: string,
+  overrides: { issuer?: string; audience?: string } = {},
+): void {
   vi.stubGlobal("fetch", async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
-    if (url.startsWith("https://github.com/login/oauth/access_token")) {
-      return Response.json({ access_token: "gho_test_token", token_type: "bearer" });
+    if (url.startsWith(`${ACCESS_ISSUER}/token`)) {
+      return Response.json({
+        id_token: await idTokenFor(email, overrides),
+        token_type: "bearer",
+      });
     }
-    if (url.startsWith("https://api.github.com/user")) {
-      return Response.json({ login, id: 1 });
+    if (url.startsWith(`${ACCESS_ISSUER}/jwks`)) {
+      return Response.json((await keysForAccess()).jwks);
     }
     return realFetch(input as never, init as never);
   });
@@ -122,13 +191,16 @@ export type AuthorizeOutcome = {
 };
 
 /**
- * Walks a full authorization for `login`, stubbing github.com.
+ * Walks a full authorization for `login`, stubbing Cloudflare Access.
  *
  * Returns the raw callback response rather than throwing on refusal, because
  * the refusal IS the thing several tests assert on.
  */
-export async function authorize(login: string = ALLOWED_LOGIN): Promise<AuthorizeOutcome> {
-  stubGitHub(login);
+export async function authorize(
+  login: string = ALLOWED_LOGIN,
+  overrides: { issuer?: string; audience?: string } = {},
+): Promise<AuthorizeOutcome> {
+  stubAccess(login, overrides);
   const clientId = await registerClient();
   const { verifier, challenge } = await pkce();
 
@@ -143,14 +215,14 @@ export async function authorize(login: string = ALLOWED_LOGIN): Promise<Authoriz
   const bounce = await hosted(authorizeUrl.href, { redirect: "manual" });
   if (bounce.status !== 302) throw new Error(`/authorize returned ${bounce.status}`);
 
-  // What the browser would carry back: the state GitHub echoes, and the
+  // What the browser would carry back: the state Access echoes, and the
   // session cookie that proves it is the same browser.
   const upstream = new URL(bounce.headers.get("Location") ?? "");
   const stateToken = upstream.searchParams.get("state") ?? "";
   const cookie = (bounce.headers.get("Set-Cookie") ?? "").split(";")[0] ?? "";
 
   const callback = await hosted(
-    `http://localhost/callback?code=gh_code&state=${encodeURIComponent(stateToken)}`,
+    `http://localhost/callback?code=cf_code&state=${encodeURIComponent(stateToken)}`,
     { headers: { Cookie: cookie }, redirect: "manual" },
   );
   if (callback.status !== 302) return { callback };

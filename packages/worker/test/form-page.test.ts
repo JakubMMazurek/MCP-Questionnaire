@@ -206,7 +206,7 @@ describe("get_form_link", () => {
     await close();
 
     const url = (result.structuredContent as { url?: string }).url ?? "";
-    expect(url).toMatch(/^http:\/\/localhost\/f\/1\./);
+    expect(url).toMatch(/^http:\/\/localhost\/f\/2\./);
     // The link the agent hands over is a link that works.
     const page = await fetchPath(new URL(url).pathname);
     expect(page.status).toBe(200);
@@ -255,7 +255,7 @@ describe("choosing the carrier", () => {
     );
 
     const structured = result.structuredContent as { formId?: string; url?: string };
-    expect(structured.url).toMatch(/\/f\/1\./);
+    expect(structured.url).toMatch(/\/f\/2\./);
     // Both channels, because this client drops content[0].text and delivers
     // structuredContent — a link in the prose alone would reach nobody here.
     expect(firstText(result)).toContain(structured.url ?? "no url");
@@ -323,7 +323,7 @@ describe("choosing the carrier", () => {
     );
 
     // "Put this form back on screen" means nothing on a client with no screen.
-    expect((result.structuredContent as { url?: string }).url).toMatch(/\/f\/1\./);
+    expect((result.structuredContent as { url?: string }).url).toMatch(/\/f\/2\./);
   });
 });
 

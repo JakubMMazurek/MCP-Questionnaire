@@ -29,14 +29,21 @@ import { isFormId } from "./form-id.js";
 /** 12 hours (§8 Q2). */
 export const FORM_URL_TTL_MS = 12 * 60 * 60 * 1_000;
 
-/** Version prefix, so a future signing change is a rejection and not a mystery. */
-const VERSION = "1";
+/**
+ * Version prefix, so a future signing change is a rejection and not a mystery.
+ *
+ * Bumped to "2" on 2026-10-26: the login became an email address when auth
+ * moved to Cloudflare Access, and the payload now carries it base64url-encoded
+ * rather than dot-mangled (see `payloadOf`). Links minted under "1" are
+ * rejected as malformed, which is the point of having the prefix.
+ */
+const VERSION = "2";
 
 export type FormToken = {
   formId: string;
   /** Epoch millis. */
   expiresAt: number;
-  /** The GitHub login the link was minted for. Provenance only. */
+  /** The email the link was minted for. Provenance only. */
   login: string;
 };
 
@@ -72,9 +79,31 @@ async function keyFor(secret: string): Promise<CryptoKey> {
   );
 }
 
-/** `v1.<formId>.<expiresAt>.<login>` — the bytes the signature covers. */
+/**
+ * The login is base64url-encoded, not interpolated raw.
+ *
+ * The payload is dot-separated and an email address contains dots, so a raw
+ * login would split the token and change how many parts `verifyFormToken`
+ * sees. The previous code replaced dots with underscores, which was safe while
+ * logins were GitHub usernames (they cannot contain a dot) but is lossy for an
+ * email: `a@b.co.uk` and `a@b_co_uk` would sign identically and only one of
+ * them is a real address. Encoding keeps the five parts AND the exact bytes.
+ */
+const encodeLogin = (login: string): string => base64url(new TextEncoder().encode(login));
+
+function decodeLogin(value: string): string | null {
+  const bytes = fromBase64url(value);
+  if (!bytes) return null;
+  try {
+    return new TextDecoder("utf-8", { fatal: true, ignoreBOM: false }).decode(bytes);
+  } catch {
+    return null;
+  }
+}
+
+/** `v2.<formId>.<expiresAt>.<b64url(login)>` — the bytes the signature covers. */
 function payloadOf(token: FormToken): string {
-  return [VERSION, token.formId, String(token.expiresAt), token.login].join(".");
+  return [VERSION, token.formId, String(token.expiresAt), encodeLogin(token.login)].join(".");
 }
 
 export async function mintFormToken(
@@ -84,9 +113,7 @@ export async function mintFormToken(
   const token: FormToken = {
     formId: input.formId,
     expiresAt: (input.now ?? Date.now()) + (input.ttlMs ?? FORM_URL_TTL_MS),
-    // A login with a dot in it would split the payload. GitHub logins cannot
-    // contain one, but the signature must not depend on that staying true.
-    login: input.login.replaceAll(".", "_"),
+    login: input.login,
   };
   const payload = payloadOf(token);
   const signature = await crypto.subtle.sign(
@@ -111,7 +138,7 @@ export async function verifyFormToken(
 ): Promise<VerifyResult> {
   const parts = value.split(".");
   if (parts.length !== 5) return { ok: false, reason: "malformed" };
-  const [version, formId, expiresAt, login, signature] = parts as [
+  const [version, formId, expiresAt, encodedLogin, signature] = parts as [
     string,
     string,
     string,
@@ -123,6 +150,8 @@ export async function verifyFormToken(
   }
   const bytes = fromBase64url(signature);
   if (!bytes) return { ok: false, reason: "malformed" };
+  const login = decodeLogin(encodedLogin);
+  if (login === null) return { ok: false, reason: "malformed" };
 
   const token: FormToken = { formId, expiresAt: Number(expiresAt), login };
   const valid = await crypto.subtle.verify(

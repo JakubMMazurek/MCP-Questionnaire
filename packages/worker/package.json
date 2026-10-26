@@ -16,6 +16,7 @@
     "@mcpq/schema": "workspace:*",
     "@modelcontextprotocol/server": "2.0.0",
     "agents": "^0.21.0",
+    "jose": "6.2.10",
     "zod": "^4.4.3"
   },
   "devDependencies": {

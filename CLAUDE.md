@@ -2,18 +2,25 @@
 
 **Status (2026-08-26): all seven §9 build steps are DONE, field-tested twice on claude.ai** — 384 tests across
 `packages/{schema,ui,worker}` (`@mcpq/*` scope), deployed to
-`mcp-questionnaire.365finance.workers.dev`. **Auth is GitHub OAuth** (step 7):
-`@cloudflare/workers-oauth-provider` owns the Worker's fetch, MCP is served at
-plain `/mcp` behind a bearer token, and `GITHUB_ALLOWED_USERS` in
-`wrangler.jsonc` `vars` decides who may hold one (comma-separated logins,
-case-insensitive, fails closed when unset). The URL is no longer a capability,
-so the repo may be public; the `formId` still is one internally. Plugin +
-marketplace live in `packages/plugin` and `.claude-plugin/`. Dev harness:
+`mcp-questionnaire.365finance.workers.dev`. **Auth is Cloudflare Access → Microsoft Entra ID**
+(2026-10-26, replaced GitHub OAuth): `@cloudflare/workers-oauth-provider` owns
+the Worker's fetch, MCP is served at plain `/mcp` behind a bearer token, and
+`src/access-handler.ts` federates to an **Access for SaaS** OIDC application
+(`ACCESS_CLIENT_ID` / `ACCESS_ISSUER` in `vars`, `ACCESS_CLIENT_SECRET` a
+secret). **There is no allowlist in this repo any more** — the Zero Trust
+"Tech Team" policy is the gate, it requires Entra as the login method, and
+Access refuses an unlisted user at its own login page without ever redirecting
+back. Do not reintroduce a membership list in `vars`. The ID token's signature,
+`iss` and `aud` are verified with `jose` against Access's JWKS. The URL is not
+a capability; the `formId` still is one internally. Plugin + marketplace live in
+`packages/plugin` and `.claude-plugin/`. Dev harness:
 `pnpm --filter @mcpq/ui dev` → localhost:5173/dev/. Deploy traps to know: a
-wrangler `vars` entry replaces a same-named secret (so `GITHUB_CLIENT_ID` /
-`GITHUB_CLIENT_SECRET` are secrets and live nowhere in `vars`; fakes are in
-`.dev.vars`), and a trailing newline piped into `wrangler secret put` is a real
-bug that has bitten this deploy before.
+wrangler `vars` entry replaces a same-named secret (so nothing in `vars` may
+share a name with a secret; a fake `ACCESS_CLIENT_SECRET` is in `.dev.vars`),
+a trailing newline piped into `wrangler secret put` is a real bug that has
+bitten this deploy before, and wrangler caches the chosen account in
+`node_modules/.cache/wrangler` — `account_id` is pinned in `wrangler.jsonc`
+because that cache survived the move between accounts and 401d every call.
 
 **The answers reach the agent by a PULL, not a push.** `ui/update-model-context`
 is advisory — the host may accept it and never surface it, which is exactly what

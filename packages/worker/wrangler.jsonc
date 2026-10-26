@@ -75,24 +75,27 @@
     }
   ],
 
-  // §3/§10 — access control. Comma-separated GitHub logins, matched
-  // case-insensitively (src/allowlist.ts). Adding a teammate is an edit here
-  // plus `wrangler deploy`; removing one is the same edit in reverse, and it
-  // takes effect on the next authorization (existing tokens survive until they
-  // expire — revoke those with `wrangler kv key delete` on this namespace, or
-  // from the dashboard).
+  // §3/§10 — access control, and the upstream identity provider.
   //
-  // In `vars` and NOT a secret, deliberately. The list is not a credential:
-  // the gate is "prove you ARE that GitHub account", which only GitHub can
-  // grant, so publishing the list costs nothing and reviewing it in a diff is
-  // worth a lot. This also sidesteps the step-4 trap — a `vars` entry REPLACES
-  // a same-named secret on deploy — by never making it a secret at all.
+  // The gate is a Cloudflare Access policy ("Tech Team"), NOT a list in here.
+  // `GITHUB_ALLOWED_USERS` lived at this spot until 2026-10-26: twenty GitHub
+  // logins that someone had to remember to edit. Access refuses an unlisted
+  // user at its own login page and never redirects back, so membership is
+  // managed in Zero Trust and a leaver loses access when their Entra account
+  // is disabled — the policy requires Entra as the login method.
   //
-  // The OAuth app's credentials ARE secrets and are set out of band:
-  //     wrangler secret put GITHUB_CLIENT_ID
-  //     wrangler secret put GITHUB_CLIENT_SECRET
-  // (obvious fakes live in `.dev.vars` for local runs and tests).
+  // In `vars` and NOT secrets, deliberately, on the same reasoning the old
+  // allowlist used: neither value is a credential. The client id is published
+  // in the discovery URL, and the issuer IS a public URL. Only the client
+  // secret authenticates anything, and it is set out of band:
+  //     wrangler secret put ACCESS_CLIENT_SECRET
+  // (an obvious fake lives in `.dev.vars` for local runs and tests).
+  //
+  // This also sidesteps the step-4 trap — a `vars` entry REPLACES a same-named
+  // secret on deploy — by keeping the names disjoint: nothing in `vars` here
+  // shares a name with a secret.
   "vars": {
-    "GITHUB_ALLOWED_USERS": "JakubMMazurek,jobrightpeter,KyleHarrison,marcinllukasiak,pbiszczak,Emanuele-20,ngstanley,jononunes,piotrslowinski365,Suwanja,Span999999999999999,Ryanksten,jakubkrawczyk-365,KeaganSedd,jag365,dawid-365,nazzia97,SebastianMarzec,MarekKlepka365,Lukasz365finance"
+    "ACCESS_CLIENT_ID": "3030004f67ef659a855c849396749d7810760e0fa50acca033d4562bc752c4f2",
+    "ACCESS_ISSUER": "https://365-finance.cloudflareaccess.com/cdn-cgi/access/sso/oidc/3030004f67ef659a855c849396749d7810760e0fa50acca033d4562bc752c4f2"
   }
 }

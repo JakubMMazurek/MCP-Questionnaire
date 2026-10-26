@@ -30,7 +30,7 @@
 import { OAuthProvider } from "@cloudflare/workers-oauth-provider";
 import { createMcpHandler } from "agents/mcp/server";
 import type { WorkerEnv } from "./env.js";
-import { githubHandler } from "./github-handler.js";
+import { accessHandler } from "./access-handler.js";
 import { logConfigError } from "./log.js";
 import { createServer } from "./mcp-server.js";
 
@@ -114,7 +114,7 @@ const apiHandler = {
 
 /**
  * `scopesSupported` is deliberately omitted: this server has exactly one
- * permission level (you are on the allowlist or you are not), so advertising a
+ * permission level (the Access policy let you in or it did not), so advertising a
  * scope vocabulary would invent a distinction the tools do not make. Requested
  * scopes are granted through unchanged.
  *
@@ -130,7 +130,7 @@ const apiHandler = {
 export default new OAuthProvider<WorkerEnv>({
   apiRoute: MCP_ROUTE,
   apiHandler,
-  defaultHandler: githubHandler,
+  defaultHandler: accessHandler,
   authorizeEndpoint: "/authorize",
   tokenEndpoint: "/token",
   clientRegistrationEndpoint: "/register",

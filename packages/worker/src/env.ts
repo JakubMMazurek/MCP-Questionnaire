@@ -14,13 +14,15 @@
 
 import type { OAuthHelpers } from "@cloudflare/workers-oauth-provider";
 
-export type WorkerEnv = Omit<Env, "GITHUB_ALLOWED_USERS" | "FORM_URL_SECRET"> & {
+export type WorkerEnv = Omit<Env, "ACCESS_CLIENT_ID" | "ACCESS_ISSUER" | "FORM_URL_SECRET"> & {
   /**
-   * Comma-separated GitHub logins, case-insensitive (see allowlist.ts).
+   * The Cloudflare Access for SaaS application's client id, and the issuer the
+   * authorize/token/jwks endpoints hang off. Both are `vars`, both are public.
    * Optional in the type because absent must be a live possibility the code
    * handles — it fails closed — not a compile error nobody sees.
    */
-  GITHUB_ALLOWED_USERS?: string;
+  ACCESS_CLIENT_ID?: string;
+  ACCESS_ISSUER?: string;
   /**
    * HMAC key for `/f/:token` form URLs. A `wrangler secret`, NEVER a `vars`
    * entry — a `vars` entry of the same name REPLACES a secret, which is the
@@ -36,11 +38,16 @@ export type WorkerEnv = Omit<Env, "GITHUB_ALLOWED_USERS" | "FORM_URL_SECRET"> & 
 /**
  * What the OAuth grant carries into every authenticated MCP request.
  *
- * Exactly one field, deliberately. The GitHub access token is NOT kept: this
- * server never calls GitHub on the user's behalf after the callback, so
- * storing the token would be a credential at rest bought for nothing. The
- * login is here because §10's audit-attribution question un-parks the moment
- * an identity exists (build step 7) — it is stamped on writes to the form DO.
+ * Exactly one field, deliberately. No upstream token is kept: this server
+ * never calls Cloudflare Access on the user's behalf after the callback, so
+ * storing one would be a credential at rest bought for nothing. The identity
+ * is here because §10's audit-attribution question un-parks the moment an
+ * identity exists — it is stamped on writes to the form DO.
+ *
+ * `login` holds an EMAIL ADDRESS since the move to Access (2026-10-26); it
+ * held a GitHub login before. The field keeps its name because what it means
+ * has not changed — "who signed in" — and renaming it would churn the DO's
+ * stored attributions for no gain.
  */
 export type AuthProps = { login: string };
 

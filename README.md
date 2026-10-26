@@ -26,22 +26,23 @@ or from a shell:
 
 Settings → Connectors → **Add custom connector** → paste the URL from
 [`packages/plugin/.mcp.json`](packages/plugin/.mcp.json). Claude will send you
-to GitHub to sign in; if your GitHub login is on the server's allowlist you come
+to Microsoft to sign in; if you are on the Tech Team Access policy you come
 back connected. First render asks a one-time "Always allow" permission. Add on
 web/desktop first — mobile picks it up from there.
 
 ## Access control
 
 The connector URL is public and carries nothing. Every MCP request needs an
-OAuth token, and the only way to get one is to sign in with a GitHub account
-whose login appears in `GITHUB_ALLOWED_USERS` in
-[`packages/worker/wrangler.jsonc`](packages/worker/wrangler.jsonc) —
-comma-separated, matched case-insensitively. Anyone else gets a 403 and no
-token.
+OAuth token, and the only way to get one is to sign in through **Cloudflare
+Access**, which federates to **Microsoft Entra ID** and admits only members of
+the **Tech Team** policy in Zero Trust. Anyone else is stopped at Access's own
+login page and never reaches this Worker.
 
-**Add a teammate:** add their GitHub login to `GITHUB_ALLOWED_USERS` and
-redeploy the Worker. **Remove one:** delete the entry and redeploy; that blocks
-new authorizations at once, and any token they still hold expires on its own (or
+**Add or remove a teammate:** edit the Tech Team rule group in Zero Trust
+(Access controls → Policies). No code change, no redeploy — and nothing in this
+repo lists who has access, deliberately. A leaver loses access when their Entra
+account is disabled, because the policy requires Entra as the login method. A
+token someone already holds expires on its own (or
 delete their `grant:`/`token:` keys from the `OAUTH_KV` namespace to cut it
 short).
 
@@ -68,15 +69,16 @@ installed from a plugin marketplace. Form ids remain capabilities internally.
     pnpm --filter @mcpq/ui dev    # offline host harness at localhost:5173/dev/
     pnpm build              # single-file renderer bundle, verified self-contained
 
-Deploying (`packages/worker`): `pnpm exec wrangler deploy`. Two secrets carry
-the GitHub OAuth app's credentials —
+Deploying (`packages/worker`): `pnpm exec wrangler deploy`. Two secrets:
 
-    wrangler secret put GITHUB_CLIENT_ID
-    wrangler secret put GITHUB_CLIENT_SECRET
+    wrangler secret put ACCESS_CLIENT_SECRET
+    wrangler secret put FORM_URL_SECRET
 
-— from a GitHub OAuth app whose **Authorization callback URL** is
-`https://mcp-questionnaire.365finance.workers.dev/callback`. Pipe secrets with
-`tr -d '\n'`: a trailing newline has bitten this deploy before. The allowlist
-(`GITHUB_ALLOWED_USERS`) is a `vars` entry, not a secret, so it ships in
-`wrangler.jsonc` and changes in a reviewable diff. `.dev.vars` holds obvious
-fakes for local runs.
+`ACCESS_CLIENT_SECRET` comes from the **Access for SaaS** OIDC application in
+Zero Trust whose **Redirect URL** is
+`https://mcp-questionnaire.365finance.workers.dev/callback`; it is shown only
+at creation, so getting it again means **Reset secret**. Its client id and
+issuer are `vars` in `wrangler.jsonc`, not secrets — neither is a credential,
+and both are visible in the public discovery document. Pipe secrets with
+`tr -d '\n'`: a trailing newline has bitten this deploy before. `.dev.vars`
+holds an obvious fake for local runs.
