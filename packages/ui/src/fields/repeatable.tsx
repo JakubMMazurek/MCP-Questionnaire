@@ -14,6 +14,7 @@ import { Button } from "../components/primitives";
 import { joinPath } from "../engine/index.js";
 import { useActions, useDisabled, useRequired, useRows, useVisible } from "../state";
 import { LeafControl } from "./controls";
+import { Markdown } from "./markdown";
 import { NoteAffordance } from "./note";
 
 const SubField = memo(function SubField({
@@ -31,8 +32,17 @@ const SubField = memo(function SubField({
   if (!visible || field.type === "computed") return null;
   const label = ("label" in field && field.label) || field.id;
 
+  /**
+   * The same renderer the top-level info block uses. It rendered raw text here
+   * until 2026-11-05, so identical markdown came out formatted in a section and
+   * as literal asterisks one level down, inside a row.
+   */
   if (field.type === "info") {
-    return <p className="why m-0">{field.markdown}</p>;
+    return (
+      <div className="text-[color:var(--color-text-secondary)]">
+        <Markdown source={field.markdown} />
+      </div>
+    );
   }
 
   return (

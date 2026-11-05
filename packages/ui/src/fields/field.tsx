@@ -15,6 +15,7 @@ import { Pill, ProvenanceChip } from "../components/primitives";
 import { useComputed, usePrefill, useRequired, useVisible } from "../state";
 import { AllocationFieldView } from "./allocation";
 import { LeafControl } from "./controls";
+import { Markdown } from "./markdown";
 import { MatrixFieldView } from "./matrix";
 import { NoteAffordance } from "./note";
 import { RankFieldView } from "./rank";
@@ -67,27 +68,6 @@ export const CounterPill = memo(function CounterPill({ field }: { field: Compute
     </Pill>
   );
 });
-
-/** Minimal, safe markdown: paragraphs and `**bold**`. No HTML is ever injected. */
-function Markdown({ source }: { source: string }) {
-  return (
-    <>
-      {source.split(/\n{2,}/).map((paragraph, index) => (
-        // biome-ignore lint/suspicious/noArrayIndexKey: paragraphs are positional
-        <p key={index} className="m-0 mb-2 text-[length:var(--font-text-sm-size)]">
-          {paragraph.split(/(\*\*[^*]+\*\*)/).map((part, i) =>
-            part.startsWith("**") && part.endsWith("**") ? (
-              // biome-ignore lint/suspicious/noArrayIndexKey: inline runs are positional
-              <strong key={i}>{part.slice(2, -2)}</strong>
-            ) : (
-              part
-            ),
-          )}
-        </p>
-      ))}
-    </>
-  );
-}
 
 const InfoBlock = memo(function InfoBlock({ field }: { field: Extract<Field, { type: "info" }> }) {
   return (
