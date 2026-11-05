@@ -22,6 +22,10 @@ or from a shell:
     claude plugin marketplace add JakubMMazurek/MCP-Questionnaire
     claude plugin install mcp-questionnaire@mcp-questionnaire
 
+At 365 Business Finance, skip both: the plugin arrives by organization sync
+from the private mirror, and the connector is added separately by an Owner.
+See [`packages/plugin/README.md`](packages/plugin/README.md).
+
 ## Install (claude.ai / Claude Desktop — where the forms render)
 
 Settings → Connectors → **Add custom connector** → paste the URL from
@@ -65,7 +69,7 @@ installed from a plugin marketplace. Form ids remain capabilities internally.
 ## Develop
 
     pnpm install
-    pnpm -r test            # 359 tests
+    pnpm -r test            # 498 tests
     pnpm --filter @mcpq/ui dev    # offline host harness at localhost:5173/dev/
     pnpm build              # single-file renderer bundle, verified self-contained
 
