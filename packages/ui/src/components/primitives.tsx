@@ -13,7 +13,7 @@
 // affordance, and clicking the selected segment again clears the answer, which
 // a native radio cannot express.
 
-import type { Option, Prefill, Value } from "@mcpq/schema";
+import { type Option, type Prefill, SEGMENTED_LABEL_SOFT_LIMIT, type Value } from "@mcpq/schema";
 import { memo, type ReactNode, useCallback, useEffect, useId, useRef, useState } from "react";
 
 export function cn(...parts: (string | false | null | undefined)[]): string {
@@ -106,8 +106,24 @@ export const Segmented = memo(function Segmented({
   onPick,
   onClear,
 }: SegmentedProps) {
+  /**
+   * §4.2 asks for "segmented for ≤4 SHORT labels", and a long label is what
+   * actually breaks the control: three 60-character options overflow a desktop
+   * surface exactly the way five short ones overflow a phone, leaving the last
+   * one off the right edge and a scrollbar under the whole form. The narrow
+   * -surface rules (§7.4) already unroll the control into separate buttons at
+   * ≤560px because that is the honest shape when it cannot stay one line; this
+   * applies the same treatment on label length, at any width.
+   *
+   * The hint is not refused — it is honoured as far as it goes. Nothing about
+   * the radiogroup semantics or the clear-by-reselect behaviour changes.
+   */
+  const unrolled = segments.some(
+    (segment) => String(segment.label).length > SEGMENTED_LABEL_SOFT_LIMIT,
+  );
+
   return (
-    <div className="seg" role="radiogroup" aria-label={label}>
+    <div className={cn("seg", unrolled && "seg-unrolled")} role="radiogroup" aria-label={label}>
       {segments.map((segment) => {
         const selected = value !== undefined && segment.value === value;
         return (

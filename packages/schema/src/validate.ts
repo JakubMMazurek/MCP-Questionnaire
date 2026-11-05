@@ -28,6 +28,7 @@ import {
   quoteList,
   SEARCHABLE_LIST_THRESHOLD,
   SECTION_FIELD_SOFT_LIMIT,
+  SEGMENTED_LABEL_SOFT_LIMIT,
   SEGMENTED_OPTION_SOFT_LIMIT,
   TABLE_COLUMN_TYPES,
 } from "./vocab.js";
@@ -332,7 +333,7 @@ function checkMatrix(
       warning(
         "matrix_cycle_option_count",
         `${location}.render "${field.id}"`,
-        `Matrix "${field.id}" asks for "cycle" with ${cellOptions.length} cell options. Cycling degrades past ${MATRIX_CYCLE_OPTION_LIMIT} — a wrong click costs about n/2 more, and the next value stops being predictable (§5.5 decided). Use "paint" (a value palette in the toolbar) at this cardinality, or drop the hint and let the renderer pick.`,
+        `Matrix "${field.id}" asks for "cycle" with ${cellOptions.length} cell options. It renders. Cycling gets awkward past ${MATRIX_CYCLE_OPTION_LIMIT} (§5.5) — a wrong click costs about n/2 more and the next value stops being predictable. "paint" (a value palette in the toolbar) suits higher cardinality, and dropping the hint lets the renderer choose per grid.`,
       ),
     );
   }
@@ -365,7 +366,7 @@ function checkRenderHintFit(field: Field, location: string, out: Diagnostic[]): 
       warning(
         "render_hint_option_count",
         `${location}.render "${field.id}"`,
-        `Field "${field.id}" asks for "segmented" with ${count} options. Segmented controls are for up to ${SEGMENTED_OPTION_SOFT_LIMIT} short labels (§4.2); beyond that they wrap and stop reading as one control. Use "cards" (up to ${CARDS_OPTION_SOFT_LIMIT}, with descriptions) or "list".`,
+        `Field "${field.id}" asks for "segmented" with ${count} options. It renders. The house style keeps segmented to about ${SEGMENTED_OPTION_SOFT_LIMIT} short labels (§4.2), because past that the row wraps and stops reading as one control — if these labels are short and the grouping matters to you, keep it. Otherwise "cards" carries a description per option and "list" is searchable.`,
       ),
     );
   }
@@ -374,16 +375,36 @@ function checkRenderHintFit(field: Field, location: string, out: Diagnostic[]): 
       warning(
         "render_hint_option_count",
         `${location}.render "${field.id}"`,
-        `Field "${field.id}" asks for "cards" with ${count} options. Cards are for up to ${CARDS_OPTION_SOFT_LIMIT} options with descriptions (§4.2). Use "list", which is searchable.`,
+        `Field "${field.id}" asks for "cards" with ${count} options. It renders. Cards carry a description each, so past about ${CARDS_OPTION_SOFT_LIMIT} (§4.2) they become a long scroll — "list" is searchable and handles the count. Worth keeping cards anyway if the descriptions are what makes the choice.`,
       ),
     );
   }
+  /**
+   * §4.2 says "segmented for ≤4 SHORT labels" and only the count was ever
+   * checked, so three 60-character options passed and then overflowed a
+   * desktop surface. The renderer no longer lets that happen — it unrolls the
+   * control into separate buttons — so this is genuinely a hint about how it
+   * will look, not a defect report.
+   */
+  if (hint === "segmented") {
+    const longest = field.options.reduce((max, option) => Math.max(max, option.label.length), 0);
+    if (longest > SEGMENTED_LABEL_SOFT_LIMIT) {
+      out.push(
+        warning(
+          "render_hint_label_length",
+          `${location}.render "${field.id}"`,
+          `Field "${field.id}" asks for "segmented" with a ${longest}-character option label. It renders, but not as one joined row: §4.2 means segmented for SHORT labels, so past about ${SEGMENTED_LABEL_SOFT_LIMIT} characters the renderer unrolls it into separate buttons rather than running off the edge. That is a fine result. If you want the joined control, shorten the labels and move the detail into each option's "description"; if you want the detail on screen, "cards" is built for it.`,
+        ),
+      );
+    }
+  }
+
   if (count > SEARCHABLE_LIST_THRESHOLD && hint !== undefined && hint !== "list") {
     out.push(
       warning(
         "render_hint_option_count",
         `${location}.render "${field.id}"`,
-        `Field "${field.id}" has ${count} options rendered as "${hint}". Above about ${SEARCHABLE_LIST_THRESHOLD} options the searchable "list" is the only one that stays usable (§4.2).`,
+        `Field "${field.id}" has ${count} options rendered as "${hint}". It renders. Past about ${SEARCHABLE_LIST_THRESHOLD} options (§4.2) a reader is scanning rather than choosing, which is what the searchable "list" is for — worth a look unless the order of these options is itself the point.`,
       ),
     );
   }
@@ -871,7 +892,7 @@ function checkPrefill(form: Form, out: Diagnostic[]): void {
       warning(
         "no_prefill",
         FORM_ROOT,
-        "This form prefills nothing. Reviewing is cheap and authoring is expensive: the agent should infer what it can and render a proposal with provenance on every value. \"If there's nothing to prefill, the form probably shouldn't exist\" (§4.7) — consider asking in chat instead.",
+        "This form prefills nothing. It renders. Reviewing is cheap and authoring is expensive, so a form usually lands better as a proposal with provenance on every value you could infer — §4.7 puts it strongly: \"If there's nothing to prefill, the form probably shouldn't exist\". If there really was nothing to infer, that is often a sign the question belonged in chat; a first-contact form with nothing to go on is the fair exception.",
       ),
     );
     return;
@@ -958,7 +979,7 @@ function checkSections(form: Form, out: Diagnostic[]): void {
         warning(
           "section_single_field",
           location,
-          `Section "${section.id}" holds one field. "Never a section with one field" (§4.8) — a section is a unit of the left rail and of section status, and one field does not earn a heading. Merge it into a neighbouring section, or add the fields that belong with it.`,
+          `Section "${section.id}" holds one field. It renders. A section is a unit of the left rail and of section status, so the house style avoids one-field sections (§4.8) — usually the field belongs with its neighbours. Keep it if the heading is doing real work for the reader here.`,
         ),
       );
     }
@@ -967,7 +988,7 @@ function checkSections(form: Form, out: Diagnostic[]): void {
         warning(
           "section_over_soft_limit",
           location,
-          `Section "${section.id}" holds ${section.fields.length} fields; the soft limit is ${SECTION_FIELD_SOFT_LIMIT} (§4.8). Split it, so the section rail carries real progress instead of one long scroll. A dense list of same-shaped rows is the exception — express that as one "table" field, not ${section.fields.length} fields (§4.2).`,
+          `Section "${section.id}" holds ${section.fields.length} fields; the house style keeps a section to about ${SECTION_FIELD_SOFT_LIMIT} (§4.8). It renders. Splitting it gives the section rail real progress instead of one long scroll. One case is worth more than the split: if these are same-shaped rows, one "table" field says it better than ${section.fields.length} fields (§4.2).`,
         ),
       );
     }

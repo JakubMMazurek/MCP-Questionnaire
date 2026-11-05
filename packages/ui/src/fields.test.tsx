@@ -642,3 +642,73 @@ describe("info blocks (§5.4)", () => {
     });
   });
 });
+
+/* -------------------------------------------------------------------------- */
+/* §4.2 — "segmented for ≤4 SHORT labels", and what happens when they are not */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * The failure this pins down: a three-option segmented control with long
+ * labels ran off the right edge of a FULLSCREEN desktop surface with the last
+ * option unreachable and a scrollbar under the whole form. The §7.4 narrow
+ * -surface rules already unrolled the control at ≤560px, so the shape was
+ * right and the trigger was wrong — overflow is content against container, and
+ * a 60-character label overflows at any width.
+ */
+describe("a segmented control with long labels (§4.2/§7.4)", () => {
+  const withLabels = (labels: string[]) => ({
+    version: FORM_SCHEMA_VERSION,
+    title: "T",
+    display: "fullscreen",
+    sections: [
+      {
+        id: "s",
+        title: "S",
+        fields: [
+          {
+            id: "pick",
+            type: "single_select",
+            label: "Pick",
+            render: "segmented",
+            options: labels.map((label, index) => ({ value: `v${index}`, label })),
+          },
+          { id: "note", type: "short_text", label: "Note" },
+        ],
+      },
+    ],
+  });
+
+  it("unrolls into separate buttons rather than overflowing", () => {
+    mount(
+      withLabels([
+        "Deal Funding checked against Opportunity.Amount (recommended)",
+        "Every payment checked against the deal total (ticket, literal)",
+        "Keep per payment (accept the gap)",
+      ]),
+    );
+    const group = screen.getByRole("radiogroup", { name: "Pick" });
+    expect(group.className).toContain("seg-unrolled");
+  });
+
+  it("leaves a short-labelled control joined, which is the §5.1 look", () => {
+    mount(withLabels(["Approve", "Revise", "TBD"]));
+    const group = screen.getByRole("radiogroup", { name: "Pick" });
+    expect(group.className).toContain("seg");
+    expect(group.className).not.toContain("seg-unrolled");
+  });
+
+  it("keeps every option reachable and selectable once unrolled", () => {
+    const store = mount(
+      withLabels([
+        "Deal Funding checked against Opportunity.Amount (recommended)",
+        "Every payment checked against the deal total (ticket, literal)",
+        "Keep per payment (accept the gap)",
+      ]),
+    );
+    const last = screen.getByRole("radio", { name: "Keep per payment (accept the gap)" });
+    act(() => {
+      fireEvent.click(last);
+    });
+    expect(store.getState().answers.pick).toEqual({ state: "answered", value: "v2" });
+  });
+});

@@ -1003,3 +1003,56 @@ describe("validateAnswers (§4.3)", () => {
     expect(validateAnswers({ "ledger[*].verdict": { state: "empty" } }).ok).toBe(false);
   });
 });
+
+/**
+ * §4.2 reads "segmented for ≤4 SHORT labels". Only the count was ever checked,
+ * so three long-labelled options validated clean and then overflowed the
+ * surface. The renderer now unrolls instead of overflowing, which makes this a
+ * hint about how the control will look — not a defect report.
+ */
+describe("segmented label length (§4.2)", () => {
+  const segmented = (labels: string[]) => ({
+    version: 1,
+    title: "T",
+    prefill: { pick: { value: "v0", source: "inferred" } },
+    sections: [
+      {
+        id: "s",
+        title: "S",
+        fields: [
+          {
+            id: "pick",
+            type: "single_select",
+            label: "Pick",
+            render: "segmented",
+            options: labels.map((label, index) => ({ value: `v${index}`, label })),
+          },
+          { id: "note", type: "short_text", label: "Note" },
+        ],
+      },
+    ],
+  });
+
+  it("hints when a label is too long to stay one joined row", () => {
+    const result = validateForm(
+      segmented(["Deal Funding checked against Opportunity.Amount (recommended)", "Keep it"]),
+    );
+    const hint = result.warnings.find((w) => w.code === "render_hint_label_length");
+    expect(hint).toBeDefined();
+    expect(hint?.message).toContain("unrolls it into separate buttons");
+  });
+
+  it("never blocks on it — the form still renders", () => {
+    const result = validateForm(
+      segmented(["Deal Funding checked against Opportunity.Amount (recommended)", "Keep it"]),
+    );
+    expect(result.ok).toBe(true);
+    expect(result.form).not.toBeNull();
+    expect(result.errors).toHaveLength(0);
+  });
+
+  it("says nothing about short labels", () => {
+    const result = validateForm(segmented(["Approve", "Revise", "TBD"]));
+    expect(result.warnings.find((w) => w.code === "render_hint_label_length")).toBeUndefined();
+  });
+});

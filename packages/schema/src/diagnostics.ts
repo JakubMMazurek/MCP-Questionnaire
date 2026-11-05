@@ -74,6 +74,7 @@ export type DiagnosticCode =
   | "no_prefill"
   | "prose_heavy"
   | "render_hint_option_count"
+  | "render_hint_label_length"
   | "matrix_cycle_option_count"
   | "self_scope_ambiguous";
 
@@ -143,17 +144,49 @@ export function formatDiagnostics(diagnostics: readonly Diagnostic[]): string {
 
   const headline =
     errors > 0
-      ? `Form rejected — ${plural(errors, "error")}${warnings > 0 ? `, ${plural(warnings, "warning")}` : ""}. Nothing was rendered; fix the errors and call again.`
+      ? `Form rejected — ${plural(errors, "error")}${warnings > 0 ? `, ${plural(warnings, "hint")}` : ""}. Nothing was rendered; fix the errors and call again.`
       : warnings > 0
-        ? `Form accepted — ${plural(warnings, "warning")}. It renders as-is; the warnings are smells worth a second look.`
+        ? `Form accepted — ${plural(warnings, "hint")}. It rendered exactly as you wrote it.`
         : "Form accepted — no problems found.";
 
   if (ordered.length === 0) return headline;
 
-  const blocks = ordered.map((d) => {
-    const head = `${d.severity === "error" ? "ERROR  " : "WARNING"} ${d.code} · ${d.location}`;
+  const block = (d: Diagnostic) => {
+    /** Both labels are seven characters, so the code column stays aligned. */
+    const head = `${d.severity === "error" ? "ERROR  " : "HINT   "} ${d.code} · ${d.location}`;
     return [head, ...wrap(d.message, WRAP_WIDTH, "  ")].join("\n");
-  });
+  };
 
-  return `${headline}\n\n${blocks.join("\n\n")}`;
+  const sections: string[] = [];
+  if (errors > 0) {
+    sections.push(
+      ordered
+        .filter((d) => d.severity === "error")
+        .map(block)
+        .join("\n\n"),
+    );
+  }
+  if (warnings > 0) {
+    /**
+     * The hints say so in their own section, because an agent reading a flat
+     * list of diagnostics treats every line in it as a rule it broke. These
+     * gate nothing and several of them are matters of taste — a form that
+     * ignores all of them is a valid form, and an author who rewrites a
+     * deliberate choice to silence one has been made worse off by the advice.
+     */
+    sections.push(
+      [
+        "HINTS — none of these blocked anything. They are suggestions from the",
+        "house style, not rules: take the ones that fit what you are building and",
+        "ignore the rest. The form above renders either way.",
+        "",
+        ordered
+          .filter((d) => d.severity === "warning")
+          .map(block)
+          .join("\n\n"),
+      ].join("\n"),
+    );
+  }
+
+  return `${headline}\n\n${sections.join("\n\n")}`;
 }

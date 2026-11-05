@@ -174,6 +174,19 @@ export const SECTION_FIELD_SOFT_LIMIT = 7;
 
 /** §4.2 render-hint soft limits, from the "Notes" column of the field table. */
 export const SEGMENTED_OPTION_SOFT_LIMIT = 4;
+
+/**
+ * §4.2 reads "segmented for ≤4 SHORT labels", and only the count was ever
+ * enforced. A three-option control with 60-character labels therefore passed
+ * every check and then ran off the right edge of a desktop surface with the
+ * third option unreachable — the §7.4 narrow-surface failure, at a width nobody
+ * thought to look at.
+ *
+ * So "short" gets a number too. It is advisory in both places that read it: the
+ * validator offers it as a hint, and the renderer unrolls the control into
+ * separate buttons rather than overflowing. Neither refuses the hint.
+ */
+export const SEGMENTED_LABEL_SOFT_LIMIT = 24;
 export const CARDS_OPTION_SOFT_LIMIT = 6;
 export const SEARCHABLE_LIST_THRESHOLD = 15;
 

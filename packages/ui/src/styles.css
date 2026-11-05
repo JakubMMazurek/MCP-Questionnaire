@@ -1239,13 +1239,48 @@ body {
  * over layered, so each one overrides its component rule without an arms race
  * of selectors.
  */
+/*
+ * THE UNROLLED SEGMENTED CONTROL.
+ *
+ * It stops being one joined control and becomes several — the honest shape
+ * when the options cannot sit on one line, and it keeps every option reachable
+ * without a nested scroll or a cut-off edge. Radiogroup semantics and the
+ * clear-by-reselect behaviour are untouched.
+ *
+ * TWO THINGS TRIGGER IT, because two different things overflow the control.
+ * Narrow surface is a media query below; long labels are a class the renderer
+ * adds (`seg-unrolled`, §4.2's "≤4 SHORT labels" — three 60-character options
+ * run off a desktop surface just as five short ones run off a phone). The
+ * declarations are written twice because CSS cannot add a class from inside a
+ * media query; keep the two in step.
+ */
+.seg-unrolled {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  max-width: 100%;
+  overflow: visible;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.seg-unrolled > button {
+  border: var(--border-width-regular) solid var(--color-border-primary);
+  border-radius: var(--border-radius-sm);
+  white-space: normal;
+}
+
+.seg-unrolled > button:first-child {
+  border-left: var(--border-width-regular) solid var(--color-border-primary);
+}
+
+.seg-unrolled > button.seg-skip {
+  border-style: dashed;
+}
+
 @media (width <= 560px) {
-  /*
-   * The segmented control unrolls into a wrapped row of buttons. It stops being
-   * one joined control and becomes several — which is the honest thing at this
-   * width, and keeps every option reachable without a nested scroll. Radiogroup
-   * semantics and the clear-by-reselect behaviour are untouched.
-   */
+  /* The narrow-surface trigger. Mirrors `.seg-unrolled` above. */
   .seg {
     display: flex;
     flex-wrap: wrap;
