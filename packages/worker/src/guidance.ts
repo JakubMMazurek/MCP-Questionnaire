@@ -59,6 +59,41 @@ You do NOT see what the user typed by watching the form. When they submit, a one
 
 If the envelope is malformed you get the specific errors plus a worked example back, and can call again.`;
 
+/**
+ * Layer 1, continued — the `form` ARGUMENT description, and the fix for the
+ * narrowest failure this tool has.
+ *
+ * The wire schema is `z.record(z.string(), z.unknown())`, loose on purpose
+ * (§6.3), so the argument description is the only type-level signal that is
+ * unconditionally in context. It used to name the envelope keys and no field
+ * types at all, and the consequence was measurable: every type beyond
+ * single_select and short_text lived behind `get_form_guide`, which is an
+ * OPTIONAL round trip, and an agent that skipped it had nothing to generate
+ * from but the prior every HTML form in its training data carries. So the forms
+ * came back as a radio group and a comment box — not because the author chose
+ * plainly, but because nothing had told them `allocation` or `matrix` existed.
+ *
+ * Hence a bare vocabulary here and the craft still in `get_form_guide`: the
+ * list is what you cannot invent, the recipes are what you would get wrong.
+ * `tools.test.ts` asserts every member of FIELD_TYPES appears below, so the
+ * list cannot drift from the schema the validator enforces.
+ */
+export const FORM_ARGUMENT_DESCRIPTION = `The form envelope: { version, title, description?, display?, submitLabel?, sections: [...], rules?: [...], prefill?: {...} }. Do not include formId — the server mints it.
+
+THE FIELD TYPES. Pick the one that matches the decision; most forms should not be a column of single_selects.
+- Choose: single_select (render: cards | segmented | radio | list), multi_select (chips | checkboxes | list), boolean (toggle | segmented).
+- Order and weigh: rank (drag to prioritise), allocation (split 100 across options — a forced tradeoff beats asking "what matters?"), slider, number.
+- Time: date, date_range.
+- Grids and repetition: matrix (2D — roles x permissions, fields x profiles; cells take a cellType, and render cycle | paint), table (columns declared once, rows as data — this is how you ask forty things cheaply), repeatable ("add another stakeholder").
+- Text, last resort: short_text, long_text. A form that is mostly long_text should have been a conversation.
+- No answer of their own: info (a markdown body — headings, lists, bold, italic, quotes and code all render), computed (a live counter over other answers: count_value, count_empty, count_answered, count_changed, count_needs_review, sum).
+
+RULES make one answer reshape the form, and targets take SECTION ids as well as field ids: ops eq, neq, in, contains, not_contains, contains_all, contains_any, contains_none, gt, lt, empty, filled; actions show, hide, enable, disable, require, optional, filter_options, set_default, clear. Branching on a multi_select takes the contains ops, never "in".
+
+PREFILL carries provenance per path: { value, source: user | inferred | default | existing, confidence?, rationale?, needsReview? }. It is what makes the form an audit rather than a blank.
+
+Call get_form_guide(archetype) for how to combine these well — the list above is the vocabulary, not the craft.`;
+
 export const GET_FORM_GUIDE_DESCRIPTION = `Return the generation recipe and worked examples for one form archetype. Call this before gather_decisions if you have not already in this conversation — it is where the craft lives, and it costs one round trip against a human filling in a form.
 
 archetype:

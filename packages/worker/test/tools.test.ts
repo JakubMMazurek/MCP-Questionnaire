@@ -3,10 +3,19 @@
  * autosave round trip, and the two hardening limits.
  */
 
-import { assumptionLedger } from "@mcpq/schema";
+import {
+  assumptionLedger,
+  COMPUTED_OPS,
+  FIELD_TYPES,
+  PREFILL_SOURCES,
+  RENDER_HINTS,
+  RULE_ACTIONS,
+  RULE_OPS,
+} from "@mcpq/schema";
 import { describe, expect, it } from "vitest";
 import { MAX_DRAFT_BYTES } from "../src/form-do.js";
 import { FORM_ID_PATTERN } from "../src/form-id.js";
+import { FORM_ARGUMENT_DESCRIPTION } from "../src/guidance.js";
 import { RENDERER_MIME_TYPE, RENDERER_URI } from "../src/renderer-resource.js";
 import { ALLOWED_LOGIN, connect, firstText } from "./harness.js";
 
@@ -60,7 +69,23 @@ describe("declaration (§7.1)", () => {
     };
     // One free-form `form` object, not a recursive rendering of the meta-schema.
     expect(Object.keys(schema.properties ?? {})).toEqual(["form"]);
-    expect(JSON.stringify(schema)).not.toContain("single_select");
+
+    /**
+     * §6.3 is about STRUCTURE — "deeply nested recursive JSON Schema degrades
+     * model output quality" — so this asserts the shape, not the absence of a
+     * word. It used to assert `not.toContain("single_select")`, which was a
+     * cheap sentinel for the meta-schema having been rendered; once the `form`
+     * argument's DESCRIPTION started naming the field types on purpose (§6.1 —
+     * it is the only type-level guidance unconditionally in context), that
+     * sentinel could no longer tell a recursive schema from a prose list. The
+     * constraint it stood for is unchanged: `form` is an open object with no
+     * declared members for the model to recurse through.
+     */
+    const form = schema.properties?.form as Record<string, unknown>;
+    expect(form.type).toBe("object");
+    for (const key of ["properties", "$ref", "oneOf", "anyOf", "allOf", "enum", "items"]) {
+      expect(form[key], `inputSchema.form.${key}`).toBeUndefined();
+    }
   });
 
   it("carries the §6.1 trigger and the don'ts in the description", async () => {
@@ -476,5 +501,68 @@ describe("attribution through the OAuth seam (§10)", () => {
     const state = await call("get_form_state", { formId });
     await close();
     expect((state.structuredContent as { updatedBy?: string }).updatedBy).toBe(ALLOWED_LOGIN);
+  });
+});
+
+/* -------------------------------------------------------------------------- */
+
+/**
+ * The `form` argument description is the ONLY type-level guidance that is
+ * unconditionally in an agent's context: the wire schema is deliberately loose
+ * (§6.3) and `get_form_guide` is an optional round trip. When this list was
+ * missing, authors generated from the prior every HTML form carries — a radio
+ * group and a comment box — because nothing had told them the rest existed.
+ *
+ * So it has to ship, and it has to stay in step with the closed vocabularies in
+ * `vocab.ts`. Adding a member there without naming it here would leave a field
+ * type that validates and that no agent ever reaches for.
+ */
+describe("the always-in-context vocabulary (§6.1)", () => {
+  /** A token as it is written in a list, not as a substring of a longer word. */
+  const names = (haystack: string, token: string) =>
+    new RegExp(`(^|[^a-z_])${token}([^a-z_]|$)`).test(haystack);
+
+  it("ships on the declared tool, not just in the module", async () => {
+    const { client, close } = await connect();
+    const { tools } = await client.listTools();
+    await close();
+
+    const gather = tools.find((tool) => tool.name === "gather_decisions");
+    const form = (
+      gather?.inputSchema as { properties?: { form?: { description?: string } } } | undefined
+    )?.properties?.form?.description;
+
+    expect(form).toBeDefined();
+    expect(form).toBe(FORM_ARGUMENT_DESCRIPTION);
+  });
+
+  it("names every closed vocabulary member the agent has to choose from", () => {
+    for (const type of FIELD_TYPES) {
+      expect(names(FORM_ARGUMENT_DESCRIPTION, type), `field type "${type}"`).toBe(true);
+    }
+    for (const op of RULE_OPS) {
+      expect(names(FORM_ARGUMENT_DESCRIPTION, op), `rule op "${op}"`).toBe(true);
+    }
+    for (const action of RULE_ACTIONS) {
+      expect(names(FORM_ARGUMENT_DESCRIPTION, action), `rule action "${action}"`).toBe(true);
+    }
+    for (const op of COMPUTED_OPS) {
+      expect(names(FORM_ARGUMENT_DESCRIPTION, op), `computed op "${op}"`).toBe(true);
+    }
+    for (const source of PREFILL_SOURCES) {
+      expect(names(FORM_ARGUMENT_DESCRIPTION, source), `prefill source "${source}"`).toBe(true);
+    }
+  });
+
+  it("names every render hint, which is most of what makes a form look considered", () => {
+    for (const hints of Object.values(RENDER_HINTS)) {
+      for (const hint of hints) {
+        expect(names(FORM_ARGUMENT_DESCRIPTION, hint), `render hint "${hint}"`).toBe(true);
+      }
+    }
+  });
+
+  it("still points at get_form_guide for the craft, rather than replacing it", () => {
+    expect(FORM_ARGUMENT_DESCRIPTION).toContain("get_form_guide");
   });
 });

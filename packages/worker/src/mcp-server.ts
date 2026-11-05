@@ -28,6 +28,7 @@ import { formStore } from "./form-store.js";
 import { formUrl, mintFormToken } from "./form-url.js";
 import {
   AWAIT_ANSWERS_DESCRIPTION,
+  FORM_ARGUMENT_DESCRIPTION,
   GATHER_DECISIONS_DESCRIPTION,
   GET_ANSWERS_DESCRIPTION,
   GET_FORM_GUIDE_DESCRIPTION,
@@ -321,11 +322,7 @@ export function createServer(
        * JSON-Schema rejection that does not.
        */
       inputSchema: z.object({
-        form: z
-          .record(z.string(), z.unknown())
-          .describe(
-            "The form envelope: { version, title, description?, display?, submitLabel?, sections: [...], rules?: [...], prefill?: {...} }. Call get_form_guide(archetype) for the shape and a worked example. Do not include formId — the server mints it.",
-          ),
+        form: z.record(z.string(), z.unknown()).describe(FORM_ARGUMENT_DESCRIPTION),
       }),
       _meta: uiMeta(["model", "app"]),
     },
