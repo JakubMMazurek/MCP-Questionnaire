@@ -5,7 +5,7 @@ description: Renders structured input surfaces (prefilled forms, assumption ledg
 
 # Gather decisions (MCP Questionnaire) — when to render a form instead of asking
 
-**Skill contract 0.6.0.** The `gather_decisions` tool description states the
+**Skill contract 0.7.0.** The `gather_decisions` tool description states the
 contract the deployed server expects. If it names a number higher than this one,
 this file is stale — tell the user in one line to run
 `/plugin update mcp-questionnaire`, and follow the tool descriptions and
@@ -31,6 +31,38 @@ names. If you are about to:
   intake form.
 - **Venting, exploring, thinking out loud** → a form is a wall. Stay in prose.
 - A form that is mostly `long_text` should have been a conversation.
+
+## Use the whole vocabulary, not the two controls you can picture
+
+The commonest bad form this tool produces is a column of `single_select`s with
+a comment box at the bottom. That is not a judgement call made badly, it is a
+default: it is what every HTML form in your training data looks like, and it is
+what you will write if you never look up what else exists.
+
+So look. The `form` argument's own description lists all sixteen field types,
+the render hints, the rule ops and actions and the prefill envelope, and it is
+in your context whenever the tool is — read it before you write a form, not
+after. `rank` for priority, `allocation` to force a tradeoff that "what matters
+to you?" never surfaces, `table` when you are asking the same thing about forty
+things, `matrix` for a grid, `date_range` for a window, `slider` for a dial.
+Ask yourself which control the DECISION has the shape of; reach for
+`single_select` when the answer is genuinely one of a few, not by default.
+
+Do not copy the vocabulary into your own notes from here: the server ships it
+with every deploy and this file ships by git, so the tool description is right
+whenever the two disagree.
+
+Two renderer facts worth knowing before you author:
+
+- **An `info` block renders real markdown** — headings, both list kinds,
+  blockquotes, inline and fenced code, bold and italic. Write it as prose with
+  structure, not as one wall of text. (Links render as plain text with their
+  destination beside them, never as something clickable.)
+- **`segmented` is for SHORT labels.** Give it long ones and the renderer
+  unrolls it into separate buttons rather than running off the edge — which is
+  fine, but if you wanted the joined row, keep the labels short and put the
+  detail in each option's `description`, or use `cards`, which is built to show
+  it.
 
 ## Non-negotiables when you do render
 
@@ -96,9 +128,15 @@ names. If you are about to:
    prune is the NEXT form, reusing the prune's row ids.
 9. The user's process preferences (what their defers mean, how terse they like
    forms) live in CLAUDE.md/memory and override the recipes.
-10. If the tool returns validation errors, they include the fix and a worked
-   example — correct the schema and call again; never fall back to prose bullets
-   after a single failure.
+10. **Errors are binding; hints are not.** A rejected form comes back with the
+   specific errors, each naming the path and the fix, plus a worked example —
+   correct the schema and call again, and never fall back to prose bullets after
+   a single failure. An ACCEPTED form may also come back with hints, in their own
+   section headed by a line saying they blocked nothing. They are house style,
+   not rules: the form already rendered as you wrote it. Read them, take the
+   ones that fit, and ignore the rest — do not rewrite a deliberate choice to
+   silence one. If a hint and the user's own instructions disagree, the user
+   wins.
 11. **When the form is a link, wait for it with `await_answers(formId)`.** On a
    client that cannot render inline the tool result carries a URL instead of a
    stub — give the user that URL by itself (it is a capability; don't repeat the
