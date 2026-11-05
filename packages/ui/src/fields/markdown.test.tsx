@@ -12,7 +12,7 @@
  * the real fixture bodies and asserts no markdown syntax survives rendering.
  */
 
-import { assumptionLedger, planConfirmation } from "@mcpq/schema";
+import { archetypes } from "@mcpq/schema";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 import { Markdown } from "./markdown";
@@ -137,11 +137,12 @@ describe("nothing leaks", () => {
   });
 
   it("renders every info body in the shipped fixtures without leaving syntax on screen", () => {
-    const bodies = [assumptionLedger, planConfirmation]
+    type Loose = { sections: { fields: { type: string; markdown?: string }[] }[] };
+    const bodies = (Object.values(archetypes) as unknown as Loose[])
       .flatMap((form) => form.sections)
       .flatMap((section) => section.fields)
       .filter((field) => field.type === "info")
-      .map((field) => (field as { markdown: string }).markdown);
+      .map((field) => field.markdown ?? "");
 
     expect(bodies.length).toBeGreaterThan(0);
     for (const body of bodies) {

@@ -36,7 +36,7 @@ ERROR   matrix_constraint_empty · sections[1].fields[2].constraints[0] "fls"
 `;
 
 exports[`formatDiagnostics > renders a rules-only failure, naming every index 1`] = `
-"Form rejected — 3 errors, 3 warnings. Nothing was rendered; fix the errors and call again.
+"Form rejected — 3 errors, 3 hints. Nothing was rendered; fix the errors and call again.
 
 ERROR   rule_payload_required · rules[0].then
   Rule 0 uses "filter_options" without saying which options survive. Add "options": [...]
@@ -52,17 +52,21 @@ ERROR   rule_default_not_an_option · rules[1].then.value
   ("accounts", "everything"). set_default writes only into empty fields (§4.6), and it can
   only write a value the field can hold.
 
-WARNING rule_payload_ignored · rules[2].then.options
+HINTS — none of these blocked anything. They are suggestions from the
+house style, not rules: take the ones that fit what you are building and
+ignore the rest. The form above renders either way.
+
+HINT    rule_payload_ignored · rules[2].then.options
   Rule 2 carries "options" but its action is "hide", which ignores them. Only
   "filter_options" narrows an option set.
 
-WARNING rule_cycle · rules[1]
+HINT    rule_cycle · rules[1]
   Rules 1 → 2 → 1 could cycle: each one changes a field the next one reads. Evaluation
   re-runs the flat list until the view is stable and stops at an iteration cap (§4.6), so a
   cycle means the rendered state may depend on where the cap lands. Break the loop — usually
   one of these rules should read a different field, or be folded into the other.
 
-WARNING rule_cycle · rules[2]
+HINT    rule_cycle · rules[2]
   Rules 2 → 3 → 2 could cycle: each one changes a field the next one reads. Evaluation
   re-runs the flat list until the view is stable and stops at an iteration cap (§4.6), so a
   cycle means the rendered state may depend on where the cap lands. Break the loop — usually
@@ -125,16 +129,22 @@ ERROR   ordinal_path · prefill["stakeholders[2].owner"]
 `;
 
 exports[`formatDiagnostics > renders warnings on a form that still renders 1`] = `
-"Form accepted — 2 warnings. It renders as-is; the warnings are smells worth a second look.
+"Form accepted — 2 hints. It rendered exactly as you wrote it.
 
-WARNING no_prefill · (form root)
-  This form prefills nothing. Reviewing is cheap and authoring is expensive: the agent
-  should infer what it can and render a proposal with provenance on every value. "If there's
-  nothing to prefill, the form probably shouldn't exist" (§4.7) — consider asking in chat
-  instead.
+HINTS — none of these blocked anything. They are suggestions from the
+house style, not rules: take the ones that fit what you are building and
+ignore the rest. The form above renders either way.
 
-WARNING section_single_field · sections[1] "timing"
-  Section "timing" holds one field. "Never a section with one field" (§4.8) — a section is a
-  unit of the left rail and of section status, and one field does not earn a heading. Merge
-  it into a neighbouring section, or add the fields that belong with it."
+HINT    no_prefill · (form root)
+  This form prefills nothing. It renders. Reviewing is cheap and authoring is expensive, so
+  a form usually lands better as a proposal with provenance on every value you could infer —
+  §4.7 puts it strongly: "If there's nothing to prefill, the form probably shouldn't exist".
+  If there really was nothing to infer, that is often a sign the question belonged in chat;
+  a first-contact form with nothing to go on is the fair exception.
+
+HINT    section_single_field · sections[1] "timing"
+  Section "timing" holds one field. It renders. A section is a unit of the left rail and of
+  section status, so the house style avoids one-field sections (§4.8) — usually the field
+  belongs with its neighbours. Keep it if the heading is doing real work for the reader
+  here."
 `;

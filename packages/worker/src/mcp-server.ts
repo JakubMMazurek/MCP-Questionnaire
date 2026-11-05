@@ -356,7 +356,7 @@ export function createServer(
       const codes = [...new Set(validation.warnings.map((w) => w.code))];
       const warnings =
         codes.length > 0
-          ? ` ${validation.warnings.length} warning(s): ${codes.join(", ")} — the form renders as-is; see get_form_guide for the recipe.`
+          ? ` ${validation.warnings.length} hint(s), none blocking: ${codes.join(", ")} — the form rendered as written. Hints are house style, not rules; get_form_guide carries the reasoning.`
           : "";
       const result = await stubFor(env, formId, origin, currentLogin(), {
         envelope: (ctx as { mcpReq?: { envelope?: unknown } })?.mcpReq?.envelope,

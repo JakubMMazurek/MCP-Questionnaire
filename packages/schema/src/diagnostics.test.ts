@@ -6,7 +6,7 @@
 
 import { describe, expect, it } from "vitest";
 import { kitchenSink, minimal } from "./__fixtures__/forms.js";
-import { formatDiagnostics } from "./diagnostics.js";
+import { error, formatDiagnostics, warning } from "./diagnostics.js";
 import { validateAnswers, validateForm } from "./validate.js";
 
 /** Fixtures are mutated as loose JSON on purpose: these tests exercise what the
@@ -180,5 +180,39 @@ describe("formatDiagnostics", () => {
       form,
     ).text;
     expect(text).toMatchSnapshot();
+  });
+});
+
+/**
+ * A hint has to read as a hint. An agent handed a flat list of diagnostics
+ * treats every line in it as a rule it broke, and then rewrites a deliberate
+ * choice to silence advice that was never binding — which is the advice making
+ * the form worse.
+ */
+describe("hints announce themselves as hints", () => {
+  const styleHint = warning("section_single_field", "sections[0]", "Section holds one field.");
+  const realError = error("rule_cycle", "rules[0]", "Rules 0 -> 1 -> 0 could cycle.");
+
+  it("says plainly that nothing was blocked, and that hints are not rules", () => {
+    const text = formatDiagnostics([styleHint]);
+    expect(text).toContain("none of these blocked anything");
+    expect(text).toContain("not rules");
+    expect(text).toContain("renders either way");
+  });
+
+  it("never labels a hint WARNING, which reads as a defect", () => {
+    const text = formatDiagnostics([styleHint]);
+    expect(text).toContain("HINT");
+    expect(text).not.toContain("WARNING");
+  });
+
+  it("keeps hints in their own section below the errors", () => {
+    const text = formatDiagnostics([realError, styleHint]);
+    expect(text.indexOf("ERROR")).toBeLessThan(text.indexOf("HINTS —"));
+    expect(text.indexOf("HINTS —")).toBeLessThan(text.indexOf("HINT    "));
+  });
+
+  it("still tells the agent the errors are what it must fix", () => {
+    expect(formatDiagnostics([realError, styleHint])).toContain("fix the errors and call again");
   });
 });

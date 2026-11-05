@@ -170,7 +170,9 @@ describe("gather_decisions on a valid form", () => {
     const body = firstText(result);
     expect(result.isError).toBeFalsy();
     // The closed part travels: count and codes.
-    expect(body).toContain("2 warning(s): no_prefill, section_single_field");
+    expect(body).toContain("2 hint(s), none blocking: no_prefill, section_single_field");
+    // And it says they blocked nothing, so a hint is not read back as a rule.
+    expect(body).toContain("not rules");
     // The prose does not — it quotes the author's own ids and labels.
     expect(body).not.toContain("lonely");
     expect(body).not.toContain("§4.8");
