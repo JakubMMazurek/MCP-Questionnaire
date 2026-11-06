@@ -1094,10 +1094,12 @@ body {
     vertical-align: bottom;
   }
 
-  .mrow {
-    max-width: 20rem;
-  }
-
+  /*
+   * `width: 1%` is the shrink-to-fit idiom: the label column takes its
+   * MIN-content width and the cells share the rest (the mockup's
+   * `minmax(64px, 1fr)`). That only works while the min-content IS the label —
+   * see `.mrow .mhead-btn` below.
+   */
   .mcorner {
     width: 1%;
   }
@@ -1121,8 +1123,37 @@ body {
     color: var(--color-text-primary);
   }
 
+  /*
+   * Header labels break at spaces only. The last-resort `overflow-wrap:
+   * anywhere` guard at the bottom of this file shrinks a label's min-content to
+   * one glyph, and the grid sizes its label column from min-content — so row
+   * labels like `Discount_Reason__c` came out one letter per line, in rows
+   * hundreds of pixels tall. The guard is not needed here: the grid scrolls
+   * sideways in `.mscroll` instead of pushing the surface.
+   */
+  .mgrid .mhead-btn {
+    overflow-wrap: normal;
+  }
+
+  /*
+   * Row labels are field names, not prose: one line, capped so one long name
+   * cannot take the grid, ellipsis past the cap, full name in the button's
+   * title. The cap is on the button because `max-width` on a table cell is
+   * ignored.
+   */
   .mrow .mhead-btn {
+    display: block;
+    max-width: 20rem;
+    overflow: hidden;
     font-family: var(--font-mono);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .mrow .why {
+    display: block;
+    max-width: 20rem;
+    padding: 0 6px;
   }
 
   .mcell-wrap {
