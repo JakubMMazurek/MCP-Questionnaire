@@ -262,6 +262,15 @@ body {
 
   /* ---------------- segmented control (the default affordance) ----------- */
   .seg {
+    /*
+     * The concentric radius: the container's own, less the border it sits
+     * inside. Derived rather than hardcoded because the host supplies both
+     * tokens (§7.4) — claude.ai sends an 8px radius where the `:root` fallback
+     * here is 6px, and a curve pinned to either number would be wrong on the
+     * other. Inherited, so the end buttons below can just name it.
+     */
+    --seg-inner-radius: calc(var(--border-radius-sm) - var(--border-width-regular));
+
     display: inline-flex;
     flex: none;
     overflow: hidden;
@@ -285,8 +294,34 @@ body {
     appearance: none;
   }
 
+  /*
+   * The two ends round to the inner radius; the dividers between them stay
+   * square.
+   *
+   * Not cosmetic. The selected state is an INSET ring
+   * (`box-shadow: inset 0 0 0 1px`, below) drawn on a square button, and `.seg`
+   * clips its children with `overflow: hidden`. A square ring meeting a rounded
+   * clip is SLICED along the arc: the ring's two straight edges run into the
+   * corner and stop dead, and the container's own border shows through the
+   * wedge the clip removed. The selected end option reads as chipped — which is
+   * precisely the corner a person looks at, since it is their answer.
+   *
+   * Rounding the button itself makes the ring turn the corner instead of being
+   * cut by it. A one-option control matches both selectors and gets all four
+   * corners, which is right.
+   *
+   * The unrolled variants need none of this: there each button carries its own
+   * border and radius and the container drops both, so nothing clips.
+   */
   .seg > button:first-child {
     border-left: 0;
+    border-start-start-radius: var(--seg-inner-radius);
+    border-end-start-radius: var(--seg-inner-radius);
+  }
+
+  .seg > button:last-child {
+    border-start-end-radius: var(--seg-inner-radius);
+    border-end-end-radius: var(--seg-inner-radius);
   }
 
   .seg > button:hover:not(:disabled):not([aria-checked="true"]) {
