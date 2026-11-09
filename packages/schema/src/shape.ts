@@ -624,6 +624,7 @@ const ruleSchema: z.ZodType<Rule> = z.strictObject({
       .min(1, "A rule must name at least one target — fields or sections (§4.6)."),
     value: z.unknown().optional(),
     options: z.array(valueSchema).min(1).optional(),
+    reason: freeText(LIMITS.rationale, "rule reason").optional(),
   }),
 }) as z.ZodType<Rule>;
 

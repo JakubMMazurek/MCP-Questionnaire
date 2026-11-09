@@ -803,6 +803,22 @@ function checkRule(
       ),
     );
   }
+  /*
+   * A reason is for a control the user can SEE and cannot USE. `hide` removes
+   * the control, so there is nothing to explain; `require`, `set_default`,
+   * `clear` and `filter_options` change an answer the user can still reach. That
+   * leaves the locking pair, and saying so is better than silently dropping the
+   * sentence an author wrote for a human.
+   */
+  if (action !== "disable" && action !== "enable" && rule.then.reason) {
+    out.push(
+      warning(
+        "rule_payload_ignored",
+        `rules[${index}].then.reason`,
+        `Rule ${index} carries a "reason" but its action is "${action}", which never shows one. A reason renders beside a control the user can see but cannot use, so only "disable" and "enable" carry one. For a branch the user should not see at all, "hide" it; to explain something they CAN act on, use the field's own "description" or an "info" block.`,
+      ),
+    );
+  }
   if (action !== "filter_options" && rule.then.options) {
     out.push(
       warning(

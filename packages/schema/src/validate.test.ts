@@ -500,6 +500,34 @@ describe("rules (§4.6)", () => {
     expect(diagnostic.severity).toBe("warning");
   });
 
+  it("warns when a reason is attached to an action that never shows one", () => {
+    const diagnostic = firstWith(
+      withRules([
+        {
+          when: { field: "env", op: "filled" },
+          then: { action: "hide", targets: ["notes"], reason: "not yours to set" },
+        },
+      ]),
+      "rule_payload_ignored",
+    );
+    expect(diagnostic.severity).toBe("warning");
+    expect(diagnostic.message).toContain('"disable" and "enable"');
+  });
+
+  it("accepts a reason on the two actions that lock a control", () => {
+    for (const action of ["disable", "enable"] as const) {
+      const report = validateForm(
+        withRules([
+          {
+            when: { field: "env", op: "filled" },
+            then: { action, targets: ["notes"], reason: "waiting on the env" },
+          },
+        ]),
+      );
+      expect(report.diagnostics.filter((d) => d.code === "rule_payload_ignored")).toEqual([]);
+    }
+  });
+
   it("rejects set_default against a section", () => {
     firstWith(
       withRules([

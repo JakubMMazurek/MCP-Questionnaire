@@ -5,7 +5,7 @@ description: Renders structured input surfaces (prefilled forms, assumption ledg
 
 # Gather decisions (MCP Questionnaire) — when to render a form instead of asking
 
-**Skill contract 0.7.0.** The `gather_decisions` tool description states the
+**Skill contract 0.8.0.** The `gather_decisions` tool description states the
 contract the deployed server expects. If it names a number higher than this one,
 this file is stale — tell the user in one line to run
 `/plugin update mcp-questionnaire`, and follow the tool descriptions and
@@ -93,6 +93,13 @@ Two renderer facts worth knowing before you author:
    Branches nest: a section governs everything inside it, so hiding one hides
    all of its content, while a field inside a shown section still waits for its
    own `show` rule. Rule order never changes what is visible.
+   **A locked control must say why.** `disable` and `enable` take a `reason` on
+   `then` — one sentence of free text, rendered beside the control, and the only
+   two actions that take one. A disabled field reads empty on screen, to rule
+   reads and in the payload, and gives its answer back when a rule re-enables
+   it; without a reason it is a greyed empty box, which users read as a broken
+   input rather than a locked one. A disable reason shows while its condition
+   holds, an enable reason while its condition does not.
 4. **Never ask for a secret.** No password, API key, token or card number
    fields — the answers enter your context and rest in the form's store. Ask
    where the value *lives* ("env var / secret manager / prompt at runtime").

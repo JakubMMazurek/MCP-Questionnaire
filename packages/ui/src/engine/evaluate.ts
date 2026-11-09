@@ -38,6 +38,11 @@ export type Effects = {
   /** Hidden addresses: leaf paths, field ids and section ids (resolved, not inherited). */
   hidden: ReadonlySet<string>;
   disabled: ReadonlySet<string>;
+  /**
+   * Why a disabled path is disabled, where its rule said so. Absent is normal:
+   * a reason is optional, and a locked control without one is still locked.
+   */
+  lockReasons: ReadonlyMap<string, string>;
   /** `require`/`optional` overrides; absent means "whatever the field declared". */
   required: ReadonlyMap<string, boolean>;
   /** Surviving option values per path. Absent means "every declared option". */
@@ -57,6 +62,7 @@ export type Effects = {
 export const EMPTY_EFFECTS: Effects = {
   hidden: new Set(),
   disabled: new Set(),
+  lockReasons: new Map(),
   required: new Map(),
   filtered: new Map(),
   defaults: new Map(),
@@ -281,6 +287,7 @@ function test(op: RuleOp, effective: Effective, against: unknown): boolean {
 type Mutable = {
   hidden: Set<string>;
   disabled: Set<string>;
+  lockReasons: Map<string, string>;
   required: Map<string, boolean>;
   filtered: Map<string, readonly Value[]>;
   defaults: Map<string, unknown>;
@@ -299,15 +306,25 @@ type Mutable = {
 function defaultsFor(instances: readonly Instance[]): {
   hidden: Set<string>;
   disabled: Set<string>;
+  lockReasons: Map<string, string>;
 } {
   const hidden = new Set<string>();
   const disabled = new Set<string>();
+  const lockReasons = new Map<string, string>();
   for (const instance of instances) {
-    const action = instance.rule.then.action;
+    const { action, reason } = instance.rule.then;
     if (action === "show") for (const target of instance.targets) hidden.add(target);
-    if (action === "enable") for (const target of instance.targets) disabled.add(target);
+    if (action === "enable") {
+      for (const target of instance.targets) {
+        disabled.add(target);
+        // An `enable` reason explains the stretch BEFORE it fires, which is
+        // precisely the stretch the seed describes. The rule deletes it again
+        // when its condition comes true.
+        if (reason !== undefined) lockReasons.set(target, reason);
+      }
+    }
   }
-  return { hidden, disabled };
+  return { hidden, disabled, lockReasons };
 }
 
 /**
@@ -332,7 +349,18 @@ function defaultsFor(instances: readonly Instance[]): {
 function closeContainment(state: Mutable, containment: ReadonlyMap<string, readonly string[]>) {
   for (const [path, leaves] of containment) {
     if (state.hidden.has(path)) for (const leaf of leaves) state.hidden.add(leaf);
-    if (state.disabled.has(path)) for (const leaf of leaves) state.disabled.add(leaf);
+    if (state.disabled.has(path)) {
+      const reason = state.lockReasons.get(path);
+      for (const leaf of leaves) {
+        state.disabled.add(leaf);
+        // A section's reason stands in for the leaves under it, but never over
+        // a reason a leaf's own rule gave: the narrower sentence is the better
+        // one, and a leaf may be locked for a different cause than its section.
+        if (reason !== undefined && !state.lockReasons.has(leaf)) {
+          state.lockReasons.set(leaf, reason);
+        }
+      }
+    }
   }
 }
 
@@ -341,12 +369,13 @@ function onePass(
   answers: Answers,
   prefill: Readonly<Record<string, Prefill>>,
   overlays: Overlays,
-  seed: { hidden: Set<string>; disabled: Set<string> },
+  seed: { hidden: Set<string>; disabled: Set<string>; lockReasons: Map<string, string> },
   containment: ReadonlyMap<string, readonly string[]>,
 ): Mutable {
   const state: Mutable = {
     hidden: new Set(seed.hidden),
     disabled: new Set(seed.disabled),
+    lockReasons: new Map(seed.lockReasons),
     required: new Map(),
     filtered: new Map(),
     defaults: new Map(),
@@ -386,10 +415,16 @@ function onePass(
         for (const path of instance.targets) state.hidden.add(path);
         break;
       case "enable":
-        for (const path of instance.targets) state.disabled.delete(path);
+        for (const path of instance.targets) {
+          state.disabled.delete(path);
+          state.lockReasons.delete(path);
+        }
         break;
       case "disable":
-        for (const path of instance.targets) state.disabled.add(path);
+        for (const path of instance.targets) {
+          state.disabled.add(path);
+          if (then.reason !== undefined) state.lockReasons.set(path, then.reason);
+        }
         break;
       case "require":
         for (const path of all) state.required.set(path, true);
@@ -441,6 +476,7 @@ function stable(a: Mutable, b: Mutable): boolean {
   return (
     sameSet(a.hidden, b.hidden) &&
     sameSet(a.disabled, b.disabled) &&
+    sameMap(a.lockReasons, b.lockReasons, (x, y) => x === y) &&
     sameMap(a.required, b.required, (x, y) => x === y) &&
     sameMap(a.filtered, b.filtered, sameValue) &&
     sameMap(a.defaults, b.defaults, sameValue) &&

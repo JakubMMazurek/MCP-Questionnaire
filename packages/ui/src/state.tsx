@@ -99,6 +99,11 @@ export function useDisabled(path: string): boolean {
   return useEngine((state) => state.effects.disabled.has(path) || state.status !== "ready");
 }
 
+/** The sentence a locked control shows, when its rule gave one (§4.6). */
+export function useLockReason(path: string): string | undefined {
+  return useEngine((state) => state.effects.lockReasons.get(path));
+}
+
 export function useRequired(path: string, declared: boolean | undefined): boolean {
   return useEngine((state) => state.effects.required.get(path) ?? declared ?? false);
 }

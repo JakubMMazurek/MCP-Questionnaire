@@ -300,6 +300,15 @@ export type Rule = {
     value?: unknown;
     /** Required by `filter_options` — the option values that survive. */
     options?: Value[];
+    /**
+     * Why the control is locked, shown to the user beside it. Free text (§4.1),
+     * never parsed. Only `enable`/`disable` carry one: those are the two actions
+     * whose effect the user can see but not act on, so they are the two that owe
+     * an explanation. A `disable` reason shows while its condition holds; an
+     * `enable` reason shows while its condition does NOT, which is exactly the
+     * stretch the target starts out disabled for.
+     */
+    reason?: string;
   };
 };
 

@@ -1,7 +1,7 @@
 {
   "name": "mcp-questionnaire",
   "description": "Structured input surfaces inside the Claude conversation \u2014 prefilled forms, assumption ledgers, review matrices \u2014 instead of clarifying questions as prose. Connector + skill in one install.",
-  "version": "0.7.0",
+  "version": "0.8.0",
   "author": {
     "name": "Jakub Mazurek"
   }

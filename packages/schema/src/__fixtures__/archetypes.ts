@@ -1025,6 +1025,19 @@ export const conditionalBranching = {
       when: { field: "scopes", op: "contains", value: "admin" },
       then: { action: "require", targets: ["admin_justification"] },
     },
+    // `enable` + `reason` — the half of locking that people leave out. The
+    // approver signs off on the justification, so asking for a name before
+    // there is anything to sign off on is the wrong order. The target starts
+    // disabled (inferred from this rule), and the reason is what the user reads
+    // beside the greyed control until they have written the sentence.
+    {
+      when: { field: "admin_justification", op: "filled" },
+      then: {
+        action: "enable",
+        targets: ["admin_approver"],
+        reason: "say what needs admin first — that is the sentence they sign off on",
+      },
+    },
     // `contains_any` — a LIST, at least one of them present. Same meaning as one
     // `contains` rule per value (a rule list is a flat OR), and one line instead
     // of two. `contains_all` would want both scopes; `contains_none` would want

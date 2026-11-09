@@ -157,6 +157,7 @@ export function reconcileEffects(prev: Effects, next: Effects): Effects {
   return {
     hidden: sameSet(prev.hidden, next.hidden) ? prev.hidden : next.hidden,
     disabled: sameSet(prev.disabled, next.disabled) ? prev.disabled : next.disabled,
+    lockReasons: reconcileMap(prev.lockReasons, next.lockReasons),
     required: reconcileMap(prev.required, next.required),
     filtered: reconcileMap<readonly Value[]>(prev.filtered, next.filtered),
     defaults: reconcileMap(prev.defaults, next.defaults),

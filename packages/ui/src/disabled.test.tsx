@@ -19,13 +19,18 @@
  */
 
 import type { Form } from "@mcpq/schema";
-import { describe, expect, it } from "vitest";
+import { act, cleanup, render, screen } from "@testing-library/react";
+import { afterEach, describe, expect, it } from "vitest";
+import { App } from "./App";
 import {
   buildSubmission,
   createEngineStore,
   type EngineStore,
   effectiveValue,
 } from "./engine/index.js";
+import { AppProvider } from "./state";
+
+afterEach(cleanup);
 
 /* The reported shape, reduced: one answer governs whether the other applies. */
 const files = {
@@ -60,7 +65,11 @@ const files = {
   rules: [
     {
       when: { field: "strategy", op: "eq", value: "link_out" },
-      then: { action: "disable", targets: ["retain_months"] },
+      then: {
+        action: "disable",
+        targets: ["retain_months"],
+        reason: "nothing moves, so there is no age to cut at",
+      },
     },
   ],
 } satisfies Form;
@@ -127,5 +136,63 @@ describe("a disabled field is not somewhere the user can answer (§4.6)", () => 
       origin: "answer",
     });
     expect(submitted(store, "retain_months")).toEqual({ state: "answered", value: 24 });
+  });
+});
+
+/*
+ * The other half of the same report: a locked control that cannot say WHY reads
+ * as a broken one, and with the stale value now cleared it is an empty grey box
+ * with nothing to explain it. `constraints[].reason` had covered matrix cells
+ * since §5.5; rule actions had no equivalent until the chip was reopened.
+ */
+describe("a locked control says why (§4.6)", () => {
+  function mount(form: unknown): EngineStore {
+    const store = createEngineStore();
+    store.getState().loadForm(form);
+    store.getState().setDisplayMode("fullscreen");
+    render(
+      <AppProvider value={{ store, bridge: null }}>
+        <App />
+      </AppProvider>,
+    );
+    return store;
+  }
+
+  it("shows the disabling rule's reason, and only while it holds", () => {
+    const store = mount(files);
+    act(() => store.getState().setAnswer("strategy", "after"));
+    expect(screen.queryByText(/no age to cut at/)).toBeNull();
+
+    act(() => store.getState().setAnswer("strategy", "link_out"));
+    expect(screen.getByText(/no age to cut at/)).toBeDefined();
+
+    act(() => store.getState().setAnswer("strategy", "after"));
+    expect(screen.queryByText(/no age to cut at/)).toBeNull();
+  });
+
+  it("reads an enable rule's reason as the wait before it fires", () => {
+    // An `enable` target starts disabled, which is the stretch that owes the
+    // explanation — so the reason shows until the condition comes true.
+    const gated = {
+      ...files,
+      rules: [
+        {
+          when: { field: "strategy", op: "filled" },
+          then: {
+            action: "enable",
+            targets: ["retain_months"],
+            reason: "pick how the files travel first",
+          },
+        },
+      ],
+    } satisfies Form;
+
+    const store = mount(gated);
+    expect(store.getState().effects.disabled.has("retain_months")).toBe(true);
+    expect(screen.getByText(/how the files travel first/)).toBeDefined();
+
+    act(() => store.getState().setAnswer("strategy", "after"));
+    expect(store.getState().effects.disabled.has("retain_months")).toBe(false);
+    expect(screen.queryByText(/how the files travel first/)).toBeNull();
   });
 });

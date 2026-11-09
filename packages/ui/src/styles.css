@@ -520,6 +520,24 @@ body {
     font-style: italic;
   }
 
+  /*
+   * The sentence a `disable`/`enable` rule attached to a locked control. It
+   * reads as the description's quieter sibling — same serif, muted ink — and
+   * earns its own class only so the lock mark can sit in front of it.
+   */
+  .locked-why {
+    color: var(--color-text-disabled);
+  }
+
+  /*
+   * The lock mark is decoration, so it goes in the cascade rather than the DOM:
+   * a second element inside the span splits the sentence across text nodes,
+   * which costs the accessible name its shape and makes the text unfindable.
+   */
+  .locked-why::before {
+    content: "— ";
+  }
+
   .subrow {
     flex-basis: 100%;
     padding: 2px 0 4px;

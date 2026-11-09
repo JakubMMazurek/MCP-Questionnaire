@@ -12,7 +12,7 @@
 import type { ComputedField, Field } from "@mcpq/schema";
 import { memo } from "react";
 import { Pill, ProvenanceChip } from "../components/primitives";
-import { useComputed, usePrefill, useRequired, useVisible } from "../state";
+import { useComputed, useLockReason, usePrefill, useRequired, useVisible } from "../state";
 import { AllocationFieldView } from "./allocation";
 import { LeafControl } from "./controls";
 import { Markdown } from "./markdown";
@@ -116,6 +116,7 @@ const Composite = memo(function Composite({ field, label }: { field: Field; labe
 const FieldRow = memo(function FieldRow({ field }: { field: Field }) {
   const path = field.id;
   const prefill = usePrefill(path);
+  const lockReason = useLockReason(path);
   const declaredRequired = "required" in field ? field.required : undefined;
   const required = useRequired(path, declaredRequired);
   const label = ("label" in field && field.label) || field.id;
@@ -150,6 +151,10 @@ const FieldRow = memo(function FieldRow({ field }: { field: Field }) {
         {"description" in field && field.description ? (
           <span className="why">{field.description}</span>
         ) : null}
+        {/* A greyed control that cannot say why reads as a broken one. The
+            sentence belongs under the label, where the description already is,
+            not in a tooltip nobody opens. */}
+        {lockReason ? <span className="why locked-why">{lockReason}</span> : null}
       </div>
       {stacked ? null : control}
       <NoteAffordance path={path} label={label} />
