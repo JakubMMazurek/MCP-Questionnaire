@@ -82,15 +82,16 @@ export const FORM_ARGUMENT_DESCRIPTION = `The form envelope: { version, title, d
 
 THE FIELD TYPES. Pick the one that matches the decision; most forms should not be a column of single_selects.
 - Choose: single_select (render: cards | segmented | radio | list), multi_select (chips | checkboxes | list), boolean (toggle | segmented).
-- Order and weigh: rank (drag to prioritise), allocation (split 100 across options — a forced tradeoff beats asking "what matters?"), slider, number.
+- Order and weigh: rank (drag to prioritise), allocation (split a total across "members" — a forced tradeoff beats asking "what matters?"), slider, number.
 - Time: date, date_range.
 - Grids and repetition: matrix (2D — roles x permissions, fields x profiles; cells take a cellType, and render cycle | paint), table (columns declared once, rows as data — this is how you ask forty things cheaply), repeatable ("add another stakeholder").
 - Text, last resort: short_text, long_text. A form that is mostly long_text should have been a conversation.
+- MEMBERS vs OPTIONS: rank "items", allocation "members" and matrix "rows"/"cols" take { id, label } — you ADDRESS them by path (tradeoff[breadth], grid[row][col]). Only option lists take { value, label }.
 - No answer of their own: info (a markdown body — headings, lists, bold, italic, quotes and code all render), computed (a live counter over other answers: count_value, count_empty, count_answered, count_changed, count_needs_review, sum).
 
 RULES make one answer reshape the form, and targets take SECTION ids as well as field ids: ops eq, neq, in, contains, not_contains, contains_all, contains_any, contains_none, gt, lt, empty, filled; actions show, hide, enable, disable, require, optional, filter_options, set_default, clear. Branching on a multi_select takes the contains ops, never "in".
 
-PREFILL carries provenance per path: { value, source: user | inferred | default | existing, confidence?, rationale?, needsReview? }. It is what makes the form an audit rather than a blank.
+PREFILL carries provenance per path: { value, source: user | inferred | default | existing, confidence?: high | low, rationale?, needsReview? }. It is what makes the form an audit rather than a blank.
 
 Call get_form_guide(archetype) for how to combine these well — the list above is the vocabulary, not the craft.`;
 

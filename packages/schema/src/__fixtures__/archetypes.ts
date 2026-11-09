@@ -143,7 +143,8 @@ export const assumptionLedger = {
 
 /**
  * §5.2 Elicitation — inline card, never fullscreen. 4–6 fields, defaults
- * prefilled, a tradeoff slider, "You decide" as an ordinary skip option,
+ * prefilled, a tradeoff slider and an allocation (members take `id`, not
+ * `value`), "You decide" as an ordinary skip option,
  * `filter_options` doing the half of the mechanic people forget.
  */
 export const elicitation = {
@@ -200,6 +201,17 @@ export const elicitation = {
           maxLabel: "exhaustive",
         },
         {
+          type: "allocation",
+          id: "effort",
+          label: "Split 100 across where the effort goes",
+          total: 100,
+          members: [
+            { id: "mapping", label: "Field mapping" },
+            { id: "cleanup", label: "Data cleanup" },
+            { id: "validation", label: "Validation + reconciliation" },
+          ],
+        },
+        {
           type: "date",
           id: "cutover",
           label: "Cutover",
@@ -232,6 +244,7 @@ export const elicitation = {
       needsReview: true,
     },
     tradeoff: { value: 3, source: "default" },
+    effort: { value: { mapping: 40, cleanup: 40, validation: 20 }, source: "default" },
     cutover: {
       value: "2026-09-30",
       source: "inferred",

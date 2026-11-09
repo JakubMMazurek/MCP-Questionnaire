@@ -296,7 +296,7 @@ const EXAMPLES: Record<ArchetypeName, WorkedExample[]> = {
   elicitation: [
     {
       title: "Elicitation — inline card",
-      note: "Six fields, defaults prefilled and marked, a tradeoff slider, filter_options narrowing one answer by another.",
+      note: "Six fields, defaults prefilled and marked, both forced-tradeoff shapes — a slider and an allocation whose members take id, not value — and filter_options narrowing one answer by another.",
       form: elicitation,
     },
     {
