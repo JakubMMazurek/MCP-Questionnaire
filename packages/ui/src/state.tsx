@@ -116,9 +116,18 @@ export function useTouched(path: string): boolean {
   return useEngine((state) => state.answers[path] !== undefined);
 }
 
-/** The §4.7 envelope for a path. Stable: prefill entries are never mutated. */
+/**
+ * The §4.7 envelope for a path, which is what the provenance chip renders.
+ * Stable: prefill entries are never mutated.
+ *
+ * Absent while a rule has the path LOCKED. A disabled path reads empty (§4.6),
+ * so its prefilled value is not on screen and not in the payload — leaving the
+ * chip up would have the row claim a provenance for a value the user cannot
+ * see, which is the same signal-outliving-its-subject fault that the stale
+ * value itself was. It comes back with the value when the rule releases it.
+ */
 export function usePrefill(path: string): Prefill | undefined {
-  return useEngine((state) => state.prefill[path]);
+  return useEngine((state) => (state.effects.disabled.has(path) ? undefined : state.prefill[path]));
 }
 
 /**

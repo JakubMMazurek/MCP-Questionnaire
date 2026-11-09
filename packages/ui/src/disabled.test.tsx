@@ -72,6 +72,9 @@ const files = {
       },
     },
   ],
+  // Gives the row a provenance chip to watch: §4.7 marks the value, and the
+  // mark has to leave with the value when a rule locks the field.
+  prefill: { retain_months: { value: 36, source: "default" } },
 } satisfies Form;
 
 function loaded(): EngineStore {
@@ -168,6 +171,21 @@ describe("a locked control says why (§4.6)", () => {
 
     act(() => store.getState().setAnswer("strategy", "after"));
     expect(screen.queryByText(/no age to cut at/)).toBeNull();
+  });
+
+  it("drops the provenance chip, which was describing a value now off screen", () => {
+    // `retain_months` is prefilled `source: "default"`, so the row carries a
+    // chip until the rule locks it (field-reported 2026-11-09, after the fix
+    // above made the field empty and left the chip still advertising 36).
+    const store = mount(files);
+    act(() => store.getState().setAnswer("strategy", "after"));
+    expect(screen.getByText("default")).toBeDefined();
+
+    act(() => store.getState().setAnswer("strategy", "link_out"));
+    expect(screen.queryByText("default")).toBeNull();
+
+    act(() => store.getState().setAnswer("strategy", "after"));
+    expect(screen.getByText("default")).toBeDefined();
   });
 
   it("reads an enable rule's reason as the wait before it fires", () => {
