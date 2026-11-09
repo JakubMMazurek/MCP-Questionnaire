@@ -41,7 +41,7 @@ export type NoteTriple = { path: string; label: string; note: string };
 export type SubmissionSummary = {
   /** Visible leaves that will submit a value. */
   answered: number;
-  /** Leaves that will submit `empty` — including every hidden one. */
+  /** Leaves that will submit `empty` — including every hidden and disabled one. */
   empty: number;
   /** Leaves that differ from their `source: "existing"` baseline. */
   changed: number;
@@ -104,7 +104,12 @@ export function buildSubmission(
   const values: ValueContext = {
     answers,
     prefill,
-    overlays: { hidden: effects.hidden, defaults: effects.defaults, filtered: effects.filtered },
+    overlays: {
+      hidden: effects.hidden,
+      disabled: effects.disabled,
+      defaults: effects.defaults,
+      filtered: effects.filtered,
+    },
   };
   const ctx: ComputeContext = { form, leaves, answers, prefill, effects };
 

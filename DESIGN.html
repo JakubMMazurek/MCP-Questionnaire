@@ -416,8 +416,9 @@ $self.detail</code></pre>
   };
 };</code></pre>
   <div class="callout">
-    <span class="callout-label">Not rendered = empty · decided 2026-08-26</span>
+    <span class="callout-label">Not rendered = empty · decided 2026-08-26 · disabled folded in 2026-11-09</span>
     <p><strong>The user submits exactly what they see.</strong> The submit payload is a function of the rendered view and nothing else. A hidden field contributes <code>empty</code> no matter what it held before; no cached or invisible state is ever submitted. If a re-shown field restores a prior value, that's fine <em>because the user sees it</em> before submitting.</p>
+    <p>A <strong>disabled</strong> field is the same case wearing a different face, and the build originally missed it: the user can see the control but cannot reach it, so a value sitting in it is not something they can be said to have submitted. A disabled path therefore reads <code>empty</code> everywhere — on screen, to rule reads, and in the payload — for as long as it is disabled. The stored answer survives, so re-enabling restores it under the same "the user sees it before submitting" clause. Found in a field session: a number field kept the value typed under a previous answer and submitted it after a rule had disabled it.</p>
     <p>Corollaries: <code>set_default</code> writes only into <code>empty</code> fields — it never overwrites a value the user entered; and rule evaluation re-runs the flat list after every change until the rendered state is stable (small iteration cap; the validator warns on rules that could cycle).</p>
   </div>
   <ul class="tight">

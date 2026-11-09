@@ -35,6 +35,7 @@ function valueContext(ctx: ComputeContext): ValueContext {
     prefill: ctx.prefill,
     overlays: {
       hidden: ctx.effects.hidden,
+      disabled: ctx.effects.disabled,
       defaults: ctx.effects.defaults,
       filtered: ctx.effects.filtered,
     },

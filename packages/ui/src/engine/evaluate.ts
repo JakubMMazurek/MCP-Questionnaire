@@ -491,6 +491,7 @@ export function evaluate(form: Form, answers: Answers, options: EvaluateOptions 
   }
   let overlays: Overlays = {
     hidden: seed.hidden,
+    disabled: seed.disabled,
     defaults: NO_OVERLAYS.defaults,
     filtered: NO_OVERLAYS.filtered,
   };
@@ -499,7 +500,12 @@ export function evaluate(form: Form, answers: Answers, options: EvaluateOptions 
   let capped = true;
 
   while (iterations < MAX_ITERATIONS) {
-    overlays = { hidden: pass.hidden, defaults: pass.defaults, filtered: pass.filtered };
+    overlays = {
+      hidden: pass.hidden,
+      disabled: pass.disabled,
+      defaults: pass.defaults,
+      filtered: pass.filtered,
+    };
     const next = onePass(instances, answers, prefill, overlays, seed, containment);
     iterations += 1;
     if (stable(pass, next)) {

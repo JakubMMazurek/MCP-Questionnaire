@@ -98,10 +98,22 @@ if (!/\.btn-primary:disabled \{\n\s+color: var\(--color-background-primary\);/.t
   );
 }
 
+/*
+ * `.field-input` was the one control with no disabled face: a greyed number
+ * field was pixel-identical to a live one and simply swallowed keystrokes, so
+ * `disable` read as a broken input (field-reported 2026-11-09).
+ */
+if (!/\.field-input:disabled \{\n\s+background: var\(--color-background-disabled\);/.test(css)) {
+  offences.push(
+    "`.field-input:disabled` must carry a visible disabled ground: without it " +
+      "a disabled text/number/date control looks live and reads as broken.",
+  );
+}
+
 if (offences.length > 0) {
   console.error("verify-styles: cascade invariants broken\n");
   for (const o of offences) console.error(`  ✗ ${o}`);
   process.exit(1);
 }
 
-console.log(`verify-styles: ${HOVER_RULES.length + SELECTED_SURFACES.length + 1} invariants hold`);
+console.log(`verify-styles: ${HOVER_RULES.length + SELECTED_SURFACES.length + 2} invariants hold`);

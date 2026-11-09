@@ -8,10 +8,13 @@
  * a user edit is an earlier layer, so it always wins — and how a user can clear
  * a prefilled field at all (an explicit `empty` entry outranks the prefill).
  *
- * Two more §4.6 consequences live here, so nothing else has to remember them:
- * a hidden path reads empty ("not rendered = empty", for rule reads too), and a
- * value that `filter_options` no longer offers reads empty even though the raw
- * entry survives in the store.
+ * Three more §4.6 consequences live here, so nothing else has to remember them:
+ * a hidden path reads empty ("not rendered = empty", for rule reads too); a
+ * DISABLED path reads empty for the same reason, because a value the user can
+ * see but cannot reach is not something they can be said to have submitted; and
+ * a value that `filter_options` no longer offers reads empty even though the raw
+ * entry survives in the store. In all three the store entry survives, so the
+ * answer comes back the moment the path is rendered and reachable again.
  */
 
 import type { Answers, Prefill, Value } from "@mcpq/schema";
@@ -22,6 +25,8 @@ export type PrefillMapCanonical = Readonly<Record<string, Prefill>>;
 export type Overlays = {
   /** Resolved hidden set: leaf paths, field ids and section ids. */
   hidden: ReadonlySet<string>;
+  /** Resolved disabled set, same shape. A disabled path reads empty (§4.6). */
+  disabled: ReadonlySet<string>;
   /** `set_default` values, by canonical path. */
   defaults: ReadonlyMap<string, unknown>;
   /** Surviving option values per path (`filter_options`). */
@@ -30,6 +35,7 @@ export type Overlays = {
 
 export const NO_OVERLAYS: Overlays = {
   hidden: new Set(),
+  disabled: new Set(),
   defaults: new Map(),
   filtered: new Map(),
 };
@@ -95,6 +101,7 @@ function survivesFilter(
 /** The value a path renders and submits, per the layer order above. */
 export function effectiveValue(ctx: ValueContext, path: string): Effective {
   if (ctx.overlays.hidden.has(path)) return ABSENT;
+  if (ctx.overlays.disabled.has(path)) return ABSENT;
 
   const filter = ctx.overlays.filtered.get(path);
   const keep = (value: unknown, origin: EffectiveOrigin): Effective => {

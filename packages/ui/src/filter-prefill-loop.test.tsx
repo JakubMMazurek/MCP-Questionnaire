@@ -132,6 +132,7 @@ describe("the read path's identity (the actual defect)", () => {
     prefill: { focus: { value, source: "inferred" as const } },
     overlays: {
       hidden: new Set<string>(),
+      disabled: new Set<string>(),
       defaults: new Map<string, unknown>(),
       filtered: new Map<string, readonly string[]>([["focus", surviving]]),
     },

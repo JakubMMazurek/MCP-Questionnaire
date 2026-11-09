@@ -471,6 +471,21 @@ body {
     font-size: var(--font-text-sm-size);
   }
 
+  /*
+   * A disabled text/number/date control looked exactly like a live one: same
+   * ground, same border, same ink, and it simply refused to accept a keystroke.
+   * Buttons, tiles, chips and matrix cells all had a disabled face already —
+   * `.field-input` was the one control that did not, so `disable` rendered as
+   * "this input is broken" (field-reported 2026-11-09). Class plus pseudo-class
+   * outranks the plain `.field-input` above, so this needs no extra weight.
+   */
+  .field-input:disabled {
+    background: var(--color-background-disabled);
+    color: var(--color-text-disabled);
+    border-color: var(--color-border-secondary);
+    cursor: not-allowed;
+  }
+
   .note-input {
     font-family: var(--font-serif);
     font-style: italic;
