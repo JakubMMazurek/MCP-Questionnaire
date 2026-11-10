@@ -244,7 +244,9 @@ export const elicitation = {
       needsReview: true,
     },
     tradeoff: { value: 3, source: "default" },
-    effort: { value: { mapping: 40, cleanup: 40, validation: 20 }, source: "default" },
+    "effort[mapping]": { value: 40, source: "default" },
+    "effort[cleanup]": { value: 40, source: "default" },
+    "effort[validation]": { value: 20, source: "default" },
     cutover: {
       value: "2026-09-30",
       source: "inferred",
