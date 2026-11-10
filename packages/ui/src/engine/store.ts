@@ -15,11 +15,11 @@
  * `count_changed` need to know, and what lets a user's edit outrank a default.
  */
 
-import type { Answers, Diagnostic, DisplayMode, Form, Prefill, Value } from "@mcpq/schema";
+import type { Answer, Answers, Diagnostic, DisplayMode, Form, Prefill, Value } from "@mcpq/schema";
 import { validateForm } from "@mcpq/schema";
 import { createStore, type StoreApi } from "zustand/vanilla";
 import type { ComputeContext } from "./computed.js";
-import { sameValue } from "./effective.js";
+import { effectiveValue, sameValue } from "./effective.js";
 import { canonicalPrefill, type Effects, EMPTY_EFFECTS, evaluate } from "./evaluate.js";
 import { formLeaves, type Leaf, repeatablePaths } from "./leaves.js";
 import { canon, mintRowId } from "./paths.js";
@@ -359,13 +359,30 @@ export function createEngineStore(): EngineStore {
 
       setNote: (path, note) => {
         const key = canon(path);
+        const state = get();
         write((answers) => {
           const existing = answers[key];
           const trimmed = note.trim();
           if (!existing) {
-            // A note is an action on the path, so it creates the entry — as an
-            // `empty` answer, which is what a note-only anchor submits (§4.4).
-            return trimmed ? { ...answers, [key]: { state: "empty", note } } : answers;
+            if (!trimmed) return answers;
+            // A note is an action on the path, so it creates the entry — but
+            // creating it must not take the value off the screen. An untouched
+            // path renders its `set_default` overlay or its prefill (§4.6), and
+            // writing a bare `empty` here outranks both: the field the user was
+            // annotating went blank under them, and submitted blank with it.
+            // So the entry carries whatever was rendered, which is exactly what
+            // §4.6 would have submitted for that visible untouched field
+            // anyway. Only where nothing is on screen — no value, or a hidden
+            // or locked path — does the note anchor to an `empty` answer (§4.4
+            // note-only anchor).
+            const effective = effectiveValue(
+              { answers, prefill: state.prefill, overlays: state.effects },
+              key,
+            );
+            const created: Answer = effective.present
+              ? { state: "answered", value: effective.value, note }
+              : { state: "empty", note };
+            return { ...answers, [key]: created };
           }
           const next: Answers = { ...answers };
           if (trimmed) next[key] = { ...existing, note };

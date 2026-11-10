@@ -73,6 +73,54 @@ describe("notes (§4.4)", () => {
     expect(payload.notes[0]?.label).toBe("Rollout targets the EU org only — Verdict");
   });
 
+  it("does not blank the prefilled value it is anchored to", () => {
+    // The bug a field session hit: annotating a field took the text out of the
+    // input under it, for every input tried. A note is a touch, and the entry
+    // the touch creates must carry what was on screen (§4.6) — not a bare
+    // `empty`, which outranks the prefill and submits blank.
+    const store = loaded(assumptionLedger);
+    store.getState().setNote(verdict("r_eu"), "the UK org is in scope too");
+    expect(answersOf(store)[verdict("r_eu")]).toEqual({
+      state: "answered",
+      value: "confirm",
+      note: "the UK org is in scope too",
+    });
+    expect(submit(store).answers[verdict("r_eu")]).toEqual({
+      state: "answered",
+      value: "confirm",
+      note: "the UK org is in scope too",
+    });
+  });
+
+  it("does not blank a defaulted value either", () => {
+    const store = loaded(elicitation);
+    store.getState().setNote("tradeoff", "leaning fast, ask me again after the pilot");
+    expect(submit(store).answers.tradeoff).toEqual({
+      state: "answered",
+      value: 3,
+      note: "leaning fast, ask me again after the pilot",
+    });
+  });
+
+  it("still anchors to an empty answer where no value is on screen", () => {
+    const store = loaded(elicitation);
+    store.getState().setNote("sandbox_name", "whatever Ops called it");
+    expect(answersOf(store).sandbox_name).toEqual({
+      state: "empty",
+      note: "whatever Ops called it",
+    });
+  });
+
+  it("keeps the value when the note is cleared again", () => {
+    const store = loaded(assumptionLedger);
+    store.getState().setNote(verdict("r_eu"), "typed then thought better of it");
+    store.getState().setNote(verdict("r_eu"), "");
+    expect(submit(store).answers[verdict("r_eu")]).toEqual({
+      state: "answered",
+      value: "confirm",
+    });
+  });
+
   it("is removed when the user empties the input", () => {
     const store = loaded(assumptionLedger);
     store.getState().setNote(verdict("r_eu"), "typed");
